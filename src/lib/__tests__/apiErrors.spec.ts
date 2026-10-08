@@ -1,0 +1,29 @@
+import { describe, expect, it } from 'vitest'
+import { AxiosError, AxiosHeaders } from 'axios'
+import { signInError } from '../apiErrors'
+
+const fail = (status: number, data: unknown = {}) =>
+  new AxiosError('fail', 'ERR', undefined, undefined, {
+    status,
+    data,
+    statusText: '',
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+  })
+
+describe('signInError', () => {
+  it('maps each server answer to a sign-in state', () => {
+    expect(signInError(fail(422))).toEqual({ kind: 'invalid' })
+    expect(signInError(fail(403, { errors: { email: ['deactivated'] } }))).toEqual({
+      kind: 'deactivated',
+    })
+    expect(signInError(fail(403, { code: 'tenant_suspended' }))).toEqual({ kind: 'suspended' })
+    expect(signInError(fail(500))).toEqual({ kind: 'generic' })
+    expect(signInError(new Error('offline'))).toEqual({ kind: 'generic' })
+  })
+
+  it('reads the throttle wait time', () => {
+    const error = fail(429, { errors: { email: ['Too many attempts. Try again in 42 seconds.'] } })
+    expect(signInError(error)).toEqual({ kind: 'throttled', seconds: 42 })
+  })
+})

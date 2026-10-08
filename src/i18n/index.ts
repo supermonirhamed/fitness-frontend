@@ -23,16 +23,37 @@ export const i18n = createI18n({
   messages: { en, ar },
   // Western digits in both languages (design system content rules).
   datetimeFormats: {
-    en: { short: { year: 'numeric', month: 'short', day: 'numeric' } },
-    ar: { short: { year: 'numeric', month: 'short', day: 'numeric', numberingSystem: 'latn' } },
+    en: {
+      short: { year: 'numeric', month: 'short', day: 'numeric' },
+      long: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' },
+    },
+    ar: {
+      short: { year: 'numeric', month: 'short', day: 'numeric', numberingSystem: 'latn' },
+      long: {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        numberingSystem: 'latn',
+      },
+    },
   },
 })
 
+export function hasSavedLocale(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) !== null
+  } catch {
+    return false
+  }
+}
+
 /** Switches language and document direction together; RTL is native, not mirrored. */
-export function setLocale(locale: Locale): void {
+export function setLocale(locale: Locale, persist = false): void {
   i18n.global.locale.value = locale
   document.documentElement.lang = locale
   document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
+  if (!persist) return
   try {
     localStorage.setItem(STORAGE_KEY, locale)
   } catch {

@@ -12,6 +12,6 @@ const { t, locale } = useI18n()
     severity="secondary"
     icon="pi pi-globe"
     :label="t('common.language')"
-    @click="setLocale(locale === 'ar' ? 'en' : 'ar')"
+    @click="setLocale(locale === 'ar' ? 'en' : 'ar', true)"
   />
 </template>
