@@ -26,9 +26,24 @@ export const i18n = createI18n({
     en: {
       short: { year: 'numeric', month: 'short', day: 'numeric' },
       long: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' },
+      dateTime: {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      },
     },
     ar: {
       short: { year: 'numeric', month: 'short', day: 'numeric', numberingSystem: 'latn' },
+      dateTime: {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        numberingSystem: 'latn',
+      },
       long: {
         weekday: 'long',
         year: 'numeric',

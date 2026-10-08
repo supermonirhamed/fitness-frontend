@@ -63,6 +63,33 @@ export interface RolesMatrix {
   scopes: AccessScope[]
 }
 
+export interface AuditEntry {
+  id: number
+  created_at: string
+  actor: { id: number; name: string; email: string } | null
+  action: string
+  entity_type: string | null
+  entity_id: string | null
+  entity_label: string | null
+  old_values: Record<string, unknown> | null
+  new_values: Record<string, unknown> | null
+  ip_address: string | null
+}
+
+export interface AuditFilters {
+  actor?: number | null
+  action?: string | null
+  entity_type?: string | null
+  from?: string | null
+  to?: string | null
+}
+
+export interface AuditFilterOptions {
+  actors: { id: number; name: string; email: string }[]
+  actions: string[]
+  entity_types: string[]
+}
+
 export interface RoleInput {
   name?: string
   scope?: AccessScope
@@ -116,6 +143,13 @@ export interface EmailedLink {
 export interface NewPassword {
   password: string
   password_confirmation: string
+}
+
+/** Drops empty filter values so they are not sent as `?actor=`. */
+function cleanParams(params: object): Record<string, string | number> {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v !== null && v !== undefined && v !== ''),
+  )
 }
 
 export const tenantApi = {
@@ -190,6 +224,18 @@ export const tenantApi = {
   },
   async reactivateUser(id: number): Promise<StaffAccess> {
     return (await http.post(`/api/users/${id}/reactivate`)).data.data
+  },
+  async auditLogs(
+    filters: AuditFilters,
+    page: number,
+  ): Promise<{ data: AuditEntry[]; meta: { total: number; per_page: number } }> {
+    return (await http.get('/api/audit-logs', { params: { ...cleanParams(filters), page } })).data
+  },
+  async auditFilterOptions(): Promise<AuditFilterOptions> {
+    return (await http.get('/api/audit-logs/filters')).data.data
+  },
+  auditExportUrl(filters: AuditFilters): string {
+    return `/api/audit-logs/export?${new URLSearchParams(cleanParams(filters) as Record<string, string>)}`
   },
   async roles(): Promise<RolesMatrix> {
     const { data } = await http.get('/api/roles')

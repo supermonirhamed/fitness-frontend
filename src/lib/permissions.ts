@@ -16,6 +16,7 @@ export const SETTINGS_PAGES: SettingsPage[] = [
   { name: 'tenant.settings.users', key: 'users', permission: 'staff.view' },
   { name: 'tenant.settings.roles', key: 'roles', permission: 'roles.view' },
   { name: 'tenant.settings.security', key: 'security', permission: 'settings.security' },
+  { name: 'tenant.settings.audit', key: 'audit', permission: 'audit.view' },
 ]
 
 export function allowedSettingsPages(can: (permission: string) => boolean): SettingsPage[] {

@@ -94,6 +94,12 @@ const tenantRoutes: RouteRecordRaw[] = [
             component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),
             meta: { permission: 'settings.security' },
           },
+          {
+            path: 'audit',
+            name: 'tenant.settings.audit',
+            component: () => import('@/views/tenant/settings/AuditLogView.vue'),
+            meta: { permission: 'audit.view' },
+          },
         ],
       },
       {
