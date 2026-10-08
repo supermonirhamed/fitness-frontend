@@ -124,6 +124,7 @@ export default {
     title: 'Settings',
     subtitle: 'How your organization works and who can do what.',
     pages: {
+      locations: 'Branches',
       users: 'Users & access',
       roles: 'Roles & permissions',
       security: 'Security',
@@ -320,6 +321,31 @@ export default {
       filters: 'Filters',
       deleted_at: 'Archived',
     },
+  },
+  archive: {
+    filter: 'Show active or archived',
+    active: 'Active',
+    archived: 'Archived',
+    archive: 'Archive',
+    restore: 'Restore',
+    archivedOn: 'Archived on',
+    archiveTitle: 'Archive {name}?',
+    restoreTitle: 'Restore {name}?',
+    noneArchived: 'Nothing archived',
+    noneArchivedHint: 'Archived records appear here and can be restored.',
+    archivedToast: '{name} archived',
+    restoredToast: '{name} restored',
+  },
+  locationsPage: {
+    intro:
+      'Branches of your organization. Adding and editing branches comes with branch management.',
+    loadError: "Branches couldn't be loaded.",
+    empty: 'No branches yet',
+    emptyHint: 'Branches will appear here once they are added.',
+    columns: { name: 'Branch' },
+    archiveDescription:
+      'It disappears from lists and pickers, and staff lose access to it. Its history stays, and you can restore it any time.',
+    restoreDescription: 'It is back in lists, and staff who were assigned to it get access again.',
   },
   tenantApp: {
     signIn: {

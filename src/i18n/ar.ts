@@ -125,6 +125,7 @@ const ar: typeof en = {
     title: 'الإعدادات',
     subtitle: 'طريقة عمل منظمتك ومن يمكنه فعل ماذا.',
     pages: {
+      locations: 'الفروع',
       users: 'المستخدمون والوصول',
       roles: 'الأدوار والصلاحيات',
       security: 'الأمان',
@@ -327,6 +328,30 @@ const ar: typeof en = {
       filters: 'الفلاتر',
       deleted_at: 'مؤرشف',
     },
+  },
+  archive: {
+    filter: 'عرض النشطة أو المؤرشفة',
+    active: 'نشطة',
+    archived: 'مؤرشفة',
+    archive: 'أرشفة',
+    restore: 'استعادة',
+    archivedOn: 'تاريخ الأرشفة',
+    archiveTitle: 'أرشفة {name}؟',
+    restoreTitle: 'استعادة {name}؟',
+    noneArchived: 'لا يوجد شيء مؤرشف',
+    noneArchivedHint: 'تظهر السجلات المؤرشفة هنا ويمكن استعادتها.',
+    archivedToast: 'تمت أرشفة {name}',
+    restoredToast: 'تمت استعادة {name}',
+  },
+  locationsPage: {
+    intro: 'فروع منظمتك. إضافة الفروع وتعديلها تأتي مع إدارة الفروع.',
+    loadError: 'تعذّر تحميل الفروع.',
+    empty: 'لا توجد فروع بعد',
+    emptyHint: 'ستظهر الفروع هنا بعد إضافتها.',
+    columns: { name: 'الفرع' },
+    archiveDescription:
+      'سيختفي من القوائم وخيارات الاختيار، ويفقد الموظفون الوصول إليه. يبقى سجله، ويمكنك استعادته في أي وقت.',
+    restoreDescription: 'سيعود إلى القوائم، ويستعيد الموظفون المعيّنون عليه الوصول.',
   },
   tenantApp: {
     signIn: {

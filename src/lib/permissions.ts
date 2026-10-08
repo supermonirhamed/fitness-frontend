@@ -13,6 +13,7 @@ export interface SettingsPage {
 
 /** Settings sub-pages, in menu order, with the permission each needs. */
 export const SETTINGS_PAGES: SettingsPage[] = [
+  { name: 'tenant.settings.locations', key: 'locations', permission: 'locations.view' },
   { name: 'tenant.settings.users', key: 'users', permission: 'staff.view' },
   { name: 'tenant.settings.roles', key: 'roles', permission: 'roles.view' },
   { name: 'tenant.settings.security', key: 'security', permission: 'settings.security' },

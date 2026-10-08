@@ -24,6 +24,7 @@ export interface StaffUser {
 export interface Location {
   id: number
   name: string
+  archived_at?: string | null
 }
 
 export interface StaffAccess {
@@ -207,8 +208,15 @@ export const tenantApi = {
       return (await http.delete('/api/account/two-factor', { data: { password } })).data.data
     },
   },
-  async locations(): Promise<Location[]> {
-    return (await http.get('/api/locations')).data.data
+  /** Active branches, or archived ones (needs locations.delete). */
+  async locations(archived = false): Promise<Location[]> {
+    return (await http.get('/api/locations', { params: archived ? { archived: 1 } : {} })).data.data
+  },
+  async archiveLocation(id: number): Promise<void> {
+    await http.delete(`/api/locations/${id}`)
+  },
+  async restoreLocation(id: number): Promise<Location> {
+    return (await http.post(`/api/locations/${id}/restore`)).data.data
   },
   async users(): Promise<StaffAccess[]> {
     return (await http.get('/api/users')).data.data

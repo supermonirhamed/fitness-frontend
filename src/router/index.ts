@@ -77,6 +77,12 @@ const tenantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/tenant/settings/SettingsLayout.vue'),
         children: [
           {
+            path: 'locations',
+            name: 'tenant.settings.locations',
+            component: () => import('@/views/tenant/settings/LocationsView.vue'),
+            meta: { permission: 'locations.view' },
+          },
+          {
             path: 'users',
             name: 'tenant.settings.users',
             component: () => import('@/views/tenant/settings/UsersAccessView.vue'),
