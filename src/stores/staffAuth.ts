@@ -7,6 +7,12 @@ export const useStaffAuth = defineStore('staffAuth', () => {
   const user = ref<StaffUser | null>(null)
   const checked = ref(false)
   const signedIn = computed(() => user.value !== null)
+  const permissions = computed(() => new Set(user.value?.permissions ?? []))
+
+  /** True when the user has every given permission (US-00.07). */
+  function can(...required: string[]): boolean {
+    return required.every((p) => permissions.value.has(p))
+  }
 
   /** Loads the signed-in user once; `refresh` reloads it (e.g. after a security setting changed). */
   async function check(refresh = false): Promise<boolean> {
@@ -58,5 +64,5 @@ export const useStaffAuth = defineStore('staffAuth', () => {
     checked.value = true
   }
 
-  return { user, checked, signedIn, check, login, challenge, adopt, logout, forget }
+  return { user, checked, signedIn, can, check, login, challenge, adopt, logout, forget }
 })

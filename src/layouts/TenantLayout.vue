@@ -7,6 +7,7 @@ import AppSidebar, { type NavItem } from '@/components/shell/AppSidebar.vue'
 import AppHeader from '@/components/shell/AppHeader.vue'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
+import { allowedSettingsPages } from '@/lib/permissions'
 
 const { t, te, locale } = useI18n()
 const org = useOrganization()
@@ -16,9 +17,9 @@ const router = useRouter()
 // Items are added as their stories ship (Calendar, Bookings, Clients, …) and filtered by permission (US-00.07).
 const nav = computed<NavItem[]>(() => [
   { key: 'today', icon: 'pi-sun', to: '/', exact: true },
-  // Owner only until role permissions arrive (US-00.07); the API enforces it either way.
-  ...(auth.user?.roles.includes('Organization Owner')
-    ? [{ key: 'settings', icon: 'pi-cog', to: '/settings/security' }]
+  // Shown when the user can open at least one settings page (US-00.07).
+  ...(allowedSettingsPages((p) => auth.can(p)).length
+    ? [{ key: 'settings', icon: 'pi-cog', to: '/settings' }]
     : []),
 ])
 

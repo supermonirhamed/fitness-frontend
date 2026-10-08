@@ -14,6 +14,26 @@ export interface StaffUser {
   roles: string[]
   two_factor_enabled: boolean
   two_factor_required: boolean
+  /** Effective permissions (module.action), for hiding what the user can't do. The API checks anyway. */
+  permissions: string[]
+  scope: AccessScope
+}
+
+/** Where a role's permissions apply: whole organization, assigned branches, or own sessions and clients. */
+export type AccessScope = 'organization' | 'locations' | 'own'
+
+export interface RoleSummary {
+  name: string
+  system: boolean
+  scope: AccessScope
+  users_count: number
+  permissions: string[]
+}
+
+export interface RolesMatrix {
+  roles: RoleSummary[]
+  /** module => actions, in display order */
+  modules: Record<string, string[]>
 }
 
 /** The password was right but the account uses 2FA: answer with twoFactorChallenge(). */
@@ -119,6 +139,10 @@ export const tenantApi = {
     async disable(password: string): Promise<TwoFactorStatus> {
       return (await http.delete('/api/account/two-factor', { data: { password } })).data.data
     },
+  },
+  async roles(): Promise<RolesMatrix> {
+    const { data } = await http.get('/api/roles')
+    return { roles: data.data, modules: data.modules }
   },
   security: {
     async get(): Promise<SecuritySettings> {

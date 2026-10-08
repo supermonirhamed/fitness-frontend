@@ -7,7 +7,6 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
-import PageHeader from '@/components/patterns/PageHeader.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import { tenantApi } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
@@ -72,11 +71,6 @@ async function save() {
 
 <template>
   <div class="settings">
-    <PageHeader
-      :title="t('tenantApp.securitySettings.title')"
-      :subtitle="t('tenantApp.securitySettings.subtitle')"
-    />
-
     <section class="card">
       <div
         v-if="state === 'loading'"

@@ -1,0 +1,22 @@
+/** Actions shown as matrix columns; every other action of a module is a special one (e.g. refund, override). */
+export const STANDARD_ACTIONS = ['view', 'create', 'update', 'delete'] as const
+
+export function specialActions(actions: string[]): string[] {
+  return actions.filter((a) => !(STANDARD_ACTIONS as readonly string[]).includes(a))
+}
+
+export interface SettingsPage {
+  name: string
+  key: string
+  permission: string
+}
+
+/** Settings sub-pages, in menu order, with the permission each needs. */
+export const SETTINGS_PAGES: SettingsPage[] = [
+  { name: 'tenant.settings.roles', key: 'roles', permission: 'roles.view' },
+  { name: 'tenant.settings.security', key: 'security', permission: 'settings.security' },
+]
+
+export function allowedSettingsPages(can: (permission: string) => boolean): SettingsPage[] {
+  return SETTINGS_PAGES.filter((page) => can(page.permission))
+}

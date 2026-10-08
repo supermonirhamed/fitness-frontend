@@ -4,6 +4,7 @@ import { usePlatformAuth } from '@/stores/platformAuth'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
 import { onUnauthenticated } from '@/lib/http'
+import { allowedSettingsPages } from '@/lib/permissions'
 
 const context = resolveAppContext(window.location.hostname)
 
@@ -71,9 +72,28 @@ const tenantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/tenant/account/SecurityView.vue'),
       },
       {
-        path: 'settings/security',
-        name: 'tenant.settings.security',
-        component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),
+        path: 'settings',
+        name: 'tenant.settings',
+        component: () => import('@/views/tenant/settings/SettingsLayout.vue'),
+        children: [
+          {
+            path: 'roles',
+            name: 'tenant.settings.roles',
+            component: () => import('@/views/tenant/settings/RolesView.vue'),
+            meta: { permission: 'roles.view' },
+          },
+          {
+            path: 'security',
+            name: 'tenant.settings.security',
+            component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),
+            meta: { permission: 'settings.security' },
+          },
+        ],
+      },
+      {
+        path: 'forbidden',
+        name: 'tenant.forbidden',
+        component: () => import('@/views/tenant/ForbiddenView.vue'),
       },
     ],
   },
@@ -108,9 +128,20 @@ if (context.kind === 'tenant') {
     if (signedIn && to.meta.guest) return { name: 'tenant.today' }
 
     // A role that requires 2FA (US-00.06): nothing else until it is set up. The API enforces this too.
-    const user = useStaffAuth().user
+    const auth = useStaffAuth()
+    const user = auth.user
     if (user?.two_factor_required && !user.two_factor_enabled && to.name !== 'tenant.security')
       return { name: 'tenant.security', query: { required: '1' } }
+
+    // Pages the role can't open (US-00.07). Hiding links is not enough: the API refuses too.
+    if (to.name === 'tenant.settings') {
+      const first = allowedSettingsPages((p) => auth.can(p))[0]
+      return first ? { name: first.name } : { name: 'tenant.forbidden' }
+    }
+    const missing = to.matched.find(
+      (r) => r.meta.permission && !auth.can(r.meta.permission as string),
+    )
+    if (missing) return { name: 'tenant.forbidden' }
   })
 
   // A session that ends server-side (expired, deactivated) sends the user back to sign in.
