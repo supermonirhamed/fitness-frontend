@@ -6,61 +6,94 @@ export type Locale = 'ar' | 'en'
 
 const STORAGE_KEY = 'locale'
 
-function initialLocale(): Locale {
+function savedLocale(): Locale | null {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === 'ar' || saved === 'en') return saved
+    return saved === 'ar' || saved === 'en' ? saved : null
   } catch {
-    // storage unavailable — fall through to the default
+    return null // storage unavailable
   }
-  return 'ar' // Arabic is the primary language
+}
+
+/**
+ * Which language to show (US-00.13): a signed-in user's own choice, else the organization's
+ * default; before sign-in, the last choice made in this browser, else the organization's default.
+ * Arabic is the primary language.
+ */
+export function resolveLocale(options: {
+  signedIn: boolean
+  user?: Locale | null
+  saved?: Locale | null
+  organization?: Locale | null
+}): Locale {
+  const own = options.signedIn ? options.user : options.saved
+  return own ?? options.organization ?? 'ar'
+}
+
+/** Date formats in the organization's timezone (D4: branches get their own later). Western digits in both languages. */
+function datetimeFormats(timeZone?: string) {
+  const zone = timeZone ? { timeZone } : {}
+  const formats = {
+    short: { year: 'numeric', month: 'short', day: 'numeric', ...zone },
+    long: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', ...zone },
+    dateTime: {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      ...zone,
+    },
+    time: { hour: 'numeric', minute: '2-digit', ...zone },
+  } as const
+  const latn = Object.fromEntries(
+    Object.entries(formats).map(([name, f]) => [name, { ...f, numberingSystem: 'latn' }]),
+  )
+  return { en: formats, ar: latn }
+}
+
+/** Number formats; `currency` uses the organization's currency. */
+function numberFormats(currency = 'SAR') {
+  const formats = {
+    currency: { style: 'currency', currency, currencyDisplay: 'symbol' },
+    decimal: { style: 'decimal', maximumFractionDigits: 2 },
+    integer: { style: 'decimal', maximumFractionDigits: 0 },
+    percent: { style: 'percent', maximumFractionDigits: 1 },
+  } as const
+  const latn = Object.fromEntries(
+    Object.entries(formats).map(([name, f]) => [name, { ...f, numberingSystem: 'latn' }]),
+  )
+  return { en: formats, ar: latn }
 }
 
 export const i18n = createI18n({
   legacy: false,
-  locale: initialLocale(),
+  locale: savedLocale() ?? 'ar',
   fallbackLocale: 'en',
   messages: { en, ar },
-  // Western digits in both languages (design system content rules).
-  datetimeFormats: {
-    en: {
-      short: { year: 'numeric', month: 'short', day: 'numeric' },
-      long: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' },
-      dateTime: {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      },
-    },
-    ar: {
-      short: { year: 'numeric', month: 'short', day: 'numeric', numberingSystem: 'latn' },
-      dateTime: {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        numberingSystem: 'latn',
-      },
-      long: {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        numberingSystem: 'latn',
-      },
-    },
-  },
+  datetimeFormats: datetimeFormats(),
+  numberFormats: numberFormats(),
 })
 
-export function hasSavedLocale(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) !== null
-  } catch {
-    return false
+/** Formats dates in the organization's timezone and money in its currency. */
+export function applyOrganizationFormats(organization: {
+  timezone?: string
+  currency?: string
+}): void {
+  const dates = datetimeFormats(organization.timezone)
+  const numbers = numberFormats(organization.currency)
+  for (const locale of ['en', 'ar'] as const) {
+    i18n.global.setDateTimeFormat(locale, dates[locale])
+    i18n.global.setNumberFormat(locale, numbers[locale])
   }
+}
+
+export function hasSavedLocale(): boolean {
+  return savedLocale() !== null
+}
+
+export function currentLocale(): Locale {
+  return i18n.global.locale.value as Locale
 }
 
 /** Switches language and document direction together; RTL is native, not mirrored. */

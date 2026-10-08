@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { tenantApi, type Organization } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
-import { hasSavedLocale, setLocale } from '@/i18n'
+import { applyOrganizationFormats, hasSavedLocale, setLocale } from '@/i18n'
 
 export type OrganizationState =
   'unknown' | 'ready' | 'suspended' | 'notFound' | 'unavailable' | 'error'
@@ -17,7 +17,8 @@ export const useOrganization = defineStore('organization', () => {
     try {
       organization.value = await tenantApi.organization()
       state.value = 'ready'
-      if (!hasSavedLocale()) setLocale(organization.value.locale) // org default until the user picks one
+      applyOrganizationFormats(organization.value)
+      if (!hasSavedLocale()) setLocale(organization.value.locale) // org default until someone picks one
     } catch (e) {
       const byStatus = { 403: 'suspended', 404: 'notFound', 503: 'unavailable' } as const
       state.value = byStatus[statusOf(e) as keyof typeof byStatus] ?? 'error'

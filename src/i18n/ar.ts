@@ -114,6 +114,7 @@ const ar: typeof en = {
     collapse: 'طي القائمة',
     expand: 'توسيع القائمة',
     security: 'الأمان',
+    profile: 'الملف الشخصي',
     nav: { today: 'اليوم', settings: 'الإعدادات' },
   },
   today: {
@@ -352,6 +353,17 @@ const ar: typeof en = {
     archiveDescription:
       'سيختفي من القوائم وخيارات الاختيار، ويفقد الموظفون الوصول إليه. يبقى سجله، ويمكنك استعادته في أي وقت.',
     restoreDescription: 'سيعود إلى القوائم، ويستعيد الموظفون المعيّنون عليه الوصول.',
+  },
+  profile: {
+    title: 'الملف الشخصي',
+    subtitle: 'حسابك وتفضيلاتك.',
+    account: 'الحساب',
+    name: 'الاسم',
+    language: 'اللغة',
+    languageHint: 'يستخدم التطبيق والرسائل هذه اللغة. تُعرض العربية من اليمين إلى اليسار.',
+    organizationDefault: 'لغة المنظمة ({language})',
+    languages: { ar: 'العربية', en: 'الإنجليزية' },
+    saved: 'تم حفظ الملف الشخصي',
   },
   tenantApp: {
     signIn: {

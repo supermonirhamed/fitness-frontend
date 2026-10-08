@@ -112,6 +112,7 @@ export default {
     collapse: 'Collapse',
     expand: 'Expand sidebar',
     security: 'Security',
+    profile: 'Profile',
     nav: { today: 'Today', settings: 'Settings' },
   },
   today: {
@@ -346,6 +347,17 @@ export default {
     archiveDescription:
       'It disappears from lists and pickers, and staff lose access to it. Its history stays, and you can restore it any time.',
     restoreDescription: 'It is back in lists, and staff who were assigned to it get access again.',
+  },
+  profile: {
+    title: 'Profile',
+    subtitle: 'Your account and preferences.',
+    account: 'Account',
+    name: 'Name',
+    language: 'Language',
+    languageHint: 'The app, emails and messages use this language. Arabic is shown right-to-left.',
+    organizationDefault: "Organization's language ({language})",
+    languages: { ar: 'Arabic', en: 'English' },
+    saved: 'Profile saved',
   },
   tenantApp: {
     signIn: {

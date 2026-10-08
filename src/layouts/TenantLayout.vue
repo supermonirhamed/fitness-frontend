@@ -25,6 +25,11 @@ const nav = computed<NavItem[]>(() => [
 
 const userMenu = computed(() => [
   {
+    label: t('shell.profile'),
+    icon: 'pi pi-user',
+    command: () => router.push({ name: 'tenant.profile' }),
+  },
+  {
     label: t('shell.security'),
     icon: 'pi pi-shield',
     command: () => router.push({ name: 'tenant.security' }),

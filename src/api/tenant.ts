@@ -4,6 +4,8 @@ export interface Organization {
   name: string
   slug: string
   locale: 'ar' | 'en'
+  currency: string
+  timezone: string
 }
 
 export interface StaffUser {
@@ -170,6 +172,10 @@ export const tenantApi = {
   },
   async logout(): Promise<void> {
     await http.post('/api/auth/logout')
+  },
+  /** null: follow the organization's language. */
+  async updateProfile(profile: { locale: 'ar' | 'en' | null }): Promise<StaffUser> {
+    return (await http.put('/api/account/profile', profile)).data.data
   },
   async forgotPassword(email: string): Promise<void> {
     await csrfCookie()

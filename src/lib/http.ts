@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios'
+import { currentLocale } from '@/i18n'
 
 // Same-origin in dev (Vite proxies /api and /sanctum), so Sanctum SPA cookie auth just works.
 export const http = axios.create({
@@ -6,6 +7,12 @@ export const http = axios.create({
   withCredentials: true,
   withXSRFToken: true,
   headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+})
+
+// The API answers validation and error messages in the language on screen (US-00.13).
+http.interceptors.request.use((config) => {
+  config.headers.set('Accept-Language', currentLocale())
+  return config
 })
 
 const unauthenticatedHandlers: Array<() => void> = []

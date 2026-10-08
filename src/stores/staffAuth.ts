@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { needsTwoFactor, tenantApi, type SecondFactor, type StaffUser } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
+import { resolveLocale, setLocale } from '@/i18n'
+import { useOrganization } from '@/stores/organization'
 
 export const useStaffAuth = defineStore('staffAuth', () => {
   const user = ref<StaffUser | null>(null)
@@ -19,6 +21,7 @@ export const useStaffAuth = defineStore('staffAuth', () => {
     if (!checked.value || refresh) {
       try {
         user.value = await tenantApi.me()
+        applyUserLocale()
       } catch (e) {
         if (statusOf(e) !== 401) throw e
         user.value = null
@@ -48,6 +51,14 @@ export const useStaffAuth = defineStore('staffAuth', () => {
   function adopt(signedInUser: StaffUser) {
     user.value = signedInUser
     checked.value = true
+    applyUserLocale()
+  }
+
+  /** The user's own language, else the organization's (US-00.13). */
+  function applyUserLocale() {
+    if (!user.value) return
+    const organization = useOrganization().organization?.locale ?? null
+    setLocale(resolveLocale({ signedIn: true, user: user.value.locale, organization }), true)
   }
 
   async function logout() {
