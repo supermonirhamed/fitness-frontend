@@ -3,19 +3,22 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
+import Menu from 'primevue/menu'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import LocationAccessDialog from '@/components/roles/LocationAccessDialog.vue'
 import { tenantApi, type Location, type StaffAccess } from '@/api/tenant'
 import { errorCode } from '@/lib/apiErrors'
 import { statusOf } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
 
-const { t, te } = useI18n()
+const { t, te, d } = useI18n()
 const toast = useToast()
 const auth = useStaffAuth()
 
@@ -41,6 +44,15 @@ async function load() {
 }
 onMounted(load)
 
+// Deactivated staff stay in the list for history, hidden unless asked for (US-00.10).
+const showDeactivated = ref(false)
+const deactivatedCount = computed(
+  () => users.value.filter((u) => u.status === 'Deactivated').length,
+)
+const visibleUsers = computed(() =>
+  showDeactivated.value ? users.value : users.value.filter((u) => u.status !== 'Deactivated'),
+)
+
 function branchesOf(user: StaffAccess): string[] {
   return user.location_ids.map((id) => locationName.value.get(id) ?? `#${id}`)
 }
@@ -51,6 +63,8 @@ const dialogOpen = ref(false)
 const saving = ref(false)
 const saveError = ref<string | null>(null)
 const canEdit = computed(() => auth.can('staff.update'))
+const canChangeStatus = (user: StaffAccess) =>
+  auth.can('staff.delete') && !user.owner && !user.is_me
 
 function edit(user: StaffAccess) {
   editing.value = user
@@ -78,6 +92,77 @@ async function save(access: { all_locations: boolean; location_ids: number[] }) 
   } finally {
     saving.value = false
   }
+}
+
+// ---- Deactivate / reactivate ----
+const statusTarget = ref<StaffAccess | null>(null)
+const statusOpen = ref(false)
+const statusBusy = ref(false)
+const statusError = ref<string | null>(null)
+
+function askStatus(user: StaffAccess) {
+  statusTarget.value = user
+  statusError.value = null
+  statusOpen.value = true
+}
+
+async function changeStatus() {
+  const user = statusTarget.value
+  if (!user) return
+  statusBusy.value = true
+  statusError.value = null
+  try {
+    const updated = await (user.status === 'Deactivated'
+      ? tenantApi.reactivateUser(user.id)
+      : tenantApi.deactivateUser(user.id))
+    users.value = users.value.map((u) => (u.id === updated.id ? updated : u))
+    statusOpen.value = false
+    toast.add({
+      severity: 'success',
+      summary: t(
+        updated.status === 'Deactivated' ? 'access.deactivatedToast' : 'access.reactivatedToast',
+        {
+          name: updated.name,
+        },
+      ),
+      life: 4000,
+    })
+  } catch {
+    statusError.value = t('common.genericError')
+  } finally {
+    statusBusy.value = false
+  }
+}
+
+// ---- Row menu ----
+const rowMenu = ref<InstanceType<typeof Menu>>()
+const menuUser = ref<StaffAccess | null>(null)
+const menuItems = computed(() => {
+  const user = menuUser.value
+  if (!user) return []
+  return [
+    ...(canEdit.value && user.status !== 'Deactivated'
+      ? [{ label: t('access.edit'), icon: 'pi pi-map-marker', command: () => edit(user) }]
+      : []),
+    ...(canChangeStatus(user)
+      ? [
+          user.status === 'Deactivated'
+            ? {
+                label: t('access.reactivate'),
+                icon: 'pi pi-replay pi-dir',
+                command: () => askStatus(user),
+              }
+            : { label: t('access.deactivate'), icon: 'pi pi-ban', command: () => askStatus(user) },
+        ]
+      : []),
+  ]
+})
+const hasActions = (user: StaffAccess) =>
+  !user.owner && ((canEdit.value && user.status !== 'Deactivated') || canChangeStatus(user))
+
+function openMenu(event: Event, user: StaffAccess) {
+  menuUser.value = user
+  rowMenu.value?.toggle(event)
 }
 </script>
 
@@ -119,9 +204,19 @@ async function save(access: { all_locations: boolean; location_ids: number[] }) 
         <Message v-if="!locations.length" severity="info" :closable="false">{{
           t('access.noLocations')
         }}</Message>
+        <label v-if="deactivatedCount" class="toggle">
+          <Checkbox v-model="showDeactivated" binary input-id="show-deactivated" />
+          <span>{{ t('access.showDeactivated', { count: deactivatedCount }) }}</span>
+        </label>
       </div>
 
-      <DataTable :value="users" data-key="id" size="small" scrollable>
+      <DataTable
+        :value="visibleUsers"
+        data-key="id"
+        size="small"
+        scrollable
+        :row-class="(row: StaffAccess) => (row.status === 'Deactivated' ? 'row--deactivated' : '')"
+      >
         <template #empty>
           <EmptyState icon="pi-users" :title="t('access.empty')" />
         </template>
@@ -149,6 +244,9 @@ async function save(access: { all_locations: boolean; location_ids: number[] }) 
               :severity="STATUS_SEVERITY[data.status as keyof typeof STATUS_SEVERITY]"
               :value="t(`access.status.${data.status}`)"
             />
+            <div v-if="data.deactivated_at" class="sub">
+              {{ d(new Date(data.deactivated_at), 'short') }}
+            </div>
           </template>
         </Column>
         <Column :header="t('access.columns.locations')">
@@ -175,20 +273,53 @@ async function save(access: { all_locations: boolean; location_ids: number[] }) 
           <template #body="{ data }">
             <div class="actions">
               <Button
-                v-if="canEdit && !data.owner"
+                v-if="hasActions(data)"
+                icon="pi pi-ellipsis-v"
                 size="small"
                 variant="text"
-                icon="pi pi-map-marker"
-                :label="t('access.edit')"
-                @click="edit(data)"
+                severity="secondary"
+                :aria-label="t('access.actions', { name: data.name })"
+                aria-haspopup="true"
+                aria-controls="user-row-menu"
+                @click="openMenu($event, data)"
               />
               <span v-else-if="data.owner" class="muted small">{{ t('access.ownerLocked') }}</span>
+              <span v-else-if="data.is_me" class="muted small">{{ t('access.you') }}</span>
             </div>
           </template>
         </Column>
       </DataTable>
     </template>
 
+    <Menu id="user-row-menu" ref="rowMenu" :model="menuItems" popup />
+    <ConfirmActionDialog
+      v-if="statusTarget"
+      v-model:visible="statusOpen"
+      :title="
+        t(
+          statusTarget.status === 'Deactivated'
+            ? 'access.reactivateTitle'
+            : 'access.deactivateTitle',
+          {
+            name: statusTarget.name,
+          },
+        )
+      "
+      :description="
+        t(
+          statusTarget.status === 'Deactivated'
+            ? 'access.reactivateDescription'
+            : 'access.deactivateDescription',
+        )
+      "
+      :confirm-label="
+        t(statusTarget.status === 'Deactivated' ? 'access.reactivate' : 'access.deactivate')
+      "
+      :destructive="statusTarget.status !== 'Deactivated'"
+      :loading="statusBusy"
+      :error="statusError"
+      @confirm="changeStatus"
+    />
     <LocationAccessDialog
       v-model:visible="dialogOpen"
       :user="editing"
@@ -256,5 +387,16 @@ async function save(access: { all_locations: boolean; location_ids: number[] }) 
 .actions {
   display: flex;
   justify-content: flex-end;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-small);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+:deep(.row--deactivated) td {
+  color: var(--text-muted);
 }
 </style>

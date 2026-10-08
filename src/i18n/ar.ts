@@ -253,6 +253,18 @@ const ar: typeof en = {
     dialogTitle: 'فروع {name}',
     notAllowed: 'يمكنك منح الوصول فقط إلى الفروع التي تعمل بها.',
     savedToast: 'تم تحديث فروع {name}',
+    deactivate: 'تعطيل',
+    reactivate: 'إعادة التفعيل',
+    actions: 'إجراءات {name}',
+    you: 'أنت',
+    showDeactivated: 'عرض المعطّلين ({count})',
+    deactivateTitle: 'تعطيل {name}؟',
+    deactivateDescription:
+      'سيتم تسجيل خروجه من كل مكان فورًا ولن يتمكن من تسجيل الدخول. يبقى سجله (الحصص التي درّبها والمدفوعات التي استلمها) كما هو.',
+    reactivateTitle: 'إعادة تفعيل {name}؟',
+    reactivateDescription: 'يمكنه تسجيل الدخول مجددًا بكلمة المرور والأدوار الحالية.',
+    deactivatedToast: 'تم تعطيل {name}',
+    reactivatedToast: 'أصبح {name} نشطًا مجددًا',
   },
   tenantApp: {
     signIn: {

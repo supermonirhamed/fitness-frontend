@@ -31,6 +31,8 @@ export interface StaffAccess {
   name: string
   email: string
   status: 'Invited' | 'Active' | 'Deactivated'
+  deactivated_at: string | null
+  is_me: boolean
   roles: string[]
   scope: AccessScope
   owner: boolean
@@ -182,6 +184,12 @@ export const tenantApi = {
     access: { all_locations: boolean; location_ids: number[] },
   ): Promise<StaffAccess> {
     return (await http.put(`/api/users/${id}/locations`, access)).data.data
+  },
+  async deactivateUser(id: number): Promise<StaffAccess> {
+    return (await http.post(`/api/users/${id}/deactivate`)).data.data
+  },
+  async reactivateUser(id: number): Promise<StaffAccess> {
+    return (await http.post(`/api/users/${id}/reactivate`)).data.data
   },
   async roles(): Promise<RolesMatrix> {
     const { data } = await http.get('/api/roles')

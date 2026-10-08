@@ -252,6 +252,18 @@ export default {
     dialogTitle: 'Branches for {name}',
     notAllowed: 'You can only give access to branches you work at.',
     savedToast: 'Branches updated for {name}',
+    deactivate: 'Deactivate',
+    reactivate: 'Reactivate',
+    actions: 'Actions for {name}',
+    you: 'You',
+    showDeactivated: 'Show deactivated ({count})',
+    deactivateTitle: 'Deactivate {name}?',
+    deactivateDescription:
+      'They are signed out everywhere right away and can no longer sign in. Their history (sessions taught, payments taken) stays.',
+    reactivateTitle: 'Reactivate {name}?',
+    reactivateDescription: 'They can sign in again with their existing password and roles.',
+    deactivatedToast: '{name} is deactivated',
+    reactivatedToast: '{name} is active again',
   },
   tenantApp: {
     signIn: {
