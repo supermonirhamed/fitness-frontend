@@ -125,6 +125,7 @@ export default {
     title: 'Settings',
     subtitle: 'How your organization works and who can do what.',
     pages: {
+      regional: 'Regional',
       locations: 'Branches',
       users: 'Users & access',
       roles: 'Roles & permissions',
@@ -343,7 +344,7 @@ export default {
     loadError: "Branches couldn't be loaded.",
     empty: 'No branches yet',
     emptyHint: 'Branches will appear here once they are added.',
-    columns: { name: 'Branch' },
+    columns: { name: 'Branch', timezone: 'Timezone' },
     archiveDescription:
       'It disappears from lists and pickers, and staff lose access to it. Its history stays, and you can restore it any time.',
     restoreDescription: 'It is back in lists, and staff who were assigned to it get access again.',
@@ -358,6 +359,35 @@ export default {
     organizationDefault: "Organization's language ({language})",
     languages: { ar: 'Arabic', en: 'English' },
     saved: 'Profile saved',
+  },
+  regional: {
+    intro:
+      'How money, dates and times appear across your organization. Each branch keeps its own timezone.',
+    readOnly: 'Only people who can change settings can edit these.',
+    loadError: "Regional settings couldn't be loaded.",
+    currency: 'Currency',
+    currencyHint: 'Fixed once the first payment or invoice is recorded.',
+    currencyLocked: 'The currency is fixed because payments or invoices already exist.',
+    timezone: 'Default timezone',
+    timezoneHint:
+      'Used for new branches and organization-wide screens. Existing branches keep theirs.',
+    language: 'Default language',
+    languageHint: 'For people who have not chosen a language, and for emails.',
+    weekStart: 'Week starts on',
+    dateFormat: 'Date format',
+    timeFormat: 'Time format',
+    clock: { '12h': '12-hour', '24h': '24-hour' },
+    days: {
+      sunday: 'Sunday',
+      monday: 'Monday',
+      tuesday: 'Tuesday',
+      wednesday: 'Wednesday',
+      thursday: 'Thursday',
+      friday: 'Friday',
+      saturday: 'Saturday',
+    },
+    invalid: 'Check the highlighted settings.',
+    saved: 'Regional settings saved',
   },
   tenantApp: {
     signIn: {

@@ -17,8 +17,10 @@ import {
 import { statusOf } from '@/lib/http'
 import { actionKey, fieldChanges, isoDay } from '@/lib/audit'
 import { useStaffAuth } from '@/stores/staffAuth'
+import { useFormat } from '@/composables/useFormat'
 
-const { t, te, d } = useI18n()
+const { t, te } = useI18n()
+const fmt = useFormat()
 const auth = useStaffAuth()
 
 const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
@@ -268,7 +270,7 @@ function summary(entry: AuditEntry): string {
       <Column expander class="expander-col" />
       <Column :header="t('audit.columns.time')">
         <template #body="{ data }">
-          <span class="num nowrap">{{ d(new Date(data.created_at), 'dateTime') }}</span>
+          <span class="num nowrap">{{ fmt.dateTime(data.created_at) }}</span>
         </template>
       </Column>
       <Column :header="t('audit.columns.actor')">

@@ -6,6 +6,19 @@ export interface Organization {
   locale: 'ar' | 'en'
   currency: string
   timezone: string
+  date_format: string
+  time_format: '12h' | '24h'
+  /** 0 = Sunday … 6 = Saturday */
+  week_start: number
+}
+
+export interface RegionalSettings {
+  currency: string
+  timezone: string
+  locale: 'ar' | 'en'
+  date_format: string
+  time_format: '12h' | '24h'
+  week_start: number
 }
 
 export interface StaffUser {
@@ -26,6 +39,7 @@ export interface StaffUser {
 export interface Location {
   id: number
   name: string
+  timezone: string
   archived_at?: string | null
 }
 
@@ -266,6 +280,24 @@ export const tenantApi = {
   },
   async deleteRole(id: number): Promise<void> {
     await http.delete(`/api/roles/${id}`)
+  },
+  regional: {
+    async get(): Promise<{
+      data: RegionalSettings & { currency_locked: boolean }
+      options: {
+        currencies: string[]
+        locales: string[]
+        date_formats: string[]
+        time_formats: string[]
+      }
+    }> {
+      return (await http.get('/api/settings/regional')).data
+    },
+    async update(
+      settings: RegionalSettings,
+    ): Promise<RegionalSettings & { currency_locked: boolean }> {
+      return (await http.put('/api/settings/regional', settings)).data.data
+    },
   },
   security: {
     async get(): Promise<SecuritySettings> {

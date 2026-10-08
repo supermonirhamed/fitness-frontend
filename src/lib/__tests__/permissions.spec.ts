@@ -13,6 +13,22 @@ describe('permissions helpers', () => {
     expect(
       allowedSettingsPages(can(['roles.view', 'settings.security'])).map((p) => p.key),
     ).toEqual(['roles', 'security'])
+    const everything = [
+      'settings.view',
+      'locations.view',
+      'staff.view',
+      'roles.view',
+      'settings.security',
+      'audit.view',
+    ]
+    expect(allowedSettingsPages(can(everything)).map((p) => p.key)).toEqual([
+      'regional',
+      'locations',
+      'users',
+      'roles',
+      'security',
+      'audit',
+    ])
     expect(allowedSettingsPages(can([]))).toEqual([])
   })
 })

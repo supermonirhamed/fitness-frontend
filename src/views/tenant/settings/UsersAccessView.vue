@@ -17,8 +17,10 @@ import { tenantApi, type Location, type StaffAccess } from '@/api/tenant'
 import { errorCode } from '@/lib/apiErrors'
 import { statusOf } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
+import { useFormat } from '@/composables/useFormat'
 
-const { t, te, d } = useI18n()
+const { t, te } = useI18n()
+const fmt = useFormat()
 const toast = useToast()
 const auth = useStaffAuth()
 
@@ -245,7 +247,7 @@ function openMenu(event: Event, user: StaffAccess) {
               :value="t(`access.status.${data.status}`)"
             />
             <div v-if="data.deactivated_at" class="sub">
-              {{ d(new Date(data.deactivated_at), 'short') }}
+              {{ fmt.date(data.deactivated_at) }}
             </div>
           </template>
         </Column>

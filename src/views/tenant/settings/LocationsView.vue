@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -12,8 +12,11 @@ import EmptyState from '@/components/patterns/EmptyState.vue'
 import { tenantApi, type Location } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
+import { useFormat } from '@/composables/useFormat'
+import { mixesZones, zoneAbbreviation } from '@/lib/datetime'
 
-const { t, d } = useI18n()
+const { t, locale } = useI18n()
+const fmt = useFormat()
 const toast = useToast()
 const auth = useStaffAuth()
 
@@ -21,6 +24,8 @@ const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
 const archived = ref(false)
 const locations = ref<Location[]>([])
 const canArchive = () => auth.can('locations.delete')
+// Branches in different timezones: show the zone next to times (US-00.14).
+const mixed = computed(() => mixesZones(locations.value.map((l) => l.timezone)))
 
 async function load() {
   state.value = 'loading'
@@ -122,10 +127,16 @@ async function confirm() {
           <span class="name">{{ data.name }}</span>
         </template>
       </Column>
+      <Column :header="t('locationsPage.columns.timezone')">
+        <template #body="{ data }">
+          <div class="ltr-isolate" dir="ltr">{{ data.timezone }}</div>
+          <div class="zone">{{ zoneAbbreviation(data.timezone, locale) }}</div>
+        </template>
+      </Column>
       <Column v-if="archived" :header="t('archive.archivedOn')">
         <template #body="{ data }">
           <span class="num">{{
-            data.archived_at ? d(new Date(data.archived_at), 'dateTime') : '—'
+            data.archived_at ? fmt.dateTime(data.archived_at, data.timezone, mixed) : '—'
           }}</span>
         </template>
       </Column>
@@ -189,6 +200,10 @@ async function confirm() {
 }
 .name {
   font-weight: var(--fw-medium);
+}
+.zone {
+  font: var(--text-caption);
+  color: var(--text-muted);
 }
 .actions {
   display: flex;
