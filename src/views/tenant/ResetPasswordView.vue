@@ -8,7 +8,7 @@ import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import AuthCard from '@/components/auth/AuthCard.vue'
 import NewPasswordFields from '@/components/auth/NewPasswordFields.vue'
-import { tenantApi, type EmailedLink } from '@/api/tenant'
+import { needsTwoFactor, tenantApi, type EmailedLink } from '@/api/tenant'
 import { linkProblem, type LinkProblem } from '@/lib/apiErrors'
 import { useNewPasswordForm } from '@/composables/useNewPasswordForm'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -49,8 +49,14 @@ async function submit() {
   busy.value = true
   error.value = null
   try {
-    auth.adopt(await tenantApi.resetPassword(link, password))
+    const result = await tenantApi.resetPassword(link, password)
     toast.add({ severity: 'success', summary: t('tenantApp.reset.done'), life: 6000 })
+    if (needsTwoFactor(result)) {
+      // A reset never skips 2FA: the code step of sign-in finishes the job.
+      await router.replace({ name: 'tenant.signin', query: { step: 'code' } })
+      return
+    }
+    auth.adopt(result)
     await router.replace({ name: 'tenant.today' })
   } catch (e) {
     const problem = linkProblem(e)

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { tenantApi, type StaffUser } from '@/api/tenant'
+import { needsTwoFactor, tenantApi, type SecondFactor, type StaffUser } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 
 export const useStaffAuth = defineStore('staffAuth', () => {
@@ -8,8 +8,9 @@ export const useStaffAuth = defineStore('staffAuth', () => {
   const checked = ref(false)
   const signedIn = computed(() => user.value !== null)
 
-  async function check(): Promise<boolean> {
-    if (!checked.value) {
+  /** Loads the signed-in user once; `refresh` reloads it (e.g. after a security setting changed). */
+  async function check(refresh = false): Promise<boolean> {
+    if (!checked.value || refresh) {
       try {
         user.value = await tenantApi.me()
       } catch (e) {
@@ -21,9 +22,20 @@ export const useStaffAuth = defineStore('staffAuth', () => {
     return user.value !== null
   }
 
-  async function login(email: string, password: string, remember: boolean) {
-    user.value = await tenantApi.login(email, password, remember)
-    checked.value = true
+  /** Returns 'two_factor' when the password was right but a code is still needed (see challenge()). */
+  async function login(
+    email: string,
+    password: string,
+    remember: boolean,
+  ): Promise<'signed_in' | 'two_factor'> {
+    const result = await tenantApi.login(email, password, remember)
+    if (needsTwoFactor(result)) return 'two_factor'
+    adopt(result)
+    return 'signed_in'
+  }
+
+  async function challenge(factor: SecondFactor) {
+    adopt(await tenantApi.twoFactorChallenge(factor))
   }
 
   /** Use the user the API just signed in (after accepting an invitation or resetting a password). */
@@ -46,5 +58,5 @@ export const useStaffAuth = defineStore('staffAuth', () => {
     checked.value = true
   }
 
-  return { user, checked, signedIn, check, login, adopt, logout, forget }
+  return { user, checked, signedIn, check, login, challenge, adopt, logout, forget }
 })

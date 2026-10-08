@@ -6,6 +6,8 @@ export interface NavItem {
   key: string
   icon: string
   to: string
+  /** Highlight only on this exact route (e.g. "/", which contains every other page). */
+  exact?: boolean
 }
 
 defineProps<{ items: NavItem[]; orgName: string; collapsed?: boolean }>()
@@ -24,7 +26,8 @@ const { t } = useI18n()
         <RouterLink
           :to="item.to"
           class="sidebar__item"
-          active-class="sidebar__item--active"
+          :active-class="item.exact ? '' : 'sidebar__item--active'"
+          exact-active-class="sidebar__item--active"
           :title="collapsed ? t(`shell.nav.${item.key}`) : undefined"
           @click="emit('navigate')"
         >

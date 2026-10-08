@@ -18,6 +18,9 @@ describe('signInError', () => {
       kind: 'deactivated',
     })
     expect(signInError(fail(403, { code: 'tenant_suspended' }))).toEqual({ kind: 'suspended' })
+    expect(signInError(fail(410, { code: 'two_factor_expired' }))).toEqual({
+      kind: 'twoFactorExpired',
+    })
     expect(signInError(fail(500))).toEqual({ kind: 'generic' })
     expect(signInError(new Error('offline'))).toEqual({ kind: 'generic' })
   })
@@ -25,6 +28,11 @@ describe('signInError', () => {
   it('reads the throttle wait time', () => {
     const error = fail(429, { errors: { email: ['Too many attempts. Try again in 42 seconds.'] } })
     expect(signInError(error)).toEqual({ kind: 'throttled', seconds: 42 })
+  })
+
+  it('reads the wait time of a locked 2FA code step', () => {
+    const error = fail(429, { errors: { code: ['Too many attempts. Try again in 17 seconds.'] } })
+    expect(signInError(error)).toEqual({ kind: 'throttled', seconds: 17 })
   })
 })
 

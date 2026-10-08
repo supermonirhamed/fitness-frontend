@@ -1,20 +1,23 @@
 <script setup lang="ts">
 // Port of the design system's shell/AppHeader (branch switcher, search and alerts arrive with their stories).
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import LanguageToggle from '@/components/LanguageToggle.vue'
 
-const props = defineProps<{ userName: string; userRole?: string }>()
+const props = defineProps<{ userName: string; userRole?: string; menuItems?: MenuItem[] }>()
 const emit = defineEmits<{ menu: []; signOut: [] }>()
 const { t } = useI18n()
 
 const userMenu = ref<InstanceType<typeof Menu>>()
-const items = [
+const items = computed<MenuItem[]>(() => [
+  ...(props.menuItems ?? []),
+  ...(props.menuItems?.length ? [{ separator: true }] : []),
   { label: t('common.signOut'), icon: 'pi pi-sign-out pi-dir', command: () => emit('signOut') },
-]
+])
 
 const initials = (name: string) =>
   name

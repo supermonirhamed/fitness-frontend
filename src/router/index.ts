@@ -65,6 +65,16 @@ const tenantRoutes: RouteRecordRaw[] = [
     component: () => import('@/layouts/TenantLayout.vue'),
     children: [
       { path: '', name: 'tenant.today', component: () => import('@/views/tenant/TodayView.vue') },
+      {
+        path: 'account/security',
+        name: 'tenant.security',
+        component: () => import('@/views/tenant/account/SecurityView.vue'),
+      },
+      {
+        path: 'settings/security',
+        name: 'tenant.settings.security',
+        component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
@@ -96,6 +106,11 @@ if (context.kind === 'tenant') {
     if (!signedIn && !to.meta.guest)
       return { name: 'tenant.signin', query: { redirect: to.fullPath } }
     if (signedIn && to.meta.guest) return { name: 'tenant.today' }
+
+    // A role that requires 2FA (US-00.06): nothing else until it is set up. The API enforces this too.
+    const user = useStaffAuth().user
+    if (user?.two_factor_required && !user.two_factor_enabled && to.name !== 'tenant.security')
+      return { name: 'tenant.security', query: { required: '1' } }
   })
 
   // A session that ends server-side (expired, deactivated) sends the user back to sign in.

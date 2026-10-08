@@ -14,7 +14,21 @@ const auth = useStaffAuth()
 const router = useRouter()
 
 // Items are added as their stories ship (Calendar, Bookings, Clients, …) and filtered by permission (US-00.07).
-const nav: NavItem[] = [{ key: 'today', icon: 'pi-sun', to: '/' }]
+const nav = computed<NavItem[]>(() => [
+  { key: 'today', icon: 'pi-sun', to: '/', exact: true },
+  // Owner only until role permissions arrive (US-00.07); the API enforces it either way.
+  ...(auth.user?.roles.includes('Organization Owner')
+    ? [{ key: 'settings', icon: 'pi-cog', to: '/settings/security' }]
+    : []),
+])
+
+const userMenu = computed(() => [
+  {
+    label: t('shell.security'),
+    icon: 'pi pi-shield',
+    command: () => router.push({ name: 'tenant.security' }),
+  },
+])
 
 const collapsed = ref(false)
 const mobileOpen = ref(false)
@@ -25,8 +39,12 @@ const role = computed(() => {
 })
 
 async function signOut() {
-  await auth.logout()
-  await router.replace({ name: 'tenant.signin' })
+  try {
+    await auth.logout()
+  } finally {
+    // Signed out locally either way (the store forgets the user even when the call fails).
+    await router.replace({ name: 'tenant.signin' })
+  }
 }
 </script>
 
@@ -55,6 +73,7 @@ async function signOut() {
       <AppHeader
         :user-name="auth.user?.name ?? ''"
         :user-role="role"
+        :menu-items="userMenu"
         @menu="mobileOpen = true"
         @sign-out="signOut"
       />
