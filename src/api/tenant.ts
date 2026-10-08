@@ -81,12 +81,29 @@ export interface StaffUser {
 
 export type LocationStatus = 'Draft' | 'Active' | 'Inactive'
 
+/** Branch figures (US-01.04); null until the module behind it exists. */
+export interface LocationStats {
+  facilities: number | null
+  active_services: number | null
+  staff: number
+  today_sessions: number | null
+}
+
 export interface Location {
   id: number
   name: string
   status: LocationStatus
   timezone: string
   archived_at?: string | null
+  stats?: LocationStats
+}
+
+export interface LocationStaffMember {
+  id: number
+  name: string
+  email: string
+  status: 'Invited' | 'Active'
+  roles: string[]
 }
 
 /** Editable branch details (US-01.03). */
@@ -292,11 +309,17 @@ export const tenantApi = {
     },
   },
   /** Active branches, or archived ones (needs locations.delete). */
-  async locations(archived = false): Promise<Location[]> {
-    return (await http.get('/api/locations', { params: archived ? { archived: 1 } : {} })).data.data
+  async locations(archived = false, status?: LocationStatus): Promise<Location[]> {
+    const params = { ...(archived ? { archived: 1 } : {}), ...(status ? { status } : {}) }
+    return (await http.get('/api/locations', { params })).data.data
   },
   async location(id: number): Promise<LocationDetails> {
     return (await http.get(`/api/locations/${id}`)).data.data
+  },
+  async locationStaff(
+    id: number,
+  ): Promise<{ data: LocationStaffMember[]; all_locations_count: number }> {
+    return (await http.get(`/api/locations/${id}/staff`)).data
   },
   async createLocation(input: Partial<LocationInput>): Promise<LocationDetails> {
     return (await http.post('/api/locations', input)).data.data

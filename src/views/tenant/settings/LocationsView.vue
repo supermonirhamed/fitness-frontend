@@ -6,13 +6,14 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import ArchiveFilter from '@/components/patterns/ArchiveFilter.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import LocationFormDrawer from '@/components/locations/LocationFormDrawer.vue'
-import { tenantApi, type Location, type LocationDetails } from '@/api/tenant'
+import { tenantApi, type Location, type LocationDetails, type LocationStatus } from '@/api/tenant'
 import { errorCode } from '@/lib/apiErrors'
 import { statusOf } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -27,6 +28,14 @@ const auth = useStaffAuth()
 const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
 const archived = ref(false)
 const locations = ref<Location[]>([])
+const statusFilter = ref<LocationStatus | null>(null)
+const statusOptions = computed(() =>
+  (['Draft', 'Active', 'Inactive'] as const).map((s) => ({
+    value: s,
+    label: t(`locationStatus.${s}`),
+  })),
+)
+const FIGURES = ['facilities', 'active_services', 'staff', 'today_sessions'] as const
 const canArchive = () => auth.can('locations.delete')
 const canCreate = () => auth.can('locations.create')
 const canEdit = () => auth.can('locations.update')
@@ -38,7 +47,10 @@ const mixed = computed(() => mixesZones(locations.value.map((l) => l.timezone)))
 async function load() {
   state.value = 'loading'
   try {
-    locations.value = await tenantApi.locations(archived.value)
+    locations.value = await tenantApi.locations(
+      archived.value,
+      archived.value ? undefined : (statusFilter.value ?? undefined),
+    )
     state.value = 'ready'
   } catch (e) {
     state.value = statusOf(e) === 403 ? 'forbidden' : 'error'
@@ -52,7 +64,7 @@ onMounted(async () => {
     router.replace({ query: {} })
   }
 })
-watch(archived, load)
+watch([archived, statusFilter], load)
 
 // Create / edit (US-01.03)
 const formOpen = ref(false)
@@ -131,6 +143,17 @@ async function confirm() {
     <div class="toolbar">
       <p>{{ t('locationsPage.intro') }}</p>
       <div class="tools">
+        <Select
+          v-if="!archived"
+          v-model="statusFilter"
+          :options="statusOptions"
+          option-label="label"
+          option-value="value"
+          :placeholder="t('locationsPage.allStatuses')"
+          :aria-label="t('locationsPage.columns.status')"
+          show-clear
+          size="small"
+        />
         <ArchiveFilter v-if="canArchive()" v-model="archived" />
         <Button
           v-if="canCreate()"
@@ -188,7 +211,13 @@ async function confirm() {
     <DataTable v-else :value="locations" data-key="id" size="small">
       <Column :header="t('locationsPage.columns.name')">
         <template #body="{ data }">
-          <span class="name">{{ data.name }}</span>
+          <RouterLink
+            v-if="!archived"
+            :to="{ name: 'tenant.locations.show', params: { id: data.id } }"
+            class="name link"
+            >{{ data.name }}</RouterLink
+          >
+          <span v-else class="name">{{ data.name }}</span>
         </template>
       </Column>
       <Column :header="t('locationsPage.columns.status')">
@@ -202,6 +231,20 @@ async function confirm() {
           <div class="zone">{{ zoneAbbreviation(data.timezone, locale) }}</div>
         </template>
       </Column>
+      <template v-if="!archived">
+        <Column
+          v-for="key in FIGURES"
+          :key="key"
+          :header="t(`locationDetails.figures.${key}`)"
+          class="num-col"
+        >
+          <template #body="{ data }">
+            <span class="num" :class="{ muted: data.stats?.[key] == null }">{{
+              data.stats?.[key] ?? '—'
+            }}</span>
+          </template>
+        </Column>
+      </template>
       <Column v-if="archived" :header="t('archive.archivedOn')">
         <template #body="{ data }">
           <span class="num">{{
@@ -288,6 +331,16 @@ async function confirm() {
 }
 .name {
   font-weight: var(--fw-medium);
+}
+.link {
+  color: var(--text-link);
+  text-decoration: none;
+}
+.link:hover {
+  text-decoration: underline;
+}
+.muted {
+  color: var(--text-muted);
 }
 .zone {
   font: var(--text-caption);

@@ -15,6 +15,7 @@ export default {
     Suspended: 'Suspended',
     Draft: 'Draft',
     Inactive: 'Inactive',
+    Invited: 'Invited',
   },
   platform: {
     consoleName: 'Platform console',
@@ -376,6 +377,7 @@ export default {
     empty: 'No branches yet',
     emptyHint: 'Your organization needs at least one branch.',
     columns: { name: 'Branch', status: 'Status', timezone: 'Timezone' },
+    allStatuses: 'All statuses',
     lastLocation:
       'The organization needs at least one branch. Add another branch before archiving this one.',
     archiveDescription:
@@ -417,6 +419,54 @@ export default {
     photoAlt: 'Photo of the branch',
     addPhoto: 'Add photo',
     replacePhoto: 'Replace',
+  },
+  locationDetails: {
+    back: 'Branches',
+    loadError: "This branch couldn't be loaded.",
+    missing: 'Branch not found',
+    missingHint: "It may have been archived, or it isn't one of your branches.",
+    draftBanner: 'Draft: clients cannot see this branch yet. Set it to Active when it is ready.',
+    inactiveBanner: 'Inactive: hidden from clients. Its history and reports are kept.',
+    tabs: {
+      info: 'Info',
+      hours: 'Business hours',
+      facilities: 'Facilities',
+      services: 'Services',
+      staff: 'Staff',
+      policies: 'Booking policies',
+    },
+    figures: {
+      facilities: 'Facilities',
+      active_services: 'Active services',
+      staff: 'Staff',
+      today_sessions: "Today's sessions",
+    },
+    figuresNote:
+      '— means the module is not set up yet: facilities, services and sessions come next.',
+    openMap: 'Open map',
+    soon: {
+      hours: {
+        title: 'Business hours are coming next',
+        body: 'Weekly opening hours, holidays and special hours will be set here.',
+      },
+      facilities: {
+        title: 'No facilities yet',
+        body: 'Rooms, studios, fields and pools of this branch will be listed here.',
+      },
+      services: {
+        title: 'No services yet',
+        body: 'Services offered at this branch will be listed here once the catalog is set up.',
+      },
+    },
+    role: 'Role',
+    noStaff: 'No one is assigned to this branch',
+    noStaffHint: 'Assign people in Users & access.',
+    allLocations:
+      'No one else works across all branches. | 1 more person works across all branches. | {n} more people work across all branches.',
+    manageAccess: 'Manage access',
+    policiesIntro:
+      "Override the organization's booking policies for this branch. Services and single sessions can override further.",
+    organizationLevel: 'Organization',
   },
   profile: {
     title: 'Profile',

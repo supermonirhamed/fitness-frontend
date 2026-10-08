@@ -77,6 +77,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/tenant/account/SecurityView.vue'),
       },
       {
+        path: 'locations/:id(\\d+)',
+        name: 'tenant.locations.show',
+        component: () => import('@/views/tenant/LocationDetailsView.vue'),
+        meta: { permission: 'locations.view' },
+        props: (route) => ({ id: Number(route.params.id) }),
+      },
+      {
         path: 'settings',
         name: 'tenant.settings',
         component: () => import('@/views/tenant/settings/SettingsLayout.vue'),
