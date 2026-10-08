@@ -23,8 +23,11 @@ export interface StaffUser {
 export type AccessScope = 'organization' | 'locations' | 'own'
 
 export interface RoleSummary {
+  id: number
   name: string
   system: boolean
+  /** false for the Owner role, which can never change */
+  editable: boolean
   scope: AccessScope
   users_count: number
   permissions: string[]
@@ -34,6 +37,13 @@ export interface RolesMatrix {
   roles: RoleSummary[]
   /** module => actions, in display order */
   modules: Record<string, string[]>
+  scopes: AccessScope[]
+}
+
+export interface RoleInput {
+  name?: string
+  scope?: AccessScope
+  permissions?: string[]
 }
 
 /** The password was right but the account uses 2FA: answer with twoFactorChallenge(). */
@@ -142,7 +152,19 @@ export const tenantApi = {
   },
   async roles(): Promise<RolesMatrix> {
     const { data } = await http.get('/api/roles')
-    return { roles: data.data, modules: data.modules }
+    return { roles: data.data, modules: data.modules, scopes: data.scopes }
+  },
+  async createRole(input: Required<RoleInput>): Promise<RoleSummary> {
+    return (await http.post('/api/roles', input)).data.data
+  },
+  async updateRole(id: number, input: RoleInput): Promise<RoleSummary> {
+    return (await http.put(`/api/roles/${id}`, input)).data.data
+  },
+  async resetRole(id: number): Promise<RoleSummary> {
+    return (await http.post(`/api/roles/${id}/reset`)).data.data
+  },
+  async deleteRole(id: number): Promise<void> {
+    await http.delete(`/api/roles/${id}`)
   },
   security: {
     async get(): Promise<SecuritySettings> {

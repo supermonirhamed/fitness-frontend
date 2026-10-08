@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowedSettingsPages, specialActions } from '../permissions'
+import { allowedSettingsPages, permissionDiff, specialActions } from '../permissions'
 
 describe('permissions helpers', () => {
   it('separates special actions from the standard columns', () => {
@@ -14,5 +14,26 @@ describe('permissions helpers', () => {
       allowedSettingsPages(can(['roles.view', 'settings.security'])).map((p) => p.key),
     ).toEqual(['roles', 'security'])
     expect(allowedSettingsPages(can([]))).toEqual([])
+  })
+})
+
+describe('permissionDiff', () => {
+  const modules = { bookings: ['view', 'create', 'override'], clients: ['view', 'export'] }
+
+  it('lists added and removed permissions in catalog order', () => {
+    expect(
+      permissionDiff(
+        ['clients.export', 'bookings.view'],
+        ['bookings.override', 'bookings.view', 'clients.view'],
+        modules,
+      ),
+    ).toEqual({ added: ['bookings.override', 'clients.view'], removed: ['clients.export'] })
+  })
+
+  it('is empty when nothing changed', () => {
+    expect(permissionDiff(['bookings.view'], ['bookings.view'], modules)).toEqual({
+      added: [],
+      removed: [],
+    })
   })
 })

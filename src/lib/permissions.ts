@@ -20,3 +20,25 @@ export const SETTINGS_PAGES: SettingsPage[] = [
 export function allowedSettingsPages(can: (permission: string) => boolean): SettingsPage[] {
   return SETTINGS_PAGES.filter((page) => can(page.permission))
 }
+
+export interface PermissionDiff {
+  added: string[]
+  removed: string[]
+}
+
+/** What saving would change, sorted in catalog order (module order, then action order). */
+export function permissionDiff(
+  before: string[],
+  after: string[],
+  modules: Record<string, string[]>,
+): PermissionDiff {
+  const order = Object.entries(modules).flatMap(([module, actions]) =>
+    actions.map((action) => `${module}.${action}`),
+  )
+  const was = new Set(before)
+  const now = new Set(after)
+  return {
+    added: order.filter((p) => now.has(p) && !was.has(p)),
+    removed: order.filter((p) => was.has(p) && !now.has(p)),
+  }
+}
