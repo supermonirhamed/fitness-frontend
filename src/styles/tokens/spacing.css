@@ -1,0 +1,48 @@
+/* Synced from Claude Design: Studio Admin Design System — tokens/spacing.css. 4px spacing scale, radii, elevation, sizing, motion */
+:root {
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-input: 6px;
+  --radius-button: 6px;
+  --radius-card: 10px;
+  --radius-dialog: 12px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(14, 17, 22, 0.06), 0 1px 3px rgba(14, 17, 22, 0.08);
+  --shadow-2: 0 4px 12px -2px rgba(14, 17, 22, 0.1), 0 2px 4px -2px rgba(14, 17, 22, 0.06);
+  --shadow-3: 0 20px 40px -8px rgba(14, 17, 22, 0.22), 0 8px 16px -8px rgba(14, 17, 22, 0.12);
+  --control-h-sm: 30px;
+  --control-h: 36px;
+  --control-h-lg: 44px;
+  --touch-target: 44px;
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 64px;
+  --header-h: 56px;
+  --drawer-w: 480px;
+  --drawer-w-lg: 640px;
+  --bottom-nav-h: 64px;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+  --border-width: 1px;
+}
+[data-theme='dark'] {
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 12px -2px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 20px 40px -8px rgba(0, 0, 0, 0.7);
+}

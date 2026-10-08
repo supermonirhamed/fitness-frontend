@@ -1,0 +1,52 @@
+/* Synced from Claude Design: Studio Admin Design System — tokens/typography.css.
+   One stack for both scripts: Latin glyphs from IBM Plex Sans, Arabic falls through to IBM Plex Sans Arabic. */
+:root {
+  --font-sans:
+    'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-arabic: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fs-display: 32px;
+  --fs-h1: 24px;
+  --fs-h2: 20px;
+  --fs-h3: 16px;
+  --fs-h4: 14px;
+  --fs-body-lg: 16px;
+  --fs-body: 14px;
+  --fs-small: 13px;
+  --fs-caption: 12px;
+  --lh-display: 1.25;
+  --lh-h1: 1.33;
+  --lh-h2: 1.4;
+  --lh-h3: 1.5;
+  --lh-h4: 1.43;
+  --lh-body: 1.57;
+  --lh-small: 1.54;
+  --lh-caption: 1.33;
+  --ls-caps: 0.04em;
+  --text-display: var(--fw-bold) var(--fs-display)/var(--lh-display) var(--font-sans);
+  --text-h1: var(--fw-semibold) var(--fs-h1)/var(--lh-h1) var(--font-sans);
+  --text-h2: var(--fw-semibold) var(--fs-h2)/var(--lh-h2) var(--font-sans);
+  --text-h3: var(--fw-semibold) var(--fs-h3)/var(--lh-h3) var(--font-sans);
+  --text-h4: var(--fw-semibold) var(--fs-h4)/var(--lh-h4) var(--font-sans);
+  --text-body: var(--fw-regular) var(--fs-body)/var(--lh-body) var(--font-sans);
+  --text-body-lg: var(--fw-regular) var(--fs-body-lg)/var(--lh-body) var(--font-sans);
+  --text-small: var(--fw-regular) var(--fs-small)/var(--lh-small) var(--font-sans);
+  --text-caption: var(--fw-medium) var(--fs-caption)/var(--lh-caption) var(--font-sans);
+}
+/* Arabic needs ~15–20% more leading */
+[dir='rtl'] {
+  --font-sans: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif;
+  --lh-display: 1.45;
+  --lh-h1: 1.55;
+  --lh-h2: 1.6;
+  --lh-h3: 1.7;
+  --lh-h4: 1.7;
+  --lh-body: 1.8;
+  --lh-small: 1.75;
+  --lh-caption: 1.6;
+  --ls-caps: 0;
+}

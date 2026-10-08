@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@layer theme, base, primevue, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@plugin "tailwindcss-primeui";
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@import './tokens/colors.css' layer(base);
+@import './tokens/spacing.css' layer(base);
+@import './tokens/typography.css' layer(base);
+@import './tokens/base.css' layer(base);
+@import 'primeicons/primeicons.css';
+
+.ltr-isolate {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.text-mono {
+  font-family: var(--font-mono);
+}

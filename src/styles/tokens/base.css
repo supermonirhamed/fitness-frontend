@@ -1,0 +1,34 @@
+/* Synced from Claude Design: Studio Admin Design System — tokens/base.css */
+html,
+body {
+  margin: 0;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+a {
+  color: var(--text-link);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+.num,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+/* Icons that carry direction flip in RTL; add .pi-dir to arrows, chevrons, back/next, undo/redo */
+[dir='rtl'] .pi-dir {
+  transform: scaleX(-1);
+}
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
