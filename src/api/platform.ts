@@ -14,8 +14,14 @@ export interface Tenant {
   currency: string
   timezone: string
   locale: 'ar' | 'en'
+  plan: string | null
   provisioning_error: string | null
   provisioned_at: string | null
+  suspended_at: string | null
+  suspension_reason: string | null
+  /** null until the tenant has the table (locations: EP-01, clients: EP-05) */
+  locations_count: number | null
+  active_clients_count: number | null
   created_at: string
 }
 
@@ -23,6 +29,18 @@ export interface SuperAdmin {
   id: number
   name: string
   email: string
+}
+
+export interface TenantQuery {
+  page?: number
+  per_page?: number
+  search?: string
+  status?: TenantStatus | null
+}
+
+export interface Paginated<T> {
+  data: T[]
+  meta: { total: number; per_page: number; current_page: number }
 }
 
 export type NewTenant = Pick<
@@ -48,10 +66,14 @@ export const platformApi = {
   async logout(): Promise<void> {
     await http.post('/api/platform/auth/logout')
   },
-  async tenants(
-    page = 1,
-  ): Promise<{ data: Tenant[]; meta: { total: number; per_page: number; current_page: number } }> {
-    return (await http.get('/api/platform/tenants', { params: { page } })).data
+  async tenants(params: TenantQuery = {}): Promise<Paginated<Tenant>> {
+    return (await http.get('/api/platform/tenants', { params })).data
+  },
+  async suspend(id: string, reason: string): Promise<Tenant> {
+    return (await http.post(`/api/platform/tenants/${id}/suspend`, { reason })).data.data
+  },
+  async reactivate(id: string, reason: string): Promise<Tenant> {
+    return (await http.post(`/api/platform/tenants/${id}/reactivate`, { reason })).data.data
   },
   async tenant(id: string): Promise<Tenant> {
     return (await http.get(`/api/platform/tenants/${id}`)).data.data
