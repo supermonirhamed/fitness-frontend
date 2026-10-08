@@ -22,6 +22,7 @@ describe('permissions helpers', () => {
       'audit.view',
     ]
     expect(allowedSettingsPages(can(everything)).map((p) => p.key)).toEqual([
+      'organization',
       'regional',
       'locations',
       'users',

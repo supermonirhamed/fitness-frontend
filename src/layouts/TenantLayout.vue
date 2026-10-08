@@ -60,6 +60,7 @@ async function signOut() {
       class="shell__sidebar"
       :items="nav"
       :org-name="org.organization?.name ?? ''"
+      :logo-url="org.organization?.logo_url"
       :collapsed="collapsed"
       @toggle="collapsed = !collapsed"
     />
@@ -72,6 +73,7 @@ async function signOut() {
       <AppSidebar
         :items="nav"
         :org-name="org.organization?.name ?? ''"
+        :logo-url="org.organization?.logo_url"
         @navigate="mobileOpen = false"
       />
     </Drawer>

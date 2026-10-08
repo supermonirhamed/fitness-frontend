@@ -14,7 +14,13 @@ const org = useOrganization()
     <div class="auth__lang"><LanguageToggle /></div>
     <form class="auth__card" novalidate @submit.prevent="$emit('submit')">
       <div class="auth__brand">
-        <span class="auth__logo" aria-hidden="true"><i class="pi pi-image" /></span>
+        <img
+          v-if="org.organization?.logo_url"
+          :src="org.organization.logo_url"
+          :alt="org.organization.name"
+          class="auth__logo-img"
+        />
+        <span v-else class="auth__logo" aria-hidden="true"><i class="pi pi-image" /></span>
         <div class="auth__title">{{ org.organization?.name }}</div>
         <div v-if="subtitle" class="auth__subtitle">{{ subtitle }}</div>
       </div>
@@ -71,6 +77,11 @@ const org = useOrganization()
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.auth__logo-img {
+  max-width: 160px;
+  max-height: 64px;
+  object-fit: contain;
 }
 .auth__logo i {
   font-size: 20px;

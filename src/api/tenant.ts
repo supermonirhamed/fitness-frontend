@@ -10,6 +10,17 @@ export interface Organization {
   time_format: '12h' | '24h'
   /** 0 = Sunday … 6 = Saturday */
   week_start: number
+  logo_url: string | null
+}
+
+export interface OrganizationProfile {
+  name: string
+  legal_name: string | null
+  email: string | null
+  phone: string | null
+  address: string | null
+  website: string | null
+  logo_url?: string | null
 }
 
 export interface RegionalSettings {
@@ -280,6 +291,22 @@ export const tenantApi = {
   },
   async deleteRole(id: number): Promise<void> {
     await http.delete(`/api/roles/${id}`)
+  },
+  organizationProfile: {
+    async get(): Promise<OrganizationProfile> {
+      return (await http.get('/api/settings/organization')).data.data
+    },
+    async update(profile: OrganizationProfile): Promise<OrganizationProfile> {
+      return (await http.put('/api/settings/organization', profile)).data.data
+    },
+    async uploadLogo(file: File): Promise<OrganizationProfile> {
+      const form = new FormData()
+      form.append('logo', file)
+      return (await http.post('/api/settings/organization/logo', form)).data.data
+    },
+    async deleteLogo(): Promise<void> {
+      await http.delete('/api/settings/organization/logo')
+    },
   },
   regional: {
     async get(): Promise<{

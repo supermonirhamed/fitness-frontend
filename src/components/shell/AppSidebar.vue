@@ -10,7 +10,7 @@ export interface NavItem {
   exact?: boolean
 }
 
-defineProps<{ items: NavItem[]; orgName: string; collapsed?: boolean }>()
+defineProps<{ items: NavItem[]; orgName: string; logoUrl?: string | null; collapsed?: boolean }>()
 const emit = defineEmits<{ toggle: []; navigate: [] }>()
 const { t } = useI18n()
 </script>
@@ -18,7 +18,10 @@ const { t } = useI18n()
 <template>
   <nav :aria-label="t('shell.mainNav')" :class="['sidebar', { 'sidebar--collapsed': collapsed }]">
     <div class="sidebar__org">
-      <span class="sidebar__logo" aria-hidden="true"><i class="pi pi-image" /></span>
+      <span class="sidebar__logo" aria-hidden="true">
+        <img v-if="logoUrl" :src="logoUrl" alt="" />
+        <i v-else class="pi pi-image" />
+      </span>
       <span v-if="!collapsed" class="sidebar__org-name">{{ orgName }}</span>
     </div>
     <ul class="sidebar__items">
@@ -146,5 +149,10 @@ const { t } = useI18n()
 .sidebar__toggle {
   color: var(--text-muted);
   font-size: 13px;
+}
+.sidebar__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 </style>

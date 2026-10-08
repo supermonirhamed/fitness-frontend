@@ -125,6 +125,7 @@ export default {
     title: 'Settings',
     subtitle: 'How your organization works and who can do what.',
     pages: {
+      organization: 'Organization',
       regional: 'Regional',
       locations: 'Branches',
       users: 'Users & access',
@@ -388,6 +389,40 @@ export default {
     },
     invalid: 'Check the highlighted settings.',
     saved: 'Regional settings saved',
+  },
+  orgProfile: {
+    loadError: "The organization profile couldn't be loaded.",
+    logo: 'Logo',
+    logoAlt: 'Logo of {name}',
+    logoHint:
+      'Shown on the sign-in page, in the app header, in emails and on receipts. PNG, JPG or SVG, up to 2 MB.',
+    uploadLogo: 'Upload logo',
+    replaceLogo: 'Replace',
+    removeLogo: 'Remove',
+    logoTooBig: 'The logo must be 2 MB or smaller.',
+    logoInvalid:
+      'Use a PNG, JPG or SVG file up to 2 MB. SVGs with scripts or links are not allowed.',
+    details: 'Details',
+    nameHint: 'Shown to staff and clients everywhere.',
+    fields: {
+      name: 'Display name',
+      legal_name: 'Legal name',
+      email: 'Email',
+      phone: 'Phone',
+      address: 'Address',
+      website: 'Website',
+    },
+    invalid: {
+      name: 'Enter a display name (up to 120 characters).',
+      legal_name: 'Use up to 190 characters.',
+      email: 'Enter a valid email address.',
+      phone: 'Use digits, spaces, +, - and brackets only.',
+      address: 'Use up to 500 characters.',
+      website: 'Enter a full address starting with https://',
+    },
+    regionalTitle: 'Currency, timezone and language',
+    regionalHint: 'Set in Regional settings.',
+    saved: 'Organization profile saved',
   },
   tenantApp: {
     signIn: {

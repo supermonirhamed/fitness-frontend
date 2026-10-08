@@ -82,6 +82,12 @@ const tenantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/tenant/settings/SettingsLayout.vue'),
         children: [
           {
+            path: 'organization',
+            name: 'tenant.settings.organization',
+            component: () => import('@/views/tenant/settings/OrganizationSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
             path: 'regional',
             name: 'tenant.settings.regional',
             component: () => import('@/views/tenant/settings/RegionalSettingsView.vue'),
