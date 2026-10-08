@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AxiosError, AxiosHeaders } from 'axios'
-import { signInError } from '../apiErrors'
+import { linkProblem, signInError } from '../apiErrors'
 
 const fail = (status: number, data: unknown = {}) =>
   new AxiosError('fail', 'ERR', undefined, undefined, {
@@ -25,5 +25,19 @@ describe('signInError', () => {
   it('reads the throttle wait time', () => {
     const error = fail(429, { errors: { email: ['Too many attempts. Try again in 42 seconds.'] } })
     expect(signInError(error)).toEqual({ kind: 'throttled', seconds: 42 })
+  })
+})
+
+describe('linkProblem', () => {
+  it('reads why an emailed link cannot be used', () => {
+    expect(linkProblem(fail(410, { code: 'link_expired' }))).toBe('expired')
+    expect(linkProblem(fail(410, { code: 'link_used' }))).toBe('used')
+    expect(linkProblem(fail(410, { code: 'link_invalid' }))).toBe('invalid')
+    expect(linkProblem(fail(410))).toBe('invalid')
+  })
+
+  it('ignores other failures', () => {
+    expect(linkProblem(fail(422))).toBeNull()
+    expect(linkProblem(new Error('offline'))).toBeNull()
   })
 })

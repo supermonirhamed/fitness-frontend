@@ -7,11 +7,10 @@ import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Message from 'primevue/message'
-import LanguageToggle from '@/components/LanguageToggle.vue'
+import AuthCard from '@/components/auth/AuthCard.vue'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
 import { signInError } from '@/lib/apiErrors'
-import { tenantDomain } from '@/lib/appContext'
 
 const { t } = useI18n()
 const org = useOrganization()
@@ -60,131 +59,70 @@ async function submit() {
 </script>
 
 <template>
-  <div class="signin">
-    <div class="signin__lang"><LanguageToggle /></div>
-    <form class="signin__card" novalidate @submit.prevent="submit">
-      <div class="signin__brand">
-        <span class="signin__logo" aria-hidden="true"><i class="pi pi-image" /></span>
-        <div class="signin__title">{{ org.organization?.name }}</div>
-        <div class="signin__subtitle">{{ t('tenantApp.signIn.subtitle') }}</div>
-      </div>
+  <AuthCard :subtitle="t('tenantApp.signIn.subtitle')" @submit="submit">
+    <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
 
-      <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
-
-      <div class="field">
-        <label for="email">{{ t('tenantApp.signIn.email') }}</label>
-        <InputText
-          id="email"
-          v-model.trim="form.email"
-          type="email"
-          dir="ltr"
-          autocomplete="username"
-          required
-          fluid
-          :invalid="!!error && !lockedFor"
-        />
-      </div>
-      <div class="field">
-        <label for="password">{{ t('tenantApp.signIn.password') }}</label>
-        <Password
-          v-model="form.password"
-          input-id="password"
-          :feedback="false"
-          toggle-mask
-          autocomplete="current-password"
-          required
-          fluid
-          :invalid="!!error && !lockedFor"
-        />
-      </div>
-      <label class="signin__remember">
+    <div class="field">
+      <label for="email">{{ t('tenantApp.signIn.email') }}</label>
+      <InputText
+        id="email"
+        v-model.trim="form.email"
+        type="email"
+        dir="ltr"
+        autocomplete="username"
+        required
+        fluid
+        :invalid="!!error && !lockedFor"
+      />
+    </div>
+    <div class="field">
+      <label for="password">{{ t('tenantApp.signIn.password') }}</label>
+      <Password
+        v-model="form.password"
+        input-id="password"
+        :feedback="false"
+        toggle-mask
+        autocomplete="current-password"
+        required
+        fluid
+        :invalid="!!error && !lockedFor"
+      />
+    </div>
+    <div class="row">
+      <label class="remember">
         <Checkbox v-model="form.remember" binary input-id="remember" />
         <span>{{ t('tenantApp.signIn.remember') }}</span>
       </label>
-      <Button
-        type="submit"
-        :label="
-          lockedFor
-            ? t('tenantApp.signIn.retryIn', { seconds: lockedFor })
-            : t('tenantApp.signIn.submit')
-        "
-        size="large"
-        fluid
-        :loading="busy"
-        :disabled="lockedFor > 0"
-      />
-    </form>
-    <div class="signin__domain ltr-isolate">
-      {{ org.organization ? tenantDomain(org.organization.slug) : '' }}
+      <RouterLink
+        :to="{ name: 'tenant.forgot', query: form.email ? { email: form.email } : {} }"
+        class="forgot"
+        >{{ t('tenantApp.forgot.link') }}</RouterLink
+      >
     </div>
-  </div>
+    <Button
+      type="submit"
+      :label="
+        lockedFor
+          ? t('tenantApp.signIn.retryIn', { seconds: lockedFor })
+          : t('tenantApp.signIn.submit')
+      "
+      size="large"
+      fluid
+      :loading="busy"
+      :disabled="lockedFor > 0"
+    />
+  </AuthCard>
 </template>
 
 <style scoped>
-.signin {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-6);
-  background: var(--bg-app);
-}
-.signin__lang {
-  position: fixed;
-  top: var(--space-4);
-  inset-inline-end: var(--space-4);
-}
-.signin__card {
-  width: 400px;
-  max-width: 100%;
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-dialog);
-  box-shadow: var(--shadow-1);
-  padding: var(--space-8);
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.signin__brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: var(--space-1);
-  text-align: center;
-}
-.signin__logo {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  border: 1px dashed var(--border-strong);
-  background: var(--surface-sunken);
-  color: var(--text-muted);
+.row {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
-.signin__logo i {
-  font-size: 20px;
-}
-.signin__title {
-  font: var(--text-h2);
-}
-.signin__subtitle {
-  font: var(--text-small);
-  color: var(--text-secondary);
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field label {
-  font: var(--fw-medium) var(--fs-small) / var(--lh-small) var(--font-sans);
-}
-.signin__remember {
+.remember {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -192,10 +130,7 @@ async function submit() {
   color: var(--text-secondary);
   cursor: pointer;
 }
-.signin__domain {
-  margin-top: var(--space-4);
-  font: var(--text-caption);
-  font-weight: var(--fw-regular);
-  color: var(--text-muted);
+.forgot {
+  font: var(--text-small);
 }
 </style>

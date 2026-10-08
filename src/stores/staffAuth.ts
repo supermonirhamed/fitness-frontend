@@ -26,6 +26,12 @@ export const useStaffAuth = defineStore('staffAuth', () => {
     checked.value = true
   }
 
+  /** Use the user the API just signed in (after accepting an invitation or resetting a password). */
+  function adopt(signedInUser: StaffUser) {
+    user.value = signedInUser
+    checked.value = true
+  }
+
   async function logout() {
     try {
       await tenantApi.logout()
@@ -40,5 +46,5 @@ export const useStaffAuth = defineStore('staffAuth', () => {
     checked.value = true
   }
 
-  return { user, checked, signedIn, check, login, logout, forget }
+  return { user, checked, signedIn, check, login, adopt, logout, forget }
 })

@@ -42,6 +42,25 @@ const tenantRoutes: RouteRecordRaw[] = [
     meta: { guest: true },
   },
   {
+    path: '/forgot-password',
+    name: 'tenant.forgot',
+    component: () => import('@/views/tenant/ForgotPasswordView.vue'),
+    meta: { guest: true },
+  },
+  // Emailed links (US-00.05) open whether or not someone is signed in on this browser.
+  {
+    path: '/reset-password',
+    name: 'tenant.reset',
+    component: () => import('@/views/tenant/ResetPasswordView.vue'),
+    meta: { link: true },
+  },
+  {
+    path: '/invitation/accept',
+    name: 'tenant.invitation',
+    component: () => import('@/views/tenant/AcceptInvitationView.vue'),
+    meta: { link: true },
+  },
+  {
     path: '/',
     component: () => import('@/layouts/TenantLayout.vue'),
     children: [
@@ -71,6 +90,7 @@ if (context.kind === 'tenant') {
     const state = await useOrganization().load()
     if (state !== 'ready') return to.name === 'tenant.status' ? true : { name: 'tenant.status' }
     if (to.meta.public) return { name: 'tenant.today' }
+    if (to.meta.link) return true
 
     const signedIn = await useStaffAuth().check()
     if (!signedIn && !to.meta.guest)
