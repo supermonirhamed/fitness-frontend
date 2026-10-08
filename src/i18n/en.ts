@@ -123,7 +123,7 @@ export default {
   settings: {
     title: 'Settings',
     subtitle: 'How your organization works and who can do what.',
-    pages: { roles: 'Roles & permissions', security: 'Security' },
+    pages: { users: 'Users & access', roles: 'Roles & permissions', security: 'Security' },
   },
   permissions: {
     rolesList: 'Roles',
@@ -230,6 +230,28 @@ export default {
       adjust_credit: 'Adjust credit',
       security: 'Security policy',
     },
+  },
+  access: {
+    intro:
+      'Choose where each person works. Branch-limited roles (manager, reception, coaches) only see data from these branches.',
+    empty: 'No staff yet',
+    loadError: "Users couldn't be loaded.",
+    columns: { person: 'Person', roles: 'Roles', status: 'Status', locations: 'Branches' },
+    status: { Active: 'Active', Invited: 'Invited', Deactivated: 'Deactivated' },
+    all: 'All branches',
+    allHint: 'Including branches added later.',
+    allNotAllowed: 'Only someone with access to every branch can grant this.',
+    selected: 'Selected branches',
+    selectedHint: 'Only data from these branches.',
+    none: 'No branches yet',
+    noneSelected: 'With no branch selected, this person sees no branch data.',
+    noLocations: 'No branches have been added yet. They are created in branch management.',
+    orgWideRole: 'Their role applies to the whole organization, so they see every branch.',
+    ownerLocked: 'Always all branches',
+    edit: 'Branches',
+    dialogTitle: 'Branches for {name}',
+    notAllowed: 'You can only give access to branches you work at.',
+    savedToast: 'Branches updated for {name}',
   },
   tenantApp: {
     signIn: {

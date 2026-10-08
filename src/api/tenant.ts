@@ -17,6 +17,27 @@ export interface StaffUser {
   /** Effective permissions (module.action), for hiding what the user can't do. The API checks anyway. */
   permissions: string[]
   scope: AccessScope
+  /** Locations this user may see; null means every location (US-00.09). */
+  location_ids: number[] | null
+}
+
+export interface Location {
+  id: number
+  name: string
+}
+
+export interface StaffAccess {
+  id: number
+  name: string
+  email: string
+  status: 'Invited' | 'Active' | 'Deactivated'
+  roles: string[]
+  scope: AccessScope
+  owner: boolean
+  /** false when a role applies to the whole organization: the assignment then has no effect */
+  location_limited: boolean
+  all_locations: boolean
+  location_ids: number[]
 }
 
 /** Where a role's permissions apply: whole organization, assigned branches, or own sessions and clients. */
@@ -149,6 +170,18 @@ export const tenantApi = {
     async disable(password: string): Promise<TwoFactorStatus> {
       return (await http.delete('/api/account/two-factor', { data: { password } })).data.data
     },
+  },
+  async locations(): Promise<Location[]> {
+    return (await http.get('/api/locations')).data.data
+  },
+  async users(): Promise<StaffAccess[]> {
+    return (await http.get('/api/users')).data.data
+  },
+  async updateUserLocations(
+    id: number,
+    access: { all_locations: boolean; location_ids: number[] },
+  ): Promise<StaffAccess> {
+    return (await http.put(`/api/users/${id}/locations`, access)).data.data
   },
   async roles(): Promise<RolesMatrix> {
     const { data } = await http.get('/api/roles')

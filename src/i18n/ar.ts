@@ -124,7 +124,7 @@ const ar: typeof en = {
   settings: {
     title: 'الإعدادات',
     subtitle: 'طريقة عمل منظمتك ومن يمكنه فعل ماذا.',
-    pages: { roles: 'الأدوار والصلاحيات', security: 'الأمان' },
+    pages: { users: 'المستخدمون والوصول', roles: 'الأدوار والصلاحيات', security: 'الأمان' },
   },
   permissions: {
     rolesList: 'الأدوار',
@@ -231,6 +231,28 @@ const ar: typeof en = {
       adjust_credit: 'تعديل الرصيد الدائن',
       security: 'سياسة الأمان',
     },
+  },
+  access: {
+    intro:
+      'اختر أين يعمل كل شخص. الأدوار المقيّدة بالفروع (المدير والاستقبال والمدربون) ترى بيانات هذه الفروع فقط.',
+    empty: 'لا يوجد موظفون بعد',
+    loadError: 'تعذّر تحميل المستخدمين.',
+    columns: { person: 'الشخص', roles: 'الأدوار', status: 'الحالة', locations: 'الفروع' },
+    status: { Active: 'نشط', Invited: 'مدعو', Deactivated: 'معطّل' },
+    all: 'كل الفروع',
+    allHint: 'بما في ذلك الفروع التي تُضاف لاحقًا.',
+    allNotAllowed: 'يمكن منح هذا فقط من قِبل من لديه صلاحية على كل الفروع.',
+    selected: 'فروع محددة',
+    selectedHint: 'بيانات هذه الفروع فقط.',
+    none: 'لا توجد فروع بعد',
+    noneSelected: 'بدون أي فرع محدد لن يرى هذا الشخص بيانات أي فرع.',
+    noLocations: 'لم تُضف أي فروع بعد. تُنشأ الفروع من إدارة الفروع.',
+    orgWideRole: 'دوره يشمل المنظمة بالكامل، لذلك يرى كل الفروع.',
+    ownerLocked: 'كل الفروع دائمًا',
+    edit: 'الفروع',
+    dialogTitle: 'فروع {name}',
+    notAllowed: 'يمكنك منح الوصول فقط إلى الفروع التي تعمل بها.',
+    savedToast: 'تم تحديث فروع {name}',
   },
   tenantApp: {
     signIn: {
