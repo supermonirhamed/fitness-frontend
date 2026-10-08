@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -9,7 +10,10 @@ import Skeleton from 'primevue/skeleton'
 import ArchiveFilter from '@/components/patterns/ArchiveFilter.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
-import { tenantApi, type Location } from '@/api/tenant'
+import StatusTag from '@/components/patterns/StatusTag.vue'
+import LocationFormDrawer from '@/components/locations/LocationFormDrawer.vue'
+import { tenantApi, type Location, type LocationDetails } from '@/api/tenant'
+import { errorCode } from '@/lib/apiErrors'
 import { statusOf } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
 import { useFormat } from '@/composables/useFormat'
@@ -24,6 +28,10 @@ const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
 const archived = ref(false)
 const locations = ref<Location[]>([])
 const canArchive = () => auth.can('locations.delete')
+const canCreate = () => auth.can('locations.create')
+const canEdit = () => auth.can('locations.update')
+const route = useRoute()
+const router = useRouter()
 // Branches in different timezones: show the zone next to times (US-00.14).
 const mixed = computed(() => mixesZones(locations.value.map((l) => l.timezone)))
 
@@ -36,8 +44,48 @@ async function load() {
     state.value = statusOf(e) === 403 ? 'forbidden' : 'error'
   }
 }
-onMounted(load)
+onMounted(async () => {
+  await load()
+  // "Create your first branch" from Today opens the form straight away.
+  if (route.query.new === '1' && canCreate()) {
+    openForm(null)
+    router.replace({ query: {} })
+  }
+})
 watch(archived, load)
+
+// Create / edit (US-01.03)
+const formOpen = ref(false)
+const editing = ref<LocationDetails | null>(null)
+const loadingEdit = ref<number | null>(null)
+
+async function openForm(location: Location | null) {
+  if (!location) {
+    editing.value = null
+    formOpen.value = true
+    return
+  }
+  loadingEdit.value = location.id
+  try {
+    editing.value = await tenantApi.location(location.id)
+    formOpen.value = true
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  } finally {
+    loadingEdit.value = null
+  }
+}
+
+async function onSaved(location: LocationDetails, created: boolean) {
+  toast.add({
+    severity: 'success',
+    summary: t(created ? 'locationForm.created' : 'locationForm.saved', { name: location.name }),
+    life: 4000,
+  })
+  if (archived.value) archived.value = false
+  else await load()
+  if (created && auth.user?.location_ids !== null) await auth.check(true) // now one of their branches
+}
 
 // Archive / restore
 const target = ref<Location | null>(null)
@@ -69,8 +117,9 @@ async function confirm() {
       life: 4000,
     })
     if (auth.user?.location_ids !== null) await auth.check(true) // their own branches may have changed
-  } catch {
-    error.value = t('common.genericError')
+  } catch (e) {
+    error.value =
+      errorCode(e) === 'last_location' ? t('locationsPage.lastLocation') : t('common.genericError')
   } finally {
     busy.value = false
   }
@@ -81,7 +130,15 @@ async function confirm() {
   <section class="card">
     <div class="toolbar">
       <p>{{ t('locationsPage.intro') }}</p>
-      <ArchiveFilter v-if="canArchive()" v-model="archived" />
+      <div class="tools">
+        <ArchiveFilter v-if="canArchive()" v-model="archived" />
+        <Button
+          v-if="canCreate()"
+          icon="pi pi-plus"
+          :label="t('locationForm.newTitle')"
+          @click="openForm(null)"
+        />
+      </div>
     </div>
 
     <div
@@ -119,12 +176,24 @@ async function confirm() {
       :icon="archived ? 'pi-inbox' : 'pi-building'"
       :title="archived ? t('archive.noneArchived') : t('locationsPage.empty')"
       :body="archived ? t('archive.noneArchivedHint') : t('locationsPage.emptyHint')"
-    />
+    >
+      <Button
+        v-if="!archived && canCreate()"
+        icon="pi pi-plus"
+        :label="t('locationForm.firstBranch')"
+        @click="openForm(null)"
+      />
+    </EmptyState>
 
     <DataTable v-else :value="locations" data-key="id" size="small">
       <Column :header="t('locationsPage.columns.name')">
         <template #body="{ data }">
           <span class="name">{{ data.name }}</span>
+        </template>
+      </Column>
+      <Column :header="t('locationsPage.columns.status')">
+        <template #body="{ data }">
+          <StatusTag :status="data.status" />
         </template>
       </Column>
       <Column :header="t('locationsPage.columns.timezone')">
@@ -140,10 +209,21 @@ async function confirm() {
           }}</span>
         </template>
       </Column>
-      <Column v-if="canArchive()" class="actions-col">
+      <Column v-if="canArchive() || canEdit()" class="actions-col">
         <template #body="{ data }">
           <div class="actions">
             <Button
+              v-if="canEdit() && !archived"
+              size="small"
+              variant="text"
+              severity="secondary"
+              icon="pi pi-pencil"
+              :label="t('locationForm.edit')"
+              :loading="loadingEdit === data.id"
+              @click="openForm(data)"
+            />
+            <Button
+              v-if="canArchive()"
               size="small"
               variant="text"
               :severity="archived ? undefined : 'secondary'"
@@ -155,6 +235,8 @@ async function confirm() {
         </template>
       </Column>
     </DataTable>
+
+    <LocationFormDrawer v-model:visible="formOpen" :location="editing" @saved="onSaved" />
 
     <ConfirmActionDialog
       v-if="target"
@@ -186,6 +268,12 @@ async function confirm() {
   flex-wrap: wrap;
   padding: var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
+}
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 .toolbar p {
   margin: 0;

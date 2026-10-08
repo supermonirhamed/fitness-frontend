@@ -79,11 +79,31 @@ export interface StaffUser {
   location_ids: number[] | null
 }
 
+export type LocationStatus = 'Draft' | 'Active' | 'Inactive'
+
 export interface Location {
   id: number
   name: string
+  status: LocationStatus
   timezone: string
   archived_at?: string | null
+}
+
+/** Editable branch details (US-01.03). */
+export interface LocationInput {
+  name: string
+  status: LocationStatus
+  address: string
+  timezone: string
+  phone: string | null
+  email: string | null
+  latitude: number | null
+  longitude: number | null
+  description: string | null
+}
+
+export interface LocationDetails extends Location, LocationInput {
+  photo_url: string | null
 }
 
 export interface StaffAccess {
@@ -274,6 +294,23 @@ export const tenantApi = {
   /** Active branches, or archived ones (needs locations.delete). */
   async locations(archived = false): Promise<Location[]> {
     return (await http.get('/api/locations', { params: archived ? { archived: 1 } : {} })).data.data
+  },
+  async location(id: number): Promise<LocationDetails> {
+    return (await http.get(`/api/locations/${id}`)).data.data
+  },
+  async createLocation(input: Partial<LocationInput>): Promise<LocationDetails> {
+    return (await http.post('/api/locations', input)).data.data
+  },
+  async updateLocation(id: number, input: LocationInput): Promise<LocationDetails> {
+    return (await http.put(`/api/locations/${id}`, input)).data.data
+  },
+  async uploadLocationPhoto(id: number, file: File): Promise<LocationDetails> {
+    const form = new FormData()
+    form.append('photo', file)
+    return (await http.post(`/api/locations/${id}/photo`, form)).data.data
+  },
+  async deleteLocationPhoto(id: number): Promise<void> {
+    await http.delete(`/api/locations/${id}/photo`)
   },
   async archiveLocation(id: number): Promise<void> {
     await http.delete(`/api/locations/${id}`)
