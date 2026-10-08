@@ -94,6 +94,12 @@ const tenantRoutes: RouteRecordRaw[] = [
             meta: { permission: 'settings.view' },
           },
           {
+            path: 'booking-policies',
+            name: 'tenant.settings.booking',
+            component: () => import('@/views/tenant/settings/BookingPolicyView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
             path: 'locations',
             name: 'tenant.settings.locations',
             component: () => import('@/views/tenant/settings/LocationsView.vue'),

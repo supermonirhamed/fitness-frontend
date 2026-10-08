@@ -32,6 +32,38 @@ export interface RegionalSettings {
   week_start: number
 }
 
+export type Penalty = 'none' | 'consume_credit' | 'fixed_fee'
+
+/** Booking & cancellation policy (US-01.02). */
+export interface BookingPolicy {
+  booking_opens_days: number
+  booking_closes_minutes: number
+  cancellation_window_hours: number
+  late_cancel_penalty: Penalty
+  late_cancel_fee: number | null
+  no_show_penalty: Penalty
+  no_show_fee: number | null
+  waitlist_closes_minutes: number
+  waitlist_mode: 'manual' | 'automatic'
+}
+
+/** Overrides: null inherits from the level above. */
+export type BookingPolicyOverrides = { [K in keyof BookingPolicy]: BookingPolicy[K] | null }
+
+export type PolicySource = 'organization' | 'location' | 'service' | 'session'
+
+export interface BookingPolicyOptions {
+  penalties: Penalty[]
+  waitlist_modes: BookingPolicy['waitlist_mode'][]
+}
+
+export interface LocationBookingPolicy {
+  overrides: Partial<BookingPolicy>
+  organization: BookingPolicy
+  effective: BookingPolicy
+  sources: Record<string, PolicySource>
+}
+
 export interface StaffUser {
   id: number
   name: string
@@ -324,6 +356,25 @@ export const tenantApi = {
       settings: RegionalSettings,
     ): Promise<RegionalSettings & { currency_locked: boolean }> {
       return (await http.put('/api/settings/regional', settings)).data.data
+    },
+  },
+  bookingPolicy: {
+    async get(): Promise<{ data: BookingPolicy; options: BookingPolicyOptions }> {
+      return (await http.get('/api/settings/booking-policy')).data
+    },
+    async update(policy: BookingPolicy): Promise<BookingPolicy> {
+      return (await http.put('/api/settings/booking-policy', policy)).data.data
+    },
+    async forLocation(
+      id: number,
+    ): Promise<{ data: LocationBookingPolicy; options: BookingPolicyOptions }> {
+      return (await http.get(`/api/locations/${id}/booking-policy`)).data
+    },
+    async updateLocation(
+      id: number,
+      overrides: BookingPolicyOverrides,
+    ): Promise<LocationBookingPolicy> {
+      return (await http.put(`/api/locations/${id}/booking-policy`, overrides)).data.data
     },
   },
   security: {

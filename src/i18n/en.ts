@@ -127,6 +127,7 @@ export default {
     pages: {
       organization: 'Organization',
       regional: 'Regional',
+      booking: 'Booking policies',
       locations: 'Branches',
       users: 'Users & access',
       roles: 'Roles & permissions',
@@ -310,6 +311,11 @@ export default {
       audit_exported: 'Audit log exported',
       location_archived: 'Branch archived',
       location_restored: 'Branch restored',
+      location_booking_policy_updated: 'Branch booking policy changed',
+      settings_booking_policy_updated: 'Booking policies changed',
+      settings_regional_updated: 'Regional settings changed',
+      organization_updated: 'Organization profile changed',
+      organization_logo_changed: 'Logo changed',
     },
     entities: { Role: 'Role', User: 'User', Location: 'Branch' },
     fields: {
@@ -323,6 +329,15 @@ export default {
       remaining: 'Recovery codes left',
       filters: 'Filters',
       deleted_at: 'Archived',
+      booking_opens_days: 'Booking opens (days before)',
+      booking_closes_minutes: 'Booking closes (minutes before)',
+      cancellation_window_hours: 'Free cancellation (hours before)',
+      late_cancel_penalty: 'Late-cancel penalty',
+      late_cancel_fee: 'Late-cancel fee',
+      no_show_penalty: 'No-show penalty',
+      no_show_fee: 'No-show fee',
+      waitlist_closes_minutes: 'Waitlist closes (minutes before)',
+      waitlist_mode: 'Waitlist mode',
     },
   },
   archive: {
@@ -389,6 +404,70 @@ export default {
     },
     invalid: 'Check the highlighted settings.',
     saved: 'Regional settings saved',
+  },
+  bookingPolicy: {
+    intro:
+      'When clients can book and cancel, and what late cancellations, no-shows and the waitlist do.',
+    inheritance:
+      'Branches, services and single sessions can override these. Changes apply to new bookings only: existing bookings keep the rules they were made with.',
+    loadError: "Booking policies couldn't be loaded.",
+    saved: 'Booking policies saved',
+    checkFields: 'Check the highlighted settings.',
+    invalid: 'Enter a valid value.',
+    feeRequired: 'Enter a fee above zero (up to 3 decimals).',
+    feeAmount: 'Fee amount',
+    override: 'Override',
+    overrideField: 'Override {field}',
+    inheritedFrom: 'From {level}',
+    groups: {
+      booking: 'Booking window',
+      cancellation: 'Cancellation',
+      noShow: 'No-show',
+      waitlist: 'Waitlist',
+    },
+    fields: {
+      booking_opens_days: 'Booking opens',
+      booking_closes_minutes: 'Booking closes',
+      cancellation_window_hours: 'Free cancellation until',
+      late_cancel_penalty: 'Late-cancel penalty',
+      no_show_penalty: 'No-show penalty',
+      waitlist_mode: 'Waitlist mode',
+      waitlist_closes_minutes: 'Waitlist closes',
+    },
+    penalties: { none: 'None', consume_credit: 'Consume credit', fixed_fee: 'Fixed fee' },
+    modes: { manual: 'Manual', automatic: 'Automatic' },
+    unitNames: { days: 'days before', minutes: 'min before', hours: 'hours before' },
+    units: {
+      days: '0 days before | 1 day before | {n} days before',
+      minutes: 'At the start | 1 minute before | {n} minutes before',
+      hours: 'At the start | 1 hour before | {n} hours before',
+    },
+    examples: {
+      booking_opens_days:
+        'Clients can book on the day of the session only. | Clients can book from 1 day before a session. | Clients can book from {n} days before a session.',
+      booking_closes_minutes:
+        'Booking stays open until the session starts. | Booking closes 1 minute before the start. | Booking closes {n} minutes before the start.',
+      cancellation_window_hours:
+        'Cancelling is free until the session starts. | Cancelling is free until 1 hour before the start; later is a late cancellation. | Cancelling is free until {n} hours before the start; later is a late cancellation.',
+      waitlist_closes_minutes:
+        'People can join the waitlist until the session starts. | The waitlist closes 1 minute before the start. | The waitlist closes {n} minutes before the start.',
+      late_cancel_penalty: {
+        none: 'A late cancellation costs the client nothing.',
+        consume_credit: 'A late cancellation uses up the credit or visit of the booking.',
+        fixed_fee: 'A late cancellation is charged the fee below.',
+      },
+      no_show_penalty: {
+        none: 'A no-show costs the client nothing.',
+        consume_credit: 'A no-show uses up the credit or visit of the booking.',
+        fixed_fee: 'A no-show is charged the fee below.',
+      },
+      waitlist_mode: {
+        manual:
+          'When a spot frees up, waitlisted clients are told and the first to claim it gets it.',
+        automatic:
+          'When a spot frees up, the first person on the waitlist is booked automatically.',
+      },
+    },
   },
   orgProfile: {
     loadError: "The organization profile couldn't be loaded.",

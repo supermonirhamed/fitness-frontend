@@ -15,6 +15,7 @@ export interface SettingsPage {
 export const SETTINGS_PAGES: SettingsPage[] = [
   { name: 'tenant.settings.organization', key: 'organization', permission: 'settings.view' },
   { name: 'tenant.settings.regional', key: 'regional', permission: 'settings.view' },
+  { name: 'tenant.settings.booking', key: 'booking', permission: 'settings.view' },
   { name: 'tenant.settings.locations', key: 'locations', permission: 'locations.view' },
   { name: 'tenant.settings.users', key: 'users', permission: 'staff.view' },
   { name: 'tenant.settings.roles', key: 'roles', permission: 'roles.view' },

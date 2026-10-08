@@ -24,6 +24,7 @@ describe('permissions helpers', () => {
     expect(allowedSettingsPages(can(everything)).map((p) => p.key)).toEqual([
       'organization',
       'regional',
+      'booking',
       'locations',
       'users',
       'roles',

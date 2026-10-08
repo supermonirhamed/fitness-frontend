@@ -128,6 +128,7 @@ const ar: typeof en = {
     pages: {
       organization: 'المنظمة',
       regional: 'الإعدادات الإقليمية',
+      booking: 'سياسات الحجز',
       locations: 'الفروع',
       users: 'المستخدمون والوصول',
       roles: 'الأدوار والصلاحيات',
@@ -317,6 +318,11 @@ const ar: typeof en = {
       audit_exported: 'تصدير سجل التدقيق',
       location_archived: 'أرشفة فرع',
       location_restored: 'استعادة فرع',
+      location_booking_policy_updated: 'تغيير سياسة الحجز للفرع',
+      settings_booking_policy_updated: 'تغيير سياسات الحجز',
+      settings_regional_updated: 'تغيير الإعدادات الإقليمية',
+      organization_updated: 'تغيير ملف المنظمة',
+      organization_logo_changed: 'تغيير الشعار',
     },
     entities: { Role: 'دور', User: 'مستخدم', Location: 'فرع' },
     fields: {
@@ -330,6 +336,15 @@ const ar: typeof en = {
       remaining: 'رموز الاسترداد المتبقية',
       filters: 'الفلاتر',
       deleted_at: 'مؤرشف',
+      booking_opens_days: 'يفتح الحجز (أيام قبل)',
+      booking_closes_minutes: 'يُغلق الحجز (دقائق قبل)',
+      cancellation_window_hours: 'الإلغاء المجاني (ساعات قبل)',
+      late_cancel_penalty: 'غرامة الإلغاء المتأخر',
+      late_cancel_fee: 'رسوم الإلغاء المتأخر',
+      no_show_penalty: 'غرامة عدم الحضور',
+      no_show_fee: 'رسوم عدم الحضور',
+      waitlist_closes_minutes: 'إغلاق قائمة الانتظار (دقائق قبل)',
+      waitlist_mode: 'وضع قائمة الانتظار',
     },
   },
   archive: {
@@ -394,6 +409,68 @@ const ar: typeof en = {
     },
     invalid: 'تحقق من الإعدادات المحددة.',
     saved: 'تم حفظ الإعدادات الإقليمية',
+  },
+  bookingPolicy: {
+    intro:
+      'متى يمكن للعملاء الحجز والإلغاء، وماذا يحدث عند الإلغاء المتأخر وعدم الحضور وفي قائمة الانتظار.',
+    inheritance:
+      'يمكن للفروع والخدمات والحصص الفردية تجاوز هذه الإعدادات. تسري التغييرات على الحجوزات الجديدة فقط، وتحتفظ الحجوزات الحالية بالقواعد التي أُنشئت بها.',
+    loadError: 'تعذّر تحميل سياسات الحجز.',
+    saved: 'تم حفظ سياسات الحجز',
+    checkFields: 'تحقق من الإعدادات المحددة.',
+    invalid: 'أدخل قيمة صحيحة.',
+    feeRequired: 'أدخل رسومًا أكبر من صفر (حتى 3 منازل عشرية).',
+    feeAmount: 'مبلغ الرسوم',
+    override: 'تجاوز',
+    overrideField: 'تجاوز {field}',
+    inheritedFrom: 'من {level}',
+    groups: {
+      booking: 'فترة الحجز',
+      cancellation: 'الإلغاء',
+      noShow: 'عدم الحضور',
+      waitlist: 'قائمة الانتظار',
+    },
+    fields: {
+      booking_opens_days: 'يفتح الحجز',
+      booking_closes_minutes: 'يُغلق الحجز',
+      cancellation_window_hours: 'الإلغاء المجاني حتى',
+      late_cancel_penalty: 'غرامة الإلغاء المتأخر',
+      no_show_penalty: 'غرامة عدم الحضور',
+      waitlist_mode: 'وضع قائمة الانتظار',
+      waitlist_closes_minutes: 'تُغلق قائمة الانتظار',
+    },
+    penalties: { none: 'لا شيء', consume_credit: 'خصم رصيد', fixed_fee: 'رسوم ثابتة' },
+    modes: { manual: 'يدوي', automatic: 'تلقائي' },
+    unitNames: { days: 'يوم قبل', minutes: 'دقيقة قبل', hours: 'ساعة قبل' },
+    units: {
+      days: 'يوم الحصة | قبل يوم واحد | قبل {n} يوم',
+      minutes: 'عند البدء | قبل دقيقة واحدة | قبل {n} دقيقة',
+      hours: 'عند البدء | قبل ساعة واحدة | قبل {n} ساعة',
+    },
+    examples: {
+      booking_opens_days:
+        'يمكن للعملاء الحجز في يوم الحصة فقط. | يمكن للعملاء الحجز قبل الحصة بيوم واحد. | يمكن للعملاء الحجز قبل الحصة بـ {n} يوم.',
+      booking_closes_minutes:
+        'يبقى الحجز مفتوحًا حتى بدء الحصة. | يُغلق الحجز قبل البدء بدقيقة واحدة. | يُغلق الحجز قبل البدء بـ {n} دقيقة.',
+      cancellation_window_hours:
+        'الإلغاء مجاني حتى بدء الحصة. | الإلغاء مجاني حتى ساعة واحدة قبل البدء، وبعدها يُعد إلغاءً متأخرًا. | الإلغاء مجاني حتى {n} ساعة قبل البدء، وبعدها يُعد إلغاءً متأخرًا.',
+      waitlist_closes_minutes:
+        'يمكن الانضمام لقائمة الانتظار حتى بدء الحصة. | تُغلق قائمة الانتظار قبل البدء بدقيقة واحدة. | تُغلق قائمة الانتظار قبل البدء بـ {n} دقيقة.',
+      late_cancel_penalty: {
+        none: 'لا يتحمل العميل أي شيء عند الإلغاء المتأخر.',
+        consume_credit: 'يُخصم رصيد الحجز أو الزيارة عند الإلغاء المتأخر.',
+        fixed_fee: 'تُفرض الرسوم أدناه عند الإلغاء المتأخر.',
+      },
+      no_show_penalty: {
+        none: 'لا يتحمل العميل أي شيء عند عدم الحضور.',
+        consume_credit: 'يُخصم رصيد الحجز أو الزيارة عند عدم الحضور.',
+        fixed_fee: 'تُفرض الرسوم أدناه عند عدم الحضور.',
+      },
+      waitlist_mode: {
+        manual: 'عند توفر مكان يُبلَّغ المنتظرون، ويحصل عليه أول من يطالب به.',
+        automatic: 'عند توفر مكان يُحجز تلقائيًا لأول شخص في قائمة الانتظار.',
+      },
+    },
   },
   orgProfile: {
     loadError: 'تعذّر تحميل ملف المنظمة.',
