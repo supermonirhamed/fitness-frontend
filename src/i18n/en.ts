@@ -481,7 +481,7 @@ export default {
     name: 'Name',
     type: 'Type',
     capacity: 'Capacity',
-    capacityHint: 'People at once',
+    capacityHint: 'People at once. Sessions here cannot take more.',
     status: 'Status',
     statusHint: {
       Active: 'Sessions can be scheduled here.',

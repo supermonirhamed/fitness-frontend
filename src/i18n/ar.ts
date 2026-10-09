@@ -485,7 +485,7 @@ const ar: typeof en = {
     name: 'الاسم',
     type: 'النوع',
     capacity: 'السعة',
-    capacityHint: 'عدد الأشخاص في وقت واحد',
+    capacityHint: 'عدد الأشخاص في وقت واحد. لا تتجاوزه الحصص هنا.',
     status: 'الحالة',
     statusHint: {
       Active: 'يمكن جدولة الحصص هنا.',
