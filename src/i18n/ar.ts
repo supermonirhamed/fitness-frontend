@@ -309,6 +309,8 @@ const ar: typeof en = {
       changes: 'ما تغيّر',
     },
     actions: {
+      service_archived: 'أرشفة خدمة',
+      service_restored: 'استعادة خدمة',
       service_created: 'إنشاء خدمة',
       service_updated: 'تعديل خدمة',
       service_photo_changed: 'تغيير الصورة',
@@ -671,6 +673,8 @@ const ar: typeof en = {
   details: {
     missing: 'الخدمة غير موجودة',
     missingHint: 'قد لا تكون مقدّمة في فروعك.',
+    draftBanner: 'مسودة: يراها الموظفون فقط ولا يمكن حجزها. انشرها عندما تكون جاهزة.',
+    archivedBanner: 'مؤرشفة: لا يمكن إنشاء حصص جديدة. تبقى في التقارير وسجل العملاء.',
     unpublish: 'إلغاء النشر',
     tabs: {
       overview: 'نظرة عامة',
@@ -699,6 +703,15 @@ const ar: typeof en = {
     noSessionsHint: 'ستظهر حصص هذه الخدمة هنا بعد إعداد الجدول.',
     noActivity: 'لا تغييرات مسجلة بعد',
     system: 'النظام',
+  },
+  archiveService: {
+    title: 'أرشفة {name}؟',
+    lead: 'لا يمكن إنشاء حصص جديدة لها. تبقى في التقارير وسجل العملاء، ويمكنك استعادتها لاحقًا.',
+    noUpcoming: 'لا توجد حصص قادمة لهذه الخدمة.',
+    upcoming: 'لهذه الخدمة {sessions} و{bookings}.',
+    keep: 'الإبقاء عليها حتى تنتهي',
+    keepHint: 'تُقام الحصص المجدولة، ولا يمكن إنشاء حصص جديدة.',
+    cancel: 'إلغاؤها الآن',
   },
   facilityConflict: {
     label: 'محجوز مسبقًا في ذلك الوقت',

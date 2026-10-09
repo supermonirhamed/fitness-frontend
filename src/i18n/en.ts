@@ -303,6 +303,8 @@ export default {
     no: 'No',
     columns: { time: 'Time', actor: 'Who', action: 'Action', entity: 'Record', changes: 'Changed' },
     actions: {
+      service_archived: 'Service archived',
+      service_restored: 'Service restored',
       service_created: 'Service created',
       service_updated: 'Service changed',
       service_photo_changed: 'Photo changed',
@@ -684,6 +686,9 @@ export default {
   details: {
     missing: 'Service not found',
     missingHint: 'It may not be offered at your branches.',
+    draftBanner: 'Draft: only staff see it and it cannot be booked. Publish it when it is ready.',
+    archivedBanner:
+      'Archived: no new sessions can be created. It stays in reports and client history.',
     unpublish: 'Unpublish',
     tabs: {
       overview: 'Overview',
@@ -712,6 +717,15 @@ export default {
     noSessionsHint: 'Sessions of this service will be listed here once the schedule is set up.',
     noActivity: 'No changes recorded yet',
     system: 'System',
+  },
+  archiveService: {
+    title: 'Archive {name}?',
+    lead: 'No new sessions can be created for it. Reports and client history keep it, and you can restore it later.',
+    noUpcoming: 'This service has no upcoming sessions.',
+    upcoming: 'This service has {sessions} and {bookings}.',
+    keep: 'Keep them until they finish',
+    keepHint: 'Scheduled sessions still take place; no new ones can be created.',
+    cancel: 'Cancel them now',
   },
   facilityConflict: {
     label: 'Already booked at that time',

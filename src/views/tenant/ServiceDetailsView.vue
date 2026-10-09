@@ -13,7 +13,8 @@ import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import Tag from 'primevue/tag'
-import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
+import Message from 'primevue/message'
+import ArchiveServiceDialog from '@/components/services/ArchiveServiceDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import ServiceBookingRules from '@/components/services/ServiceBookingRules.vue'
@@ -116,7 +117,18 @@ function onSaved(saved: Service) {
 // Publish / unpublish / archive (bulk endpoint, one service)
 const archiveOpen = ref(false)
 const busy = ref(false)
-async function setStatus(action: 'publish' | 'archive' | 'draft') {
+async function restore() {
+  if (!service.value) return
+  busy.value = true
+  try {
+    service.value = await tenantApi.services.restore(service.value.id)
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 5000 })
+  } finally {
+    busy.value = false
+  }
+}
+async function setStatus(action: 'publish' | 'draft') {
   if (!service.value) return
   busy.value = true
   try {
@@ -245,7 +257,7 @@ const changedFields = (entry: AuditEntry) =>
         </template>
         <template v-if="canEdit" #actions>
           <Button
-            v-if="service.status !== 'Published'"
+            v-if="service.status === 'Draft'"
             icon="pi pi-check"
             :label="t('catalog.bulk.publish')"
             severity="secondary"
@@ -254,7 +266,7 @@ const changedFields = (entry: AuditEntry) =>
             @click="setStatus('publish')"
           />
           <Button
-            v-else
+            v-else-if="service.status === 'Published'"
             icon="pi pi-eye-slash"
             :label="t('details.unpublish')"
             severity="secondary"
@@ -263,7 +275,16 @@ const changedFields = (entry: AuditEntry) =>
             @click="setStatus('draft')"
           />
           <Button
-            v-if="service.status !== 'Archived'"
+            v-if="service.status === 'Archived'"
+            icon="pi pi-replay pi-dir"
+            :label="t('archive.restore')"
+            severity="secondary"
+            variant="outlined"
+            :loading="busy"
+            @click="restore"
+          />
+          <Button
+            v-else
             icon="pi pi-box"
             :label="t('catalog.bulk.archive')"
             severity="secondary"
@@ -273,6 +294,13 @@ const changedFields = (entry: AuditEntry) =>
           <Button icon="pi pi-pencil" :label="t('locationForm.edit')" @click="openEdit" />
         </template>
       </PageHeader>
+
+      <Message v-if="service.status === 'Draft'" severity="info" :closable="false">{{
+        t('details.draftBanner')
+      }}</Message>
+      <Message v-else-if="service.status === 'Archived'" severity="warn" :closable="false">{{
+        t('details.archivedBanner')
+      }}</Message>
 
       <Tabs v-model:value="tab" scrollable>
         <TabList>
@@ -451,14 +479,10 @@ const changedFields = (entry: AuditEntry) =>
         :locations="locations"
         @saved="onSaved"
       />
-      <ConfirmActionDialog
+      <ArchiveServiceDialog
         v-model:visible="archiveOpen"
-        :title="t('catalog.bulk.archiveTitle', 1)"
-        :description="t('catalog.bulk.archiveBody')"
-        :confirm-label="t('catalog.bulk.archive')"
-        destructive
-        :loading="busy"
-        @confirm="setStatus('archive')"
+        :service="service"
+        @archived="(s) => (service = s)"
       />
     </template>
   </div>

@@ -785,6 +785,18 @@ export const tenantApi = {
     async get(id: number): Promise<Service> {
       return (await http.get(`/api/services/${id}`)).data.data
     },
+    async archiveImpact(id: number): Promise<DeactivationImpact> {
+      return (await http.get(`/api/services/${id}/archive-impact`)).data.data
+    },
+    async archive(
+      id: number,
+      choice: { future_sessions?: FutureSessionsChoice; reason?: string } = {},
+    ): Promise<Service> {
+      return (await http.post(`/api/services/${id}/archive`, choice)).data.data
+    },
+    async restore(id: number): Promise<Service> {
+      return (await http.post(`/api/services/${id}/restore`)).data.data
+    },
     async staffOptions(): Promise<StaffOption[]> {
       return (await http.get('/api/services/staff-options')).data.data
     },

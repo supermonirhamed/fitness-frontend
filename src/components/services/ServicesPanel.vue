@@ -28,6 +28,7 @@ import {
   type StaffOption,
 } from '@/api/tenant'
 import { ACTIVITY_ICONS, activityKey, durationParts } from '@/lib/catalog'
+import { apiMessage } from '@/lib/apiErrors'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ categories: ServiceCategory[]; locationId?: number | null }>()
@@ -152,8 +153,10 @@ async function bulk(action: 'publish' | 'archive' | 'add_location') {
     selected.value = []
     bulkBranch.value = null
     load()
-  } catch {
-    toast.add({ severity: 'error', summary: t('common.genericError'), life: 5000 })
+  } catch (e) {
+    // e.g. a selected service has upcoming sessions: it is archived on its own page (US-02.12).
+    archiveOpen.value = false
+    toast.add({ severity: 'error', summary: apiMessage(e) ?? t('common.genericError'), life: 7000 })
   } finally {
     bulkBusy.value = false
   }
