@@ -19,6 +19,7 @@ import EmptyState from '@/components/patterns/EmptyState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import BusinessHoursEditor from '@/components/locations/BusinessHoursEditor.vue'
+import VatPanel from '@/components/locations/VatPanel.vue'
 import FacilitiesPanel from '@/components/locations/FacilitiesPanel.vue'
 import HourOverridesSection from '@/components/locations/HourOverridesSection.vue'
 import DeactivateLocationDialog from '@/components/locations/DeactivateLocationDialog.vue'
@@ -284,6 +285,7 @@ async function refreshStats() {
             t('locationDetails.tabs.staff')
           }}</Tab>
           <Tab value="policies">{{ t('locationDetails.tabs.policies') }}</Tab>
+          <Tab value="vat">{{ t('locationDetails.tabs.vat') }}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="info">
@@ -406,6 +408,14 @@ async function refreshStats() {
                 >
               </p>
             </template>
+          </TabPanel>
+
+          <TabPanel value="vat">
+            <VatPanel
+              v-if="tab === 'vat'"
+              :location-id="location.id"
+              :can-edit="auth.can('locations.vat')"
+            />
           </TabPanel>
 
           <TabPanel value="policies">

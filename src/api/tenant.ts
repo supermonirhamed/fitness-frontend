@@ -215,6 +215,26 @@ export interface FacilityAvailability {
   reservations: FacilityReservation[]
 }
 
+/** A branch's VAT (US-01.14). Rates are "15.00"; each applies from its date. */
+export interface VatSettings {
+  enabled: boolean
+  prices_include_vat: boolean
+  registration_number: string | null
+  legal_name: string | null
+  rate: string | null
+  rates: { rate: string; effective_from: string; scheduled: boolean }[]
+  today: string
+}
+
+export interface VatInput {
+  enabled: boolean
+  prices_include_vat: boolean
+  rate: number | null
+  effective_from: string | null
+  registration_number: string | null
+  legal_name: string | null
+}
+
 /** A holiday or special hours (US-01.07); dates are Y-m-d in the branch timezone. */
 export interface HourOverride {
   id: number
@@ -541,6 +561,14 @@ export const tenantApi = {
     },
     async unblock(id: number, blockId: number): Promise<void> {
       await http.delete(`/api/facilities/${id}/blocks/${blockId}`)
+    },
+  },
+  vat: {
+    async get(locationId: number): Promise<VatSettings> {
+      return (await http.get(`/api/locations/${locationId}/vat`)).data.data
+    },
+    async update(locationId: number, input: VatInput): Promise<VatSettings> {
+      return (await http.put(`/api/locations/${locationId}/vat`, input)).data.data
     },
   },
   hourOverrides: {
