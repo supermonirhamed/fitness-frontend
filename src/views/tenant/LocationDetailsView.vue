@@ -17,6 +17,7 @@ import Tabs from 'primevue/tabs'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
+import DeactivateLocationDialog from '@/components/locations/DeactivateLocationDialog.vue'
 import LocationFormDrawer from '@/components/locations/LocationFormDrawer.vue'
 import BookingPolicyFields from '@/components/policies/BookingPolicyFields.vue'
 import {
@@ -82,6 +83,35 @@ function onSaved(saved: LocationDetails) {
     summary: t('locationForm.saved', { name: saved.name }),
     life: 4000,
   })
+}
+
+// Deactivate / activate (US-01.05)
+const canChangeStatus = computed(() => auth.can('locations.delete'))
+const deactivateOpen = ref(false)
+const activating = ref(false)
+function onDeactivated(saved: LocationDetails) {
+  location.value = { ...location.value, ...saved }
+  toast.add({
+    severity: 'success',
+    summary: t('deactivateLocation.done', { name: saved.name }),
+    life: 4000,
+  })
+}
+async function activate() {
+  activating.value = true
+  try {
+    const saved = await tenantApi.activateLocation(props.id)
+    location.value = { ...location.value, ...saved }
+    toast.add({
+      severity: 'success',
+      summary: t('deactivateLocation.activated', { name: saved.name }),
+      life: 4000,
+    })
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 5000 })
+  } finally {
+    activating.value = false
+  }
 }
 
 // Staff tab
@@ -196,6 +226,23 @@ const comingSoon = ['hours', 'facilities', 'services'] as const
           >
         </template>
         <template #actions>
+          <Button
+            v-if="canChangeStatus && location.status === 'Inactive'"
+            severity="secondary"
+            variant="outlined"
+            icon="pi pi-play"
+            :label="t('deactivateLocation.activate')"
+            :loading="activating"
+            @click="activate"
+          />
+          <Button
+            v-else-if="canChangeStatus"
+            severity="danger"
+            variant="outlined"
+            icon="pi pi-power-off"
+            :label="t('deactivateLocation.action')"
+            @click="deactivateOpen = true"
+          />
           <Button
             v-if="canEdit"
             icon="pi pi-pencil"
@@ -374,6 +421,11 @@ const comingSoon = ['hours', 'facilities', 'services'] as const
       </Tabs>
 
       <LocationFormDrawer v-model:visible="formOpen" :location="location" @saved="onSaved" />
+      <DeactivateLocationDialog
+        v-model:visible="deactivateOpen"
+        :location="location"
+        @deactivated="onDeactivated"
+      />
     </template>
   </div>
 </template>

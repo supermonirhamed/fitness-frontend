@@ -33,3 +33,10 @@ export function linkProblem(error: unknown): LinkProblem | null {
 export function errorCode(error: unknown): string | undefined {
   return error instanceof AxiosError ? error.response?.data?.code : undefined
 }
+
+/** The translated message of a refusal that carries a `code` (409 conflicts, 403 rules), if any. */
+export function apiMessage(error: unknown): string | undefined {
+  return errorCode(error)
+    ? (error as AxiosError<{ message?: string }>).response?.data?.message
+    : undefined
+}

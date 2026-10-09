@@ -18,6 +18,7 @@ import {
   type LocationStatus,
 } from '@/api/tenant'
 import { validationErrors, type ValidationErrors } from '@/lib/http'
+import { apiMessage } from '@/lib/apiErrors'
 import { useOrganization } from '@/stores/organization'
 
 const props = defineProps<{ location: LocationDetails | null }>()
@@ -57,7 +58,8 @@ const photoError = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const statusOptions = computed(() =>
-  STATUSES.filter((s) => editing.value || s !== 'Inactive').map((s) => ({
+  // Deactivating has its own dialog (US-01.05): it checks upcoming sessions first.
+  STATUSES.filter((s) => s !== 'Inactive' || props.location?.status === 'Inactive').map((s) => ({
     value: s,
     label: t(`locationStatus.${s}`),
   })),
@@ -145,7 +147,7 @@ async function submit() {
     errors.value = validationErrors(e)
     formError.value = Object.keys(errors.value).length
       ? t('locationForm.checkFields')
-      : t('common.genericError')
+      : (apiMessage(e) ?? t('common.genericError'))
   } finally {
     saving.value = false
   }

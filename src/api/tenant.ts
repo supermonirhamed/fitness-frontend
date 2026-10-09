@@ -98,6 +98,14 @@ export interface Location {
   stats?: LocationStats
 }
 
+/** What deactivating a branch would affect (US-01.05). */
+export interface DeactivationImpact {
+  upcoming_sessions: number
+  upcoming_bookings: number
+}
+
+export type FutureSessionsChoice = 'keep' | 'cancel'
+
 export interface LocationStaffMember {
   id: number
   name: string
@@ -334,6 +342,18 @@ export const tenantApi = {
   },
   async deleteLocationPhoto(id: number): Promise<void> {
     await http.delete(`/api/locations/${id}/photo`)
+  },
+  async deactivationImpact(id: number): Promise<DeactivationImpact> {
+    return (await http.get(`/api/locations/${id}/deactivation`)).data.data
+  },
+  async deactivateLocation(
+    id: number,
+    choice: { future_sessions?: FutureSessionsChoice; reason?: string } = {},
+  ): Promise<LocationDetails> {
+    return (await http.post(`/api/locations/${id}/deactivate`, choice)).data.data
+  },
+  async activateLocation(id: number): Promise<LocationDetails> {
+    return (await http.post(`/api/locations/${id}/activate`)).data.data
   },
   async archiveLocation(id: number): Promise<void> {
     await http.delete(`/api/locations/${id}`)
