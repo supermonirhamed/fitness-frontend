@@ -557,6 +557,27 @@ export default {
       is_free: 'No payment; no other option applies.',
     },
     creditCost: 'Credits per booking',
+    allBranches: 'All branches',
+    anyCoach: 'Any coach',
+    coach: 'Coach',
+    bulk: {
+      label: 'Bulk actions',
+      selected: '{n} selected | {n} selected | {n} selected',
+      publish: 'Publish',
+      archive: 'Archive',
+      pickBranch: 'Branch',
+      addToBranch: 'Add to branch',
+      clear: 'Clear selection',
+      archiveTitle:
+        'Archive the selected service? | Archive the selected service? | Archive {n} services?',
+      archiveBody:
+        'They are no longer offered. Upcoming sessions are handled when sessions exist (US-02.12).',
+      done: {
+        publish: 'No services changed | 1 service published | {n} services published',
+        archive: 'No services changed | 1 service archived | {n} services archived',
+        add_location: 'No services changed | 1 service updated | {n} services updated',
+      },
+    },
     capacityHint: 'Sessions start with this; a facility can limit it.',
     branches: 'Branches offering it',
     branchesHint:

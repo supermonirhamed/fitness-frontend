@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The service catalog (US-02.02/03): filters, list, create and edit. Branch-limited staff see
-// the services of their branches.
+// The service catalog (US-02.02/03, list & filters US-02.10): search, filters, bulk publish /
+// archive / add to branch, create and edit. Branch-limited staff see their branches' services.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -13,6 +13,7 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ServiceBookingRulesDialog from '@/components/services/ServiceBookingRulesDialog.vue'
 import ServiceFormDrawer from '@/components/services/ServiceFormDrawer.vue'
@@ -24,6 +25,7 @@ import {
   type Service,
   type ServiceCategory,
   type ServiceStatus,
+  type StaffOption,
 } from '@/api/tenant'
 import { ACTIVITY_ICONS, activityKey, durationParts } from '@/lib/catalog'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -42,6 +44,10 @@ const search = ref('')
 const category = ref<number | null>(null)
 const type = ref<ActivityType | null>(null)
 const status = ref<ServiceStatus | null>(null)
+const branch = ref<number | null>(null)
+const coach = ref<number | null>(null)
+const coaches = ref<StaffOption[]>([])
+const branches = computed(() => auth.user?.switchable_locations ?? [])
 
 async function load() {
   state.value = 'loading'
@@ -51,6 +57,8 @@ async function load() {
       ...(category.value ? { category_id: category.value } : {}),
       ...(type.value ? { activity_type: type.value } : {}),
       ...(status.value ? { status: status.value } : {}),
+      ...(!props.locationId && branch.value ? { location_id: branch.value } : {}),
+      ...(coach.value ? { staff_id: coach.value } : {}),
       ...(search.value.trim() ? { search: search.value.trim() } : {}),
     })
     state.value = 'ready'
@@ -65,16 +73,21 @@ async function loadLocations() {
     locations.value = []
   }
 }
-onMounted(() => {
+onMounted(async () => {
   load()
   if (canCreate.value || canUpdate.value) loadLocations()
+  try {
+    coaches.value = await tenantApi.services.staffOptions()
+  } catch {
+    coaches.value = []
+  }
 })
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(search, () => {
   clearTimeout(timer)
   timer = setTimeout(load, 300)
 })
-watch([category, type, status, () => props.locationId], load)
+watch([category, type, status, branch, coach, () => props.locationId], load)
 
 const typeOptions = computed(() =>
   ACTIVITY_TYPES.map((v) => ({ value: v, label: t(`catalog.types.${activityKey(v)}`) })),
@@ -95,7 +108,10 @@ const duration = (minutes: number) => {
 }
 const branchNames = (s: Service) =>
   (s.locations ?? []).map((l) => l.name).join(locale.value === 'ar' ? '، ' : ', ')
-const filtered = computed(() => !!(search.value || category.value || type.value || status.value))
+const filtered = computed(
+  () =>
+    !!(search.value || category.value || type.value || status.value || branch.value || coach.value),
+)
 
 const drawerOpen = ref(false)
 const editing = ref<Service | null>(null)
@@ -108,6 +124,39 @@ const rulesFor = ref<Service | null>(null)
 function openRules(service: Service) {
   rulesFor.value = service
   rulesOpen.value = true
+}
+
+// Bulk actions (US-02.10)
+const selected = ref<Service[]>([])
+watch(
+  services,
+  () => (selected.value = selected.value.filter((s) => services.value.some((x) => x.id === s.id))),
+)
+const bulkBranch = ref<number | null>(null)
+const bulkBusy = ref(false)
+const archiveOpen = ref(false)
+async function bulk(action: 'publish' | 'archive' | 'add_location') {
+  bulkBusy.value = true
+  try {
+    const changed = await tenantApi.services.bulk(
+      selected.value.map((s) => s.id),
+      action,
+      action === 'add_location' ? bulkBranch.value : null,
+    )
+    toast.add({
+      severity: 'success',
+      summary: t(`catalog.bulk.done.${action}`, changed.length),
+      life: 3000,
+    })
+    archiveOpen.value = false
+    selected.value = []
+    bulkBranch.value = null
+    load()
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 5000 })
+  } finally {
+    bulkBusy.value = false
+  }
 }
 
 function onSaved(saved: Service, created: boolean) {
@@ -164,6 +213,29 @@ function onSaved(saved: Service, created: boolean) {
         class="filter"
         :aria-label="t('catalog.statusLabel')"
       />
+      <Select
+        v-if="!locationId && branches.length > 1"
+        v-model="branch"
+        :options="branches"
+        option-label="name"
+        option-value="id"
+        :placeholder="t('catalog.allBranches')"
+        show-clear
+        class="filter"
+        :aria-label="t('catalog.columns.branches')"
+      />
+      <Select
+        v-if="coaches.length"
+        v-model="coach"
+        :options="coaches"
+        option-label="name"
+        option-value="id"
+        :placeholder="t('catalog.anyCoach')"
+        show-clear
+        filter
+        class="filter"
+        :aria-label="t('catalog.coach')"
+      />
       <span class="spacer" />
       <Button
         v-if="canCreate"
@@ -199,7 +271,66 @@ function onSaved(saved: Service, created: boolean) {
         @click="open()"
       />
     </EmptyState>
-    <DataTable v-else :value="services" data-key="id" size="small" class="table">
+    <div
+      v-if="state === 'ready' && canUpdate && selected.length"
+      class="bulk"
+      role="region"
+      :aria-label="t('catalog.bulk.label')"
+    >
+      <span class="count">{{ t('catalog.bulk.selected', selected.length) }}</span>
+      <Button
+        size="small"
+        icon="pi pi-check"
+        :label="t('catalog.bulk.publish')"
+        :loading="bulkBusy"
+        @click="bulk('publish')"
+      />
+      <Button
+        size="small"
+        severity="secondary"
+        variant="outlined"
+        icon="pi pi-box"
+        :label="t('catalog.bulk.archive')"
+        @click="archiveOpen = true"
+      />
+      <span v-if="!locationId" class="add-branch">
+        <Select
+          v-model="bulkBranch"
+          :options="branches"
+          option-label="name"
+          option-value="id"
+          :placeholder="t('catalog.bulk.pickBranch')"
+          size="small"
+          :aria-label="t('catalog.bulk.pickBranch')"
+        />
+        <Button
+          size="small"
+          severity="secondary"
+          variant="outlined"
+          icon="pi pi-plus"
+          :label="t('catalog.bulk.addToBranch')"
+          :disabled="!bulkBranch"
+          :loading="bulkBusy"
+          @click="bulk('add_location')"
+        />
+      </span>
+      <Button
+        size="small"
+        variant="text"
+        severity="secondary"
+        :label="t('catalog.bulk.clear')"
+        @click="selected = []"
+      />
+    </div>
+    <DataTable
+      v-if="state === 'ready' && services.length"
+      v-model:selection="selected"
+      :value="services"
+      data-key="id"
+      size="small"
+      class="table"
+    >
+      <Column v-if="canUpdate" selection-mode="multiple" header-style="width: 3rem" />
       <Column :header="t('catalog.columns.service')">
         <template #body="{ data }">
           <div class="name-cell">
@@ -272,6 +403,15 @@ function onSaved(saved: Service, created: boolean) {
       </Column>
     </DataTable>
 
+    <ConfirmActionDialog
+      v-model:visible="archiveOpen"
+      :title="t('catalog.bulk.archiveTitle', selected.length)"
+      :description="t('catalog.bulk.archiveBody')"
+      :confirm-label="t('catalog.bulk.archive')"
+      destructive
+      :loading="bulkBusy"
+      @confirm="bulk('archive')"
+    />
     <ServiceBookingRulesDialog
       v-model:visible="rulesOpen"
       :service="rulesFor"
@@ -314,6 +454,24 @@ function onSaved(saved: Service, created: boolean) {
 .stack {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+}
+.bulk {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface-card));
+}
+.bulk .count {
+  font-weight: var(--fw-medium);
+  margin-inline-end: var(--space-2);
+}
+.add-branch {
+  display: inline-flex;
   gap: var(--space-2);
 }
 .name-cell {

@@ -772,6 +772,15 @@ export const tenantApi = {
     ): Promise<Service[]> {
       return (await http.get('/api/services', { params })).data.data
     },
+    /** Publish, archive or add to a branch (US-02.10); returns the services changed. */
+    async bulk(
+      ids: number[],
+      action: 'publish' | 'archive' | 'add_location',
+      locationId: number | null = null,
+    ): Promise<Service[]> {
+      return (await http.post('/api/services/bulk', { ids, action, location_id: locationId })).data
+        .data
+    },
     async staffOptions(): Promise<StaffOption[]> {
       return (await http.get('/api/services/staff-options')).data.data
     },
