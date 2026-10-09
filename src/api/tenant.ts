@@ -115,6 +115,26 @@ export interface TimeRange {
 /** Days "0" (Sunday) to "6"; an empty list is closed. */
 export type WeeklyHours = Record<string, TimeRange[]>
 
+/** A holiday or special hours (US-01.07); dates are Y-m-d in the branch timezone. */
+export interface HourOverride {
+  id: number
+  label: string
+  start_date: string
+  end_date: string
+  closed: boolean
+  hours: TimeRange[] | null
+}
+
+export type HourOverrideInput = Omit<HourOverride, 'id'> & { sessions?: FutureSessionsChoice }
+
+/** A session a closure or deactivation would affect (filled in by EP-03). */
+export interface AffectedSession {
+  id: number
+  title: string
+  starts_at: string
+  bookings: number
+}
+
 /** A branch's weekly opening hours (US-01.06); null hours: not set yet. */
 export interface BusinessHours {
   hours: WeeklyHours | null
@@ -375,6 +395,20 @@ export const tenantApi = {
   },
   async updateBusinessHours(id: number, hours: WeeklyHours | null): Promise<BusinessHours> {
     return (await http.put(`/api/locations/${id}/business-hours`, { hours })).data.data
+  },
+  hourOverrides: {
+    async list(locationId: number): Promise<HourOverride[]> {
+      return (await http.get(`/api/locations/${locationId}/hour-overrides`)).data.data
+    },
+    async create(locationId: number, input: HourOverrideInput): Promise<HourOverride> {
+      return (await http.post(`/api/locations/${locationId}/hour-overrides`, input)).data.data
+    },
+    async update(locationId: number, id: number, input: HourOverrideInput): Promise<HourOverride> {
+      return (await http.put(`/api/locations/${locationId}/hour-overrides/${id}`, input)).data.data
+    },
+    async remove(locationId: number, id: number): Promise<void> {
+      await http.delete(`/api/locations/${locationId}/hour-overrides/${id}`)
+    },
   },
   async archiveLocation(id: number): Promise<void> {
     await http.delete(`/api/locations/${id}`)

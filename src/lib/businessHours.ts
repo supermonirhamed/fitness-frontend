@@ -40,3 +40,22 @@ export function dayError(errors: Record<string, string[]>, day: number): string 
   const key = Object.keys(errors).find((k) => k === `hours.${day}` || k.startsWith(`hours.${day}.`))
   return key ? errors[key]?.[0] : undefined
 }
+
+/** Today in a timezone, as Y-m-d (sv-SE formats dates that way). */
+export function todayIn(timeZone: string, now = new Date()): string {
+  return now.toLocaleDateString('sv-SE', { timeZone })
+}
+
+/** Upcoming (not over yet) first by date, then past ones most recent first. */
+export function splitByDate<T extends { start_date: string; end_date: string }>(
+  items: T[],
+  today: string,
+): { upcoming: T[]; past: T[] } {
+  const upcoming = items
+    .filter((i) => i.end_date >= today)
+    .sort((a, b) => a.start_date.localeCompare(b.start_date))
+  const past = items
+    .filter((i) => i.end_date < today)
+    .sort((a, b) => b.start_date.localeCompare(a.start_date))
+  return { upcoming, past }
+}

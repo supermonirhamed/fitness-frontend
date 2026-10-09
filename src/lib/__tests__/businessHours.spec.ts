@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayError, fromInput, toInput, weekOrder } from '@/lib/businessHours'
+import { dayError, fromInput, splitByDate, todayIn, toInput, weekOrder } from '@/lib/businessHours'
 
 describe('business hours helpers', () => {
   it('orders days from the first day of the week', () => {
@@ -18,5 +18,25 @@ describe('business hours helpers', () => {
     expect(dayError(errors, 3)).toBe('overlap')
     expect(dayError(errors, 1)).toBe('after start')
     expect(dayError(errors, 0)).toBeUndefined()
+  })
+})
+
+describe('holiday lists', () => {
+  it('splits upcoming and past by the branch day', () => {
+    const items = [
+      { start_date: '2026-10-01', end_date: '2026-10-02' },
+      { start_date: '2026-12-01', end_date: '2026-12-01' },
+      { start_date: '2026-10-08', end_date: '2026-10-10' },
+      { start_date: '2026-09-01', end_date: '2026-09-01' },
+    ]
+    const { upcoming, past } = splitByDate(items, '2026-10-09')
+    expect(upcoming.map((i) => i.start_date)).toEqual(['2026-10-08', '2026-12-01'])
+    expect(past.map((i) => i.start_date)).toEqual(['2026-10-01', '2026-09-01'])
+  })
+
+  it("knows today's date in the branch timezone", () => {
+    const lateUtc = new Date('2026-10-09T22:30:00Z')
+    expect(todayIn('Asia/Riyadh', lateUtc)).toBe('2026-10-10')
+    expect(todayIn('UTC', lateUtc)).toBe('2026-10-09')
   })
 })
