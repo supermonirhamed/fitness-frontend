@@ -158,6 +158,53 @@ export interface FacilityInput {
   sub_areas?: SubArea[]
 }
 
+/** Time a facility is taken (US-01.10): a session (EP-03) or blocked by staff. Times are ISO (UTC). */
+export interface FacilityReservation {
+  id: number
+  kind: 'session' | 'block'
+  title: string
+  facility_id: number
+  facility: string | null
+  starts_at: string
+  ends_at: string
+  /** Including setup/cleanup buffers. */
+  blocked_from: string
+  blocked_until: string
+  coach: string | null
+}
+
+/** Something in the way of a booking (409 facility_conflict). */
+export interface FacilityConflictItem {
+  id: number
+  kind: 'session' | 'block'
+  title: string
+  facility: string | null
+  starts_at: string
+  ends_at: string
+  coach: string | null
+}
+
+export interface AvailabilityDay {
+  date: string
+  /** Opening ranges that day; [] closed; null weekly hours not set (open all day). */
+  hours: TimeRange[] | null
+  override: { label: string; closed: boolean } | null
+}
+
+export interface FacilityAvailability {
+  facility: {
+    id: number
+    name: string
+    type: FacilityType
+    capacity: number
+    status: FacilityStatus
+    parent_id: number | null
+  }
+  timezone: string
+  days: AvailabilityDay[]
+  reservations: FacilityReservation[]
+}
+
 /** A holiday or special hours (US-01.07); dates are Y-m-d in the branch timezone. */
 export interface HourOverride {
   id: number
@@ -463,6 +510,23 @@ export const tenantApi = {
     },
     async restore(id: number): Promise<Facility> {
       return (await http.post(`/api/facilities/${id}/restore`)).data.data
+    },
+    async get(id: number): Promise<Facility> {
+      return (await http.get(`/api/facilities/${id}`)).data.data
+    },
+    async availability(id: number, from: string, to: string): Promise<FacilityAvailability> {
+      return (await http.get(`/api/facilities/${id}/availability`, { params: { from, to } })).data
+        .data
+    },
+    /** Local "Y-m-d H:i" times at the facility's branch. */
+    async block(
+      id: number,
+      input: { title: string; starts_at: string; ends_at: string },
+    ): Promise<FacilityReservation> {
+      return (await http.post(`/api/facilities/${id}/blocks`, input)).data.data
+    },
+    async unblock(id: number, blockId: number): Promise<void> {
+      await http.delete(`/api/facilities/${id}/blocks/${blockId}`)
     },
   },
   hourOverrides: {

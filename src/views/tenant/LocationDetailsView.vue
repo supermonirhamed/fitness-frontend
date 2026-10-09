@@ -2,6 +2,7 @@
 // Branch details (US-01.04): header with status and timezone, then tabs. Business hours:
 // US-01.06 and holidays US-01.07; facilities: US-01.08; services arrive with EP-02.
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -43,7 +44,8 @@ const auth = useStaffAuth()
 
 const state = ref<'loading' | 'ready' | 'error' | 'missing'>('loading')
 const location = ref<LocationDetails>()
-const tab = ref('info')
+const route = useRoute()
+const tab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'info')
 const canEdit = computed(() => auth.can('locations.update'))
 
 async function load() {

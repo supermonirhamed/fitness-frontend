@@ -166,11 +166,23 @@ async function toggleArchive() {
       <Column :header="t('facilities.columns.status')">
         <template #body="{ data }"><StatusTag :status="data.status" /></template>
       </Column>
-      <Column v-if="canEdit" class="actions-col">
+      <Column class="actions-col">
         <template #body="{ data }">
           <div class="actions">
             <Button
               v-if="!archived"
+              as="router-link"
+              :to="{ name: 'tenant.facilities.availability', params: { id: data.id } }"
+              icon="pi pi-calendar"
+              severity="secondary"
+              variant="text"
+              rounded
+              size="small"
+              :aria-label="t('facilities.availability', { name: data.name })"
+              v-tooltip.top="t('facilities.availabilityShort')"
+            />
+            <Button
+              v-if="canEdit && !archived"
               icon="pi pi-pencil"
               severity="secondary"
               variant="text"
@@ -180,6 +192,7 @@ async function toggleArchive() {
               @click="openDrawer(data)"
             />
             <Button
+              v-if="canEdit"
               :icon="archived ? 'pi pi-replay pi-dir' : 'pi pi-box'"
               :label="archived ? t('archive.restore') : undefined"
               :severity="archived ? undefined : 'secondary'"
