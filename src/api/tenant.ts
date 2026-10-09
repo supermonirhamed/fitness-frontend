@@ -287,6 +287,12 @@ export interface Service {
   default_capacity: number | null
   buffer_before: number
   buffer_after: number
+  /** How it can be paid for (US-02.08). */
+  allow_membership: boolean
+  allow_package: boolean
+  allow_drop_in: boolean
+  is_free: boolean
+  credit_cost: number
   status: ServiceStatus
   color: string | null
   own_color: string | null
@@ -319,6 +325,11 @@ export interface ServiceInput {
   default_capacity: number | null
   buffer_before: number | null
   buffer_after: number | null
+  allow_membership: boolean
+  allow_package: boolean
+  allow_drop_in: boolean
+  is_free: boolean
+  credit_cost: number | null
   status?: ServiceStatus
   color: string | null
   skill_level: SkillLevel

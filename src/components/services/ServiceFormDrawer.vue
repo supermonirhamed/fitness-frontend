@@ -53,6 +53,11 @@ const blank = (): ServiceInput => ({
   default_capacity: 20,
   buffer_before: 0,
   buffer_after: 0,
+  allow_membership: false,
+  allow_package: false,
+  allow_drop_in: true,
+  is_free: false,
+  credit_cost: 1,
   status: 'Draft',
   color: null,
   skill_level: 'All',
@@ -130,6 +135,19 @@ const genderOptions = computed(() =>
   (['Any', 'Male', 'Female'] as const).map((g) => ({ value: g, label: t(`catalog.gender.${g}`) })),
 )
 const err = (field: string) => errors.value[field]?.[0]
+
+// Booking & payment (US-02.08): free excludes paid options.
+const PAID = ['allow_membership', 'allow_package', 'allow_drop_in'] as const
+function setFree(free: boolean) {
+  form.is_free = free
+  if (free) PAID.forEach((k) => (form[k] = false))
+  else if (!PAID.some((k) => form[k])) form.allow_drop_in = true
+}
+function setPaid(key: (typeof PAID)[number], on: boolean) {
+  form[key] = on
+  if (on) form.is_free = false
+}
+const paymentError = computed(() => err('allow_drop_in') ?? err('is_free') ?? err('credit_cost'))
 const facilitiesError = computed(() => {
   const key = Object.keys(errors.value).find((k) => k.startsWith('facility_ids'))
   return key ? errors.value[key]?.[0] : undefined
@@ -154,6 +172,11 @@ watch(visible, (open) => {
           default_capacity: s.default_capacity,
           buffer_before: s.buffer_before,
           buffer_after: s.buffer_after,
+          allow_membership: s.allow_membership,
+          allow_package: s.allow_package,
+          allow_drop_in: s.allow_drop_in,
+          is_free: s.is_free,
+          credit_cost: s.credit_cost,
           status: s.status,
           color: s.own_color,
           skill_level: s.skill_level,
@@ -412,6 +435,46 @@ async function submit() {
         <small v-if="locationsError" class="error">{{ locationsError }}</small>
       </fieldset>
 
+      <fieldset class="field payment">
+        <legend class="label">{{ t('catalog.payment') }} *</legend>
+        <label v-for="key in PAID" :key="key" class="check">
+          <Checkbox
+            :model-value="form[key]"
+            binary
+            :input-id="`pay-${key}`"
+            @update:model-value="(v: boolean) => setPaid(key, v)"
+          />
+          <span>
+            {{ t(`catalog.pay.${key}`) }}
+            <small>{{ t(`catalog.payHints.${key}`) }}</small>
+          </span>
+        </label>
+        <div v-if="form.allow_package" class="credits">
+          <label for="service-credits">{{ t('catalog.creditCost') }}</label>
+          <InputNumber
+            v-model="form.credit_cost"
+            input-id="service-credits"
+            :min="1"
+            :max="100"
+            show-buttons
+            :invalid="!!err('credit_cost')"
+          />
+        </div>
+        <label class="check">
+          <Checkbox
+            :model-value="form.is_free"
+            binary
+            input-id="pay-free"
+            @update:model-value="setFree"
+          />
+          <span>
+            {{ t('catalog.pay.is_free') }}
+            <small>{{ t('catalog.payHints.is_free') }}</small>
+          </span>
+        </label>
+        <small v-if="paymentError" class="error">{{ paymentError }}</small>
+      </fieldset>
+
       <div class="field">
         <label for="service-facilities">{{ t('catalog.facilities') }}</label>
         <MultiSelect
@@ -657,6 +720,35 @@ async function submit() {
 }
 .branches :deep(.override) {
   width: 100%;
+}
+.payment {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font: var(--text-body);
+  font-weight: normal;
+}
+.check span {
+  display: flex;
+  flex-direction: column;
+}
+.check small {
+  font: var(--text-caption);
+  color: var(--text-muted);
+}
+.credits {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline-start: var(--space-6);
+}
+.credits :deep(input) {
+  width: 80px;
 }
 .staff-option {
   display: flex;

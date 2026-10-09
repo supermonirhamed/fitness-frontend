@@ -542,6 +542,20 @@ const ar: typeof en = {
     noFacilities: 'لا مرافق مرتبطة',
     noFacilitiesAtBranches: 'لا توجد مرافق في الفروع المحددة',
     facilitiesHint: 'تظهر أولًا عند الجدولة. المرفق الذي له خدمات مسموحة يستقبلها فقط.',
+    payment: 'يمكن حجزها باستخدام',
+    pay: {
+      allow_membership: 'عضوية',
+      allow_package: 'رصيد باقة',
+      allow_drop_in: 'دفع مباشر',
+      is_free: 'مجانية',
+    },
+    payHints: {
+      allow_membership: 'للعملاء الذين تشملها عضويتهم (العضويات لاحقًا).',
+      allow_package: 'تستخدم رصيدًا من باقة.',
+      allow_drop_in: 'تُدفع لكل حجز، مثل الدفع في الاستقبال.',
+      is_free: 'بدون دفع؛ لا تنطبق الخيارات الأخرى.',
+    },
+    creditCost: 'الرصيد لكل حجز',
     capacityHint: 'تبدأ الحصص بهذه السعة، وقد يحدّها المرفق.',
     branches: 'الفروع التي تقدّمها',
     branchesHint:

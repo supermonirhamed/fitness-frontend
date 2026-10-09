@@ -543,6 +543,20 @@ export default {
     noFacilitiesAtBranches: 'No facilities at the ticked branches',
     facilitiesHint:
       'Listed first when scheduling. A facility with its own allowed services only takes those.',
+    payment: 'Can be booked with',
+    pay: {
+      allow_membership: 'Membership',
+      allow_package: 'Package credits',
+      allow_drop_in: 'Drop-in payment',
+      is_free: 'Free',
+    },
+    payHints: {
+      allow_membership: 'Clients with a membership that covers it (memberships arrive later).',
+      allow_package: 'Uses credits from a package.',
+      allow_drop_in: 'Paid per booking, e.g. at the desk.',
+      is_free: 'No payment; no other option applies.',
+    },
+    creditCost: 'Credits per booking',
     capacityHint: 'Sessions start with this; a facility can limit it.',
     branches: 'Branches offering it',
     branchesHint:
