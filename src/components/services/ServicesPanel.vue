@@ -340,7 +340,11 @@ function onSaved(saved: Service, created: boolean) {
               aria-hidden="true"
             />
             <div>
-              <div class="name">{{ data.display_name }}</div>
+              <RouterLink
+                :to="{ name: 'tenant.services.show', params: { id: data.id } }"
+                class="name"
+                >{{ data.display_name }}</RouterLink
+              >
               <div class="sub">
                 <i :class="['pi', data.category?.icon]" aria-hidden="true" />
                 {{ data.category?.display_name }}

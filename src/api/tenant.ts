@@ -501,6 +501,7 @@ export interface AuditFilters {
   actor?: number | null
   action?: string | null
   entity_type?: string | null
+  entity_id?: string | number | null
   from?: string | null
   to?: string | null
 }
@@ -780,6 +781,9 @@ export const tenantApi = {
     ): Promise<Service[]> {
       return (await http.post('/api/services/bulk', { ids, action, location_id: locationId })).data
         .data
+    },
+    async get(id: number): Promise<Service> {
+      return (await http.get(`/api/services/${id}`)).data.data
     },
     async staffOptions(): Promise<StaffOption[]> {
       return (await http.get('/api/services/staff-options')).data.data
