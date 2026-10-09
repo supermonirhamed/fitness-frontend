@@ -271,6 +271,8 @@ export interface Service {
   }
   default_duration: number
   default_capacity: number | null
+  buffer_before: number
+  buffer_after: number
   status: ServiceStatus
   color: string | null
   own_color: string | null
@@ -291,6 +293,8 @@ export interface ServiceInput {
   category_id: number | null
   default_duration: number | null
   default_capacity: number | null
+  buffer_before: number | null
+  buffer_after: number | null
   status?: ServiceStatus
   color: string | null
   skill_level: SkillLevel

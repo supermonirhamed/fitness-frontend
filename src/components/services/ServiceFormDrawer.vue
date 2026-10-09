@@ -48,6 +48,8 @@ const blank = (): ServiceInput => ({
   category_id: null,
   default_duration: 60,
   default_capacity: 20,
+  buffer_before: 0,
+  buffer_after: 0,
   status: 'Draft',
   color: null,
   skill_level: 'All',
@@ -114,6 +116,8 @@ watch(visible, (open) => {
           category_id: s.category_id,
           default_duration: s.default_duration,
           default_capacity: s.default_capacity,
+          buffer_before: s.buffer_before,
+          buffer_after: s.buffer_after,
           status: s.status,
           color: s.own_color,
           skill_level: s.skill_level,
@@ -295,6 +299,42 @@ async function submit() {
           }}</small>
         </div>
       </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="service-buffer-before">{{ t('catalog.bufferBefore') }}</label>
+          <InputNumber
+            v-model="form.buffer_before"
+            input-id="service-buffer-before"
+            :min="0"
+            :max="240"
+            :step="5"
+            :suffix="` ${t('catalog.minutes')}`"
+            show-buttons
+            :invalid="!!err('buffer_before')"
+            fluid
+          />
+        </div>
+        <div class="field">
+          <label for="service-buffer-after">{{ t('catalog.bufferAfter') }}</label>
+          <InputNumber
+            v-model="form.buffer_after"
+            input-id="service-buffer-after"
+            :min="0"
+            :max="240"
+            :step="5"
+            :suffix="` ${t('catalog.minutes')}`"
+            show-buttons
+            :invalid="!!err('buffer_after')"
+            fluid
+          />
+        </div>
+      </div>
+      <small
+        :class="err('buffer_before') || err('buffer_after') ? 'error' : 'hint'"
+        class="under"
+        >{{ err('buffer_before') ?? err('buffer_after') ?? t('catalog.bufferHint') }}</small
+      >
 
       <fieldset class="field branches">
         <legend class="label">{{ t('catalog.branches') }} *</legend>
@@ -546,6 +586,9 @@ async function submit() {
   flex-direction: column;
   gap: var(--space-5);
   padding-top: var(--space-4);
+}
+.under {
+  margin-top: calc(-1 * var(--space-4));
 }
 .hint {
   font: var(--text-caption);

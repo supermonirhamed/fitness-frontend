@@ -531,6 +531,9 @@ const ar: typeof en = {
     duration: 'المدة الافتراضية',
     minutes: 'دقيقة',
     capacity: 'السعة الافتراضية',
+    bufferBefore: 'تجهيز قبل',
+    bufferAfter: 'تنظيف بعد',
+    bufferHint: 'يحجز المدرب والمرفق حول كل حصة. لا يراه العملاء.',
     capacityHint: 'تبدأ الحصص بهذه السعة، وقد يحدّها المرفق.',
     branches: 'الفروع التي تقدّمها',
     branchesHint:

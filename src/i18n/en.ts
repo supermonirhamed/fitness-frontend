@@ -531,6 +531,9 @@ export default {
     duration: 'Default duration',
     minutes: 'min',
     capacity: 'Default capacity',
+    bufferBefore: 'Setup before',
+    bufferAfter: 'Cleanup after',
+    bufferHint: 'Blocks the coach and the facility around each session. Clients do not see it.',
     capacityHint: 'Sessions start with this; a facility can limit it.',
     branches: 'Branches offering it',
     branchesHint:
