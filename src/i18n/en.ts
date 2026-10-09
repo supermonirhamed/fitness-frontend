@@ -538,6 +538,11 @@ export default {
     anyStaff: 'Any staff member',
     staffHint:
       'Only these people are offered as coach when scheduling (unless the scheduler may override). Leave empty to allow anyone.',
+    facilities: 'Facilities suited to it',
+    noFacilities: 'None linked',
+    noFacilitiesAtBranches: 'No facilities at the ticked branches',
+    facilitiesHint:
+      'Listed first when scheduling. A facility with its own allowed services only takes those.',
     capacityHint: 'Sessions start with this; a facility can limit it.',
     branches: 'Branches offering it',
     branchesHint:
@@ -693,6 +698,10 @@ export default {
       Active: 'Sessions can be scheduled here.',
       Inactive: 'No new sessions here; existing history is kept.',
     },
+    allowedServices: 'Allowed services',
+    anyService: 'Any service',
+    allowedServicesHint:
+      'If set, only sessions of these services can use this facility. Leave empty to allow any.',
     subAreas: 'Sub-areas',
     subAreasHint:
       'Optional, for example Lane 1–6 of a pool. Booking the whole facility blocks its sub-areas, and the other way round.',

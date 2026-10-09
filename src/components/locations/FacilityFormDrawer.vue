@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import InputNumber from 'primevue/inputnumber'
+import MultiSelect from 'primevue/multiselect'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
@@ -18,17 +19,20 @@ import {
   type Facility,
   type FacilityStatus,
   type FacilityType,
+  type Service,
   type SubArea,
 } from '@/api/tenant'
 import { validationErrors, type ValidationErrors } from '@/lib/http'
 import { apiMessage } from '@/lib/apiErrors'
 import { FACILITY_ICONS, splitInto, typeKey } from '@/lib/facilities'
+import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ locationId: number; facility: Facility | null }>()
 const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{ saved: [facility: Facility, created: boolean] }>()
 const { t, locale } = useI18n()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
+const auth = useStaffAuth()
 
 const MAX_SUB_AREAS = 50
 const editing = computed(() => props.facility !== null)
@@ -41,6 +45,22 @@ const form = reactive({
   sub_areas: [] as SubArea[],
 })
 const splitCount = ref<number | null>(null)
+// Allowed services (US-01.09): services offered at the facility's branch.
+const serviceIds = ref<number[]>([])
+const branchServices = ref<Service[]>([])
+const servicesLoaded = ref(false)
+async function loadServices() {
+  servicesLoaded.value = false
+  try {
+    branchServices.value = await tenantApi.services.list({
+      location_id: props.facility?.location_id ?? props.locationId,
+    })
+  } catch {
+    branchServices.value = []
+  } finally {
+    servicesLoaded.value = true
+  }
+}
 const photo = ref<File | null>(null)
 const removePhoto = ref(false)
 const photoError = ref<string | null>(null)
@@ -72,6 +92,8 @@ watch(visible, (open) => {
     sub_areas: (f?.sub_areas ?? []).map((s) => ({ ...s })),
   })
   splitCount.value = null
+  serviceIds.value = (f?.allowed_services ?? []).map((s) => s.id)
+  if (auth.can('services.view')) loadServices()
   photo.value = null
   removePhoto.value = false
   photoError.value = null
@@ -110,6 +132,7 @@ async function submit() {
     ...(editing.value ? { status: form.status } : {}),
     description: form.description || null,
     sub_areas: form.sub_areas,
+    ...(auth.can('services.view') ? { service_ids: serviceIds.value } : {}),
   }
   try {
     let saved = props.facility
@@ -209,6 +232,24 @@ async function submit() {
           aria-labelledby="fac-status"
         />
         <small class="hint">{{ t(`facilityForm.statusHint.${form.status}`) }}</small>
+      </div>
+
+      <div v-if="auth.can('services.view')" class="field">
+        <label for="fac-services">{{ t('facilityForm.allowedServices') }}</label>
+        <MultiSelect
+          v-model="serviceIds"
+          input-id="fac-services"
+          :options="branchServices"
+          option-label="display_name"
+          option-value="id"
+          filter
+          display="chip"
+          :loading="!servicesLoaded"
+          :placeholder="t('facilityForm.anyService')"
+          :invalid="Object.keys(errors).some((k) => k.startsWith('service_ids'))"
+          fluid
+        />
+        <small class="hint">{{ t('facilityForm.allowedServicesHint') }}</small>
       </div>
 
       <fieldset class="field sub-areas">

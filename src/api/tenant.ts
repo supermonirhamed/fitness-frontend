@@ -156,6 +156,8 @@ export interface Facility {
   photo_url: string | null
   archived_at: string | null
   sub_areas?: SubArea[]
+  /** Allowed services (US-01.09); empty: any service. */
+  allowed_services?: { id: number; display_name: string | null }[]
 }
 
 export interface FacilityInput {
@@ -166,6 +168,7 @@ export interface FacilityInput {
   status?: FacilityStatus
   description: string | null
   sub_areas?: SubArea[]
+  service_ids?: number[]
 }
 
 /** Time a facility is taken (US-01.10): a session (EP-03) or blocked by staff. Times are ISO (UTC). */
@@ -286,6 +289,8 @@ export interface Service {
   locations?: ServiceLocation[]
   /** Staff who may deliver it (US-02.05); empty: anyone. */
   staff?: { id: number; name: string }[]
+  /** Facilities suited to it (US-02.06). */
+  facilities?: { id: number; name: string; location_id: number }[]
 }
 
 export interface StaffOption {
@@ -312,6 +317,7 @@ export interface ServiceInput {
   equipment_notes: string | null
   locations: ServiceLocation[]
   staff_ids?: number[]
+  facility_ids?: number[]
 }
 
 /** A branch's VAT (US-01.14). Rates are "15.00"; each applies from its date. */

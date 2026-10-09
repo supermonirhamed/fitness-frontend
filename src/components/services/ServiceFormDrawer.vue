@@ -21,6 +21,7 @@ import {
   type Service,
   type ServiceCategory,
   type ServiceInput,
+  type Facility,
   type ServiceLocation,
   type StaffOption,
 } from '@/api/tenant'
@@ -76,6 +77,24 @@ async function loadStaff() {
     staffLoaded.value = true
   }
 }
+// Facilities suited to it (US-02.06), at the branches ticked above.
+const facilityIds = ref<number[]>([])
+const allFacilities = ref<Facility[]>([])
+const facilitiesLoaded = ref(false)
+async function loadFacilities() {
+  try {
+    allFacilities.value = await tenantApi.facilities.list()
+  } catch {
+    allFacilities.value = []
+  } finally {
+    facilitiesLoaded.value = true
+  }
+}
+const facilityOptions = computed(() =>
+  allFacilities.value
+    .filter((f) => links[f.location_id]?.on)
+    .map((f) => ({ id: f.id, label: `${f.name} · ${f.location?.name ?? ''}` })),
+)
 const roleName = (role: string) => (te(`roles.${role}`) ? t(`roles.${role}`) : role)
 const photo = ref<File | null>(null)
 const removePhoto = ref(false)
@@ -111,6 +130,10 @@ const genderOptions = computed(() =>
   (['Any', 'Male', 'Female'] as const).map((g) => ({ value: g, label: t(`catalog.gender.${g}`) })),
 )
 const err = (field: string) => errors.value[field]?.[0]
+const facilitiesError = computed(() => {
+  const key = Object.keys(errors.value).find((k) => k.startsWith('facility_ids'))
+  return key ? errors.value[key]?.[0] : undefined
+})
 const locationsError = computed(() => {
   const key = Object.keys(errors.value).find((k) => k === 'locations' || k.startsWith('locations.'))
   return key ? errors.value[key]?.[0] : undefined
@@ -151,6 +174,8 @@ watch(visible, (open) => {
     }
   }
   staffIds.value = (s?.staff ?? []).map((u) => u.id)
+  facilityIds.value = (s?.facilities ?? []).map((f) => f.id)
+  if (!facilitiesLoaded.value) loadFacilities()
   if (!staffLoaded.value) loadStaff()
   photo.value = null
   removePhoto.value = false
@@ -177,6 +202,8 @@ async function submit() {
     equipment_notes: form.equipment_notes || null,
     locations,
     staff_ids: staffIds.value,
+    // Only facilities at branches still ticked.
+    facility_ids: facilityIds.value.filter((id) => facilityOptions.value.some((o) => o.id === id)),
   }
   try {
     let saved = props.service
@@ -384,6 +411,26 @@ async function submit() {
         </div>
         <small v-if="locationsError" class="error">{{ locationsError }}</small>
       </fieldset>
+
+      <div class="field">
+        <label for="service-facilities">{{ t('catalog.facilities') }}</label>
+        <MultiSelect
+          v-model="facilityIds"
+          input-id="service-facilities"
+          :options="facilityOptions"
+          option-label="label"
+          option-value="id"
+          filter
+          display="chip"
+          :loading="!facilitiesLoaded"
+          :placeholder="t('catalog.noFacilities')"
+          :empty-message="t('catalog.noFacilitiesAtBranches')"
+          fluid
+        />
+        <small :class="facilitiesError ? 'error' : 'hint'">{{
+          facilitiesError ?? t('catalog.facilitiesHint')
+        }}</small>
+      </div>
 
       <div class="field">
         <label for="service-staff">{{ t('catalog.staff') }}</label>
