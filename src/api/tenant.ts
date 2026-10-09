@@ -64,6 +64,17 @@ export interface LocationBookingPolicy {
   sources: Record<string, PolicySource>
 }
 
+/** A service's booking rules (US-02.07), optionally at one of its branches. */
+export interface ServiceBookingPolicy {
+  overrides: Partial<BookingPolicy>
+  location: { id: number; name: string } | null
+  /** What it gets without its own overrides, and where from. */
+  inherited: BookingPolicy
+  inherited_sources: Record<string, PolicySource>
+  effective: BookingPolicy
+  sources: Record<string, PolicySource>
+}
+
 export interface StaffUser {
   id: number
   name: string
@@ -845,6 +856,21 @@ export const tenantApi = {
       overrides: BookingPolicyOverrides,
     ): Promise<LocationBookingPolicy> {
       return (await http.put(`/api/locations/${id}/booking-policy`, overrides)).data.data
+    },
+    async forService(
+      id: number,
+      locationId: number | null,
+    ): Promise<{ data: ServiceBookingPolicy; options: BookingPolicyOptions }> {
+      const params = locationId ? { location_id: locationId } : {}
+      return (await http.get(`/api/services/${id}/booking-policy`, { params })).data
+    },
+    async updateService(
+      id: number,
+      overrides: BookingPolicyOverrides,
+      locationId: number | null,
+    ): Promise<ServiceBookingPolicy> {
+      const params = locationId ? { location_id: locationId } : {}
+      return (await http.put(`/api/services/${id}/booking-policy`, overrides, { params })).data.data
     },
   },
   security: {

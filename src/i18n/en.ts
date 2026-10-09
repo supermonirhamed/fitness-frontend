@@ -609,6 +609,17 @@ export default {
       },
     },
   },
+  serviceRules: {
+    title: 'Booking rules: {name}',
+    short: 'Booking rules',
+    open: 'Booking rules of {name}',
+    intro:
+      'Each rule inherits from the organization (or the branch) unless you override it for this service. Single sessions can override further.',
+    showAt: 'Show the values at',
+    anyBranch: 'Organization defaults',
+    fromBranch: 'Branch: {name}',
+    saved: 'Booking rules saved',
+  },
   facilityConflict: {
     label: 'Already booked at that time',
     kinds: { session: 'Session', block: 'Blocked time' },

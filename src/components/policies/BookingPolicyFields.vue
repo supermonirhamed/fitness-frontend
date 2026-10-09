@@ -30,6 +30,8 @@ const props = defineProps<{
   inherited?: BookingPolicy
   /** …and where they come from, e.g. "Organization". */
   inheritedLabel?: string
+  /** Per setting, when sources differ (e.g. some from a branch, US-02.07). */
+  inheritedSources?: Partial<Record<string, string>>
   disabled?: boolean
   errors?: Record<string, string[]>
 }>()
@@ -122,7 +124,7 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
         <div v-if="!overriding(field)" class="inherited">
           <span class="value">{{ describe(field, inherited!) }}</span>
           <span class="source">{{
-            t('bookingPolicy.inheritedFrom', { level: inheritedLabel })
+            t('bookingPolicy.inheritedFrom', { level: inheritedSources?.[field] ?? inheritedLabel })
           }}</span>
         </div>
 

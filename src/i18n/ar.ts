@@ -599,6 +599,17 @@ const ar: typeof en = {
       delete: { title: 'حذف {name}؟', body: 'ليس لها خدمات، لذا تُحذف نهائيًا.', button: 'حذف' },
     },
   },
+  serviceRules: {
+    title: 'قواعد الحجز: {name}',
+    short: 'قواعد الحجز',
+    open: 'قواعد حجز {name}',
+    intro:
+      'ترث كل قاعدة من المنظمة (أو الفرع) ما لم تتجاوزها لهذه الخدمة. ويمكن للحصص المفردة التجاوز أيضًا.',
+    showAt: 'اعرض القيم في',
+    anyBranch: 'إعدادات المنظمة',
+    fromBranch: 'الفرع: {name}',
+    saved: 'تم حفظ قواعد الحجز',
+  },
   facilityConflict: {
     label: 'محجوز مسبقًا في ذلك الوقت',
     kinds: { session: 'حصة', block: 'وقت محجوب' },

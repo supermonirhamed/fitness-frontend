@@ -14,6 +14,7 @@ import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ServiceBookingRulesDialog from '@/components/services/ServiceBookingRulesDialog.vue'
 import ServiceFormDrawer from '@/components/services/ServiceFormDrawer.vue'
 import {
   ACTIVITY_TYPES,
@@ -102,6 +103,13 @@ function open(service: Service | null = null) {
   editing.value = service
   drawerOpen.value = true
 }
+const rulesOpen = ref(false)
+const rulesFor = ref<Service | null>(null)
+function openRules(service: Service) {
+  rulesFor.value = service
+  rulesOpen.value = true
+}
+
 function onSaved(saved: Service, created: boolean) {
   toast.add({
     severity: 'success',
@@ -238,9 +246,20 @@ function onSaved(saved: Service, created: boolean) {
           ><Tag :severity="severity(data.status)" :value="t(`catalog.status.${data.status}`)"
         /></template>
       </Column>
-      <Column v-if="canUpdate" class="actions-col">
+      <Column class="actions-col">
         <template #body="{ data }">
           <Button
+            v-tooltip.top="t('serviceRules.short')"
+            icon="pi pi-sliders-h"
+            severity="secondary"
+            variant="text"
+            rounded
+            size="small"
+            :aria-label="t('serviceRules.open', { name: data.display_name })"
+            @click="openRules(data)"
+          />
+          <Button
+            v-if="canUpdate"
             icon="pi pi-pencil"
             severity="secondary"
             variant="text"
@@ -253,6 +272,11 @@ function onSaved(saved: Service, created: boolean) {
       </Column>
     </DataTable>
 
+    <ServiceBookingRulesDialog
+      v-model:visible="rulesOpen"
+      :service="rulesFor"
+      :can-edit="canUpdate"
+    />
     <ServiceFormDrawer
       v-model:visible="drawerOpen"
       :service="editing"
