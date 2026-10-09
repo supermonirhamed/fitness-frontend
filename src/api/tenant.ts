@@ -115,6 +115,49 @@ export interface TimeRange {
 /** Days "0" (Sunday) to "6"; an empty list is closed. */
 export type WeeklyHours = Record<string, TimeRange[]>
 
+export const FACILITY_TYPES = [
+  'Room',
+  'Studio',
+  'Field',
+  'Pool',
+  'Gym Area',
+  'Court',
+  'Other',
+] as const
+export type FacilityType = (typeof FACILITY_TYPES)[number]
+export type FacilityStatus = 'Active' | 'Inactive'
+
+export interface SubArea {
+  id: number | null
+  name: string
+  capacity: number
+}
+
+/** A room, studio, field, pool, gym area or court of a branch (US-01.08). */
+export interface Facility {
+  id: number
+  name: string
+  type: FacilityType
+  location_id: number
+  location?: { id: number; name: string; timezone: string } | null
+  capacity: number
+  status: FacilityStatus
+  description: string | null
+  photo_url: string | null
+  archived_at: string | null
+  sub_areas?: SubArea[]
+}
+
+export interface FacilityInput {
+  name: string
+  type: FacilityType
+  location_id: number
+  capacity: number
+  status?: FacilityStatus
+  description: string | null
+  sub_areas?: SubArea[]
+}
+
 /** A holiday or special hours (US-01.07); dates are Y-m-d in the branch timezone. */
 export interface HourOverride {
   id: number
@@ -395,6 +438,32 @@ export const tenantApi = {
   },
   async updateBusinessHours(id: number, hours: WeeklyHours | null): Promise<BusinessHours> {
     return (await http.put(`/api/locations/${id}/business-hours`, { hours })).data.data
+  },
+  facilities: {
+    async list(params: { location_id?: number; archived?: boolean } = {}): Promise<Facility[]> {
+      const query = { ...params, archived: params.archived ? 1 : undefined }
+      return (await http.get('/api/facilities', { params: query })).data.data
+    },
+    async create(input: FacilityInput): Promise<Facility> {
+      return (await http.post('/api/facilities', input)).data.data
+    },
+    async update(id: number, input: FacilityInput): Promise<Facility> {
+      return (await http.put(`/api/facilities/${id}`, input)).data.data
+    },
+    async uploadPhoto(id: number, file: File): Promise<Facility> {
+      const form = new FormData()
+      form.append('photo', file)
+      return (await http.post(`/api/facilities/${id}/photo`, form)).data.data
+    },
+    async deletePhoto(id: number): Promise<void> {
+      await http.delete(`/api/facilities/${id}/photo`)
+    },
+    async archive(id: number): Promise<void> {
+      await http.delete(`/api/facilities/${id}`)
+    },
+    async restore(id: number): Promise<Facility> {
+      return (await http.post(`/api/facilities/${id}/restore`)).data.data
+    },
   },
   hourOverrides: {
     async list(locationId: number): Promise<HourOverride[]> {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Branch details (US-01.04): header with status and timezone, then tabs. Business hours:
-// US-01.06 and holidays US-01.07; facilities and services arrive with US-01.08 and EP-02.
+// US-01.06 and holidays US-01.07; facilities: US-01.08; services arrive with EP-02.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -18,6 +18,7 @@ import EmptyState from '@/components/patterns/EmptyState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import BusinessHoursEditor from '@/components/locations/BusinessHoursEditor.vue'
+import FacilitiesPanel from '@/components/locations/FacilitiesPanel.vue'
 import HourOverridesSection from '@/components/locations/HourOverridesSection.vue'
 import DeactivateLocationDialog from '@/components/locations/DeactivateLocationDialog.vue'
 import LocationFormDrawer from '@/components/locations/LocationFormDrawer.vue'
@@ -179,7 +180,17 @@ watch(tab, (value) => {
   if (value === 'policies' && policyState.value === 'idle') loadPolicy()
 })
 
-const comingSoon = ['facilities', 'services'] as const
+const comingSoon = ['services'] as const
+
+// The facilities figure changes when facilities are added or archived.
+async function refreshStats() {
+  try {
+    const fresh = await tenantApi.location(props.id)
+    if (location.value) location.value = { ...location.value, stats: fresh.stats }
+  } catch {
+    // Figures stay as they were.
+  }
+}
 </script>
 
 <template>
@@ -323,9 +334,18 @@ const comingSoon = ['facilities', 'services'] as const
             </div>
           </TabPanel>
 
+          <TabPanel value="facilities">
+            <FacilitiesPanel
+              v-if="tab === 'facilities'"
+              :location-id="location.id"
+              :can-edit="canEdit"
+              @changed="refreshStats"
+            />
+          </TabPanel>
+
           <TabPanel v-for="key in comingSoon" :key="key" :value="key">
             <EmptyState
-              :icon="key === 'facilities' ? 'pi-th-large' : 'pi-tags'"
+              icon="pi-tags"
               :title="t(`locationDetails.soon.${key}.title`)"
               :body="t(`locationDetails.soon.${key}.body`)"
             />

@@ -17,6 +17,7 @@ import {
   type LocationInput,
   type LocationStatus,
 } from '@/api/tenant'
+import PhotoField from '@/components/patterns/PhotoField.vue'
 import { validationErrors, type ValidationErrors } from '@/lib/http'
 import { apiMessage } from '@/lib/apiErrors'
 import { useOrganization } from '@/stores/organization'
@@ -28,8 +29,6 @@ const emit = defineEmits<{ saved: [location: LocationDetails, created: boolean] 
 const { t, locale } = useI18n()
 const org = useOrganization()
 
-const PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp']
-const PHOTO_MAX = 4 * 1024 * 1024
 const STATUSES: LocationStatus[] = ['Draft', 'Active', 'Inactive']
 const timezones = Intl.supportedValuesOf('timeZone')
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
@@ -52,10 +51,8 @@ const errors = ref<ValidationErrors>({})
 const formError = ref<string | null>(null)
 const saving = ref(false)
 const photo = ref<File | null>(null)
-const photoPreview = ref<string | null>(null)
 const removePhoto = ref(false)
 const photoError = ref<string | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
 
 const statusOptions = computed(() =>
   // Deactivating has its own dialog (US-01.05): it checks upcoming sessions first.
@@ -65,9 +62,6 @@ const statusOptions = computed(() =>
   })),
 )
 const statusHint = computed(() => t(`locationForm.statusHint.${form.status}`))
-const shownPhoto = computed(() =>
-  removePhoto.value ? null : (photoPreview.value ?? props.location?.photo_url ?? null),
-)
 
 watch(visible, (open) => {
   if (!open) return
@@ -76,8 +70,6 @@ watch(visible, (open) => {
   photoError.value = null
   photo.value = null
   removePhoto.value = false
-  if (photoPreview.value) URL.revokeObjectURL(photoPreview.value)
-  photoPreview.value = null
   const l = props.location
   Object.assign(
     form,
@@ -96,28 +88,6 @@ watch(visible, (open) => {
       : blank(),
   )
 })
-
-function onFile(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  ;(event.target as HTMLInputElement).value = ''
-  photoError.value = null
-  if (!file) return
-  if (!PHOTO_TYPES.includes(file.type) || file.size > PHOTO_MAX) {
-    photoError.value = t('locationForm.photoInvalid')
-    return
-  }
-  if (photoPreview.value) URL.revokeObjectURL(photoPreview.value)
-  photo.value = file
-  photoPreview.value = URL.createObjectURL(file)
-  removePhoto.value = false
-}
-
-function clearPhoto() {
-  photo.value = null
-  if (photoPreview.value) URL.revokeObjectURL(photoPreview.value)
-  photoPreview.value = null
-  removePhoto.value = true
-}
 
 const err = (field: string) => errors.value[field]?.[0]
 
@@ -283,39 +253,13 @@ async function submit() {
 
       <div class="field">
         <span class="label">{{ t('locationForm.fields.photo') }}</span>
-        <div class="photo">
-          <img v-if="shownPhoto" :src="shownPhoto" :alt="t('locationForm.photoAlt')" />
-          <div v-else class="placeholder"><i class="pi pi-image" aria-hidden="true" /></div>
-          <div class="photo-actions">
-            <input
-              ref="fileInput"
-              type="file"
-              :accept="PHOTO_TYPES.join(',')"
-              hidden
-              @change="onFile"
-            />
-            <Button
-              size="small"
-              severity="secondary"
-              variant="outlined"
-              icon="pi pi-upload"
-              :label="shownPhoto ? t('locationForm.replacePhoto') : t('locationForm.addPhoto')"
-              @click="fileInput?.click()"
-            />
-            <Button
-              v-if="shownPhoto"
-              size="small"
-              variant="text"
-              severity="secondary"
-              icon="pi pi-trash"
-              :label="t('orgProfile.removeLogo')"
-              @click="clearPhoto"
-            />
-          </div>
-        </div>
-        <small :class="photoError ? 'error' : 'hint'">{{
-          photoError ?? t('locationForm.photoHint')
-        }}</small>
+        <PhotoField
+          v-model:file="photo"
+          v-model:remove="removePhoto"
+          :current-url="location?.photo_url"
+          :alt="t('locationForm.photoAlt')"
+          :error="photoError"
+        />
       </div>
 
       <div class="field">
@@ -397,31 +341,6 @@ legend {
 .error {
   font: var(--text-caption);
   color: var(--sev-danger-fg);
-}
-.photo {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.photo img,
-.placeholder {
-  width: 120px;
-  height: 80px;
-  border-radius: var(--radius-sm);
-  object-fit: cover;
-  border: 1px solid var(--border-subtle);
-}
-.placeholder {
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  background: var(--surface-sunken);
-}
-.photo-actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
 }
 .footer {
   display: flex;
