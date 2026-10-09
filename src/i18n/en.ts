@@ -119,6 +119,7 @@ export default {
     nav: { today: 'Today', settings: 'Settings' },
   },
   today: {
+    atBranch: '{date} · {branch}',
     title: 'Today',
     welcome: 'Welcome, {name}',
     firstBranchTitle: 'Create your first branch',
@@ -439,6 +440,11 @@ export default {
     saved: 'Opening hours saved',
     checkDays: 'Check the highlighted days.',
     loadError: "Opening hours couldn't be loaded.",
+  },
+  branchSwitcher: {
+    label: 'Branch you are working in',
+    all: 'All my branches',
+    error: "The branch couldn't be changed.",
   },
   facilityConflict: {
     label: 'Already booked at that time',

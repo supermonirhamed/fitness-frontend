@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import PageHeader from '@/components/patterns/PageHeader.vue'
@@ -7,8 +7,23 @@ import EmptyState from '@/components/patterns/EmptyState.vue'
 import { tenantApi } from '@/api/tenant'
 import { useStaffAuth } from '@/stores/staffAuth'
 
-const { t, d } = useI18n()
+const { t, d, locale } = useI18n()
 const auth = useStaffAuth()
+
+// Follows the branch switcher (US-01.13): today's date there, in its timezone.
+const subtitle = computed(() => {
+  const branch = auth.currentLocation
+  const date = d(new Date(), 'long')
+  return branch
+    ? t('today.atBranch', {
+        date: new Date().toLocaleDateString(locale.value, {
+          dateStyle: 'full',
+          timeZone: branch.timezone,
+        }),
+        branch: branch.name,
+      })
+    : date
+})
 
 // Onboarding (US-01.03): an organization starts without branches; whoever may add one is asked to.
 const needsFirstBranch = ref(false)
@@ -24,7 +39,7 @@ onMounted(async () => {
 
 <template>
   <div class="today">
-    <PageHeader :title="t('today.title')" :subtitle="d(new Date(), 'long')" />
+    <PageHeader :title="t('today.title')" :subtitle="subtitle" />
     <section v-if="needsFirstBranch" class="card">
       <EmptyState
         icon="pi-building"

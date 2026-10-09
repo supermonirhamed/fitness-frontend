@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import Drawer from 'primevue/drawer'
 import AppSidebar, { type NavItem } from '@/components/shell/AppSidebar.vue'
 import AppHeader from '@/components/shell/AppHeader.vue'
+import BranchSwitcher from '@/components/shell/BranchSwitcher.vue'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
 import { allowedSettingsPages } from '@/lib/permissions'
@@ -84,7 +85,9 @@ async function signOut() {
         :menu-items="userMenu"
         @menu="mobileOpen = true"
         @sign-out="signOut"
-      />
+      >
+        <template #context><BranchSwitcher /></template>
+      </AppHeader>
       <main class="shell__content"><RouterView /></main>
     </div>
   </div>

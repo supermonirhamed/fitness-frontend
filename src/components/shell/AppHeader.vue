@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// Port of the design system's shell/AppHeader (branch switcher, search and alerts arrive with their stories).
+// Port of the design system's shell/AppHeader. The branch switcher (US-01.13) goes in the
+// `context` slot; search and alerts arrive with their stories.
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Avatar from 'primevue/avatar'
@@ -39,6 +40,7 @@ const initials = (name: string) =>
       :aria-label="t('shell.openMenu')"
       @click="emit('menu')"
     />
+    <slot name="context" />
     <span class="app-header__spacer" />
     <LanguageToggle />
     <button

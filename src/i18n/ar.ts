@@ -121,6 +121,7 @@ const ar: typeof en = {
     nav: { today: 'اليوم', settings: 'الإعدادات' },
   },
   today: {
+    atBranch: '{date} · {branch}',
     title: 'اليوم',
     welcome: 'مرحبًا، {name}',
     firstBranchTitle: 'أنشئ فرعك الأول',
@@ -444,6 +445,11 @@ const ar: typeof en = {
     saved: 'تم حفظ ساعات العمل',
     checkDays: 'راجع الأيام المظللة.',
     loadError: 'تعذّر تحميل ساعات العمل.',
+  },
+  branchSwitcher: {
+    label: 'الفرع الذي تعمل فيه',
+    all: 'كل فروعي',
+    error: 'تعذّر تغيير الفرع.',
   },
   facilityConflict: {
     label: 'محجوز مسبقًا في ذلك الوقت',

@@ -77,6 +77,16 @@ export interface StaffUser {
   scope: AccessScope
   /** Locations this user may see; null means every location (US-00.09). */
   location_ids: number[] | null
+  /** The header branch switcher (US-01.13); null current = all my branches. */
+  current_location_id: number | null
+  switchable_locations: SwitchableLocation[]
+}
+
+export interface SwitchableLocation {
+  id: number
+  name: string
+  timezone: string
+  status: 'Draft' | 'Active' | 'Inactive'
 }
 
 export type LocationStatus = 'Draft' | 'Active' | 'Inactive'
@@ -393,6 +403,10 @@ export const tenantApi = {
   },
   async twoFactorChallenge(factor: SecondFactor): Promise<StaffUser> {
     return (await http.post('/api/auth/two-factor-challenge', factor)).data.data
+  },
+  /** The branch the user works in, kept on their account (US-01.13); null for all of them. */
+  async setCurrentLocation(locationId: number | null): Promise<StaffUser> {
+    return (await http.put('/api/account/current-location', { location_id: locationId })).data.data
   },
   async me(): Promise<StaffUser> {
     return (await http.get('/api/auth/me')).data.data

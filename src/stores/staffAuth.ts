@@ -11,6 +11,17 @@ export const useStaffAuth = defineStore('staffAuth', () => {
   const signedIn = computed(() => user.value !== null)
   const permissions = computed(() => new Set(user.value?.permissions ?? []))
 
+  /** The branch picked in the header switcher (US-01.13); null means all the user's branches. */
+  const currentLocation = computed(
+    () =>
+      user.value?.switchable_locations.find((l) => l.id === user.value?.current_location_id) ??
+      null,
+  )
+
+  async function setCurrentLocation(locationId: number | null) {
+    user.value = await tenantApi.setCurrentLocation(locationId)
+  }
+
   /** True when the user has every given permission (US-00.07). */
   function can(...required: string[]): boolean {
     return required.every((p) => permissions.value.has(p))
@@ -75,5 +86,18 @@ export const useStaffAuth = defineStore('staffAuth', () => {
     checked.value = true
   }
 
-  return { user, checked, signedIn, can, check, login, challenge, adopt, logout, forget }
+  return {
+    user,
+    checked,
+    signedIn,
+    currentLocation,
+    setCurrentLocation,
+    can,
+    check,
+    login,
+    challenge,
+    adopt,
+    logout,
+    forget,
+  }
 })
