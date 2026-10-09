@@ -482,7 +482,7 @@ export default {
   catalog: {
     title: 'Services',
     subtitle: 'Everything you offer: classes, appointments, events and open access.',
-    tabs: { services: 'Services', categories: 'Categories' },
+    tabs: { services: 'Services', categories: 'Categories', programs: 'Programs' },
     search: 'Search services',
     allCategories: 'All categories',
     allTypes: 'All types',
@@ -633,6 +633,28 @@ export default {
     anyBranch: 'Organization defaults',
     fromBranch: 'Branch: {name}',
     saved: 'Booking rules saved',
+  },
+  programs: {
+    intro:
+      'Programs are enrolled into for a term or month by month, e.g. a football academy or swimming lessons.',
+    new: 'New program',
+    newTitle: 'New program',
+    editTitle: 'Edit {name}',
+    create: 'Create program',
+    none: 'No programs yet',
+    noneHint: 'Add academies or courses clients enroll into.',
+    academyNote:
+      'Levels, age groups and groups are managed in the Academy module (coming in a later release). Their training sessions use the same schedule.',
+    category: 'Sport or category',
+    enrollment: 'Enrollment',
+    modes: { Term: 'Term', Rolling: 'Rolling monthly' },
+    modeHints: {
+      Term: 'Clients enroll for a term with start and end dates.',
+      Rolling: 'Clients enroll and pay month by month.',
+    },
+    term: 'Term dates',
+    branches: 'Branches running it',
+    columns: { program: 'Program', enrollment: 'Enrollment' },
   },
   facilityConflict: {
     label: 'Already booked at that time',

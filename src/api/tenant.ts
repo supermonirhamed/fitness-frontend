@@ -342,6 +342,40 @@ export interface ServiceInput {
   facility_ids?: number[]
 }
 
+export type EnrollmentMode = 'Term' | 'Rolling'
+
+/** A program clients enroll into (US-02.09); levels and groups come with the Academy (EP-10). */
+export interface Program {
+  id: number
+  name: Translated
+  display_name: string | null
+  description: Translated
+  category_id: number
+  category?: { id: number; display_name: string | null; color: string; icon: string }
+  status: ServiceStatus
+  enrollment_mode: EnrollmentMode
+  term_start: string | null
+  term_end: string | null
+  age_min: number | null
+  age_max: number | null
+  gender: GenderRestriction
+  locations?: { id: number; name: string }[]
+}
+
+export interface ProgramInput {
+  name: Translated
+  description: Translated | null
+  category_id: number | null
+  status?: ServiceStatus
+  enrollment_mode: EnrollmentMode
+  term_start: string | null
+  term_end: string | null
+  age_min: number | null
+  age_max: number | null
+  gender: GenderRestriction
+  location_ids: number[]
+}
+
 /** A branch's VAT (US-01.14). Rates are "15.00"; each applies from its date. */
 export interface VatSettings {
   enabled: boolean
@@ -713,6 +747,17 @@ export const tenantApi = {
     },
     async remove(id: number): Promise<void> {
       await http.delete(`/api/service-categories/${id}`)
+    },
+  },
+  programs: {
+    async list(params: { location_id?: number; status?: ServiceStatus } = {}): Promise<Program[]> {
+      return (await http.get('/api/programs', { params })).data.data
+    },
+    async create(input: ProgramInput): Promise<Program> {
+      return (await http.post('/api/programs', input)).data.data
+    },
+    async update(id: number, input: ProgramInput): Promise<Program> {
+      return (await http.put(`/api/programs/${id}`, input)).data.data
     },
   },
   services: {
