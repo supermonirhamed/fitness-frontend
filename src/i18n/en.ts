@@ -420,6 +420,26 @@ export default {
     addPhoto: 'Add photo',
     replacePhoto: 'Replace',
   },
+  businessHours: {
+    intro: 'Opening hours in the branch timezone:',
+    notSet: 'Opening hours are not set',
+    notSetHint:
+      'Until you set them, sessions can be scheduled at any time. Set them so sessions outside opening hours are flagged.',
+    set: 'Set opening hours',
+    closed: 'Closed',
+    opens: '{day} opens at',
+    closes: '{day} closes at',
+    addRange: 'Add hours',
+    removeRange: 'Remove these hours',
+    copy: 'Copy to…',
+    copyTo: 'Copy {day} to',
+    applyCopy: 'Copy',
+    midnightHint: 'A closing time of 00:00 means midnight.',
+    clear: 'Clear opening hours',
+    saved: 'Opening hours saved',
+    checkDays: 'Check the highlighted days.',
+    loadError: "Opening hours couldn't be loaded.",
+  },
   deactivateLocation: {
     action: 'Deactivate',
     activate: 'Activate',
@@ -467,10 +487,6 @@ export default {
       '— means the module is not set up yet: facilities, services and sessions come next.',
     openMap: 'Open map',
     soon: {
-      hours: {
-        title: 'Business hours are coming next',
-        body: 'Weekly opening hours, holidays and special hours will be set here.',
-      },
       facilities: {
         title: 'No facilities yet',
         body: 'Rooms, studios, fields and pools of this branch will be listed here.',

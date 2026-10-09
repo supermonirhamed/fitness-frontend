@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Branch details (US-01.04): header with status and timezone, then tabs. Business hours,
-// facilities and services arrive with US-01.06, US-01.08 and EP-02.
+// Branch details (US-01.04): header with status and timezone, then tabs. Business hours:
+// US-01.06; facilities and services arrive with US-01.08 and EP-02.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -17,6 +17,7 @@ import Tabs from 'primevue/tabs'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
+import BusinessHoursEditor from '@/components/locations/BusinessHoursEditor.vue'
 import DeactivateLocationDialog from '@/components/locations/DeactivateLocationDialog.vue'
 import LocationFormDrawer from '@/components/locations/LocationFormDrawer.vue'
 import BookingPolicyFields from '@/components/policies/BookingPolicyFields.vue'
@@ -177,7 +178,7 @@ watch(tab, (value) => {
   if (value === 'policies' && policyState.value === 'idle') loadPolicy()
 })
 
-const comingSoon = ['hours', 'facilities', 'services'] as const
+const comingSoon = ['facilities', 'services'] as const
 </script>
 
 <template>
@@ -310,11 +311,17 @@ const comingSoon = ['hours', 'facilities', 'services'] as const
             </div>
           </TabPanel>
 
+          <TabPanel value="hours">
+            <BusinessHoursEditor
+              v-if="tab === 'hours'"
+              :location-id="location.id"
+              :can-edit="canEdit"
+            />
+          </TabPanel>
+
           <TabPanel v-for="key in comingSoon" :key="key" :value="key">
             <EmptyState
-              :icon="
-                key === 'hours' ? 'pi-clock' : key === 'facilities' ? 'pi-th-large' : 'pi-tags'
-              "
+              :icon="key === 'facilities' ? 'pi-th-large' : 'pi-tags'"
               :title="t(`locationDetails.soon.${key}.title`)"
               :body="t(`locationDetails.soon.${key}.body`)"
             />

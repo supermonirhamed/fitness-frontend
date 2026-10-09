@@ -106,6 +106,21 @@ export interface DeactivationImpact {
 
 export type FutureSessionsChoice = 'keep' | 'cancel'
 
+/** "HH:MM"; an end of "24:00" is midnight. */
+export interface TimeRange {
+  start: string
+  end: string
+}
+
+/** Days "0" (Sunday) to "6"; an empty list is closed. */
+export type WeeklyHours = Record<string, TimeRange[]>
+
+/** A branch's weekly opening hours (US-01.06); null hours: not set yet. */
+export interface BusinessHours {
+  hours: WeeklyHours | null
+  timezone: string
+}
+
 export interface LocationStaffMember {
   id: number
   name: string
@@ -354,6 +369,12 @@ export const tenantApi = {
   },
   async activateLocation(id: number): Promise<LocationDetails> {
     return (await http.post(`/api/locations/${id}/activate`)).data.data
+  },
+  async businessHours(id: number): Promise<BusinessHours> {
+    return (await http.get(`/api/locations/${id}/business-hours`)).data.data
+  },
+  async updateBusinessHours(id: number, hours: WeeklyHours | null): Promise<BusinessHours> {
+    return (await http.put(`/api/locations/${id}/business-hours`, { hours })).data.data
   },
   async archiveLocation(id: number): Promise<void> {
     await http.delete(`/api/locations/${id}`)
