@@ -215,6 +215,92 @@ export interface FacilityAvailability {
   reservations: FacilityReservation[]
 }
 
+/** Text in Arabic and/or English (catalog, EP-02). */
+export interface Translated {
+  ar?: string | null
+  en?: string | null
+}
+
+/** A service category (US-02.01). */
+export interface ServiceCategory {
+  id: number
+  name: Translated
+  display_name: string | null
+  color: string
+  icon: string
+  sort_order: number
+  archived_at: string | null
+  services_count?: number
+}
+
+export interface ServiceCategoryInput {
+  name: Translated
+  color: string
+  icon: string
+}
+
+export const ACTIVITY_TYPES = ['Class', 'Appointment', 'Event', 'Open Access'] as const
+export type ActivityType = (typeof ACTIVITY_TYPES)[number]
+export type ServiceStatus = 'Draft' | 'Published' | 'Archived'
+export type SkillLevel = 'All' | 'Beginner' | 'Intermediate' | 'Advanced'
+export type GenderRestriction = 'Any' | 'Male' | 'Female'
+
+/** A branch offering a service (US-02.03), with its overrides. */
+export interface ServiceLocation {
+  location_id: number
+  name?: string
+  capacity_override: number | null
+  price_override: string | number | null
+}
+
+/** A service (US-02.02). */
+export interface Service {
+  id: number
+  name: Translated
+  display_name: string | null
+  description: Translated
+  display_description: string | null
+  activity_type: ActivityType
+  category_id: number
+  category?: {
+    id: number
+    display_name: string | null
+    color: string
+    icon: string
+    archived: boolean
+  }
+  default_duration: number
+  default_capacity: number | null
+  status: ServiceStatus
+  color: string | null
+  own_color: string | null
+  skill_level: SkillLevel
+  age_min: number | null
+  age_max: number | null
+  gender: GenderRestriction
+  equipment_notes: string | null
+  photo_url: string | null
+  bookable: boolean
+  locations?: ServiceLocation[]
+}
+
+export interface ServiceInput {
+  name: Translated
+  description: Translated | null
+  activity_type: ActivityType
+  category_id: number | null
+  default_duration: number | null
+  default_capacity: number | null
+  status?: ServiceStatus
+  color: string | null
+  skill_level: SkillLevel
+  age_min: number | null
+  age_max: number | null
+  gender: GenderRestriction
+  equipment_notes: string | null
+  locations: ServiceLocation[]
+}
+
 /** A branch's VAT (US-01.14). Rates are "15.00"; each applies from its date. */
 export interface VatSettings {
   enabled: boolean
@@ -561,6 +647,58 @@ export const tenantApi = {
     },
     async unblock(id: number, blockId: number): Promise<void> {
       await http.delete(`/api/facilities/${id}/blocks/${blockId}`)
+    },
+  },
+  serviceCategories: {
+    async list(archived = false): Promise<ServiceCategory[]> {
+      return (
+        await http.get('/api/service-categories', { params: archived ? { archived: 1 } : {} })
+      ).data.data
+    },
+    async create(input: ServiceCategoryInput): Promise<ServiceCategory> {
+      return (await http.post('/api/service-categories', input)).data.data
+    },
+    async update(id: number, input: ServiceCategoryInput): Promise<ServiceCategory> {
+      return (await http.put(`/api/service-categories/${id}`, input)).data.data
+    },
+    async reorder(ids: number[]): Promise<ServiceCategory[]> {
+      return (await http.put('/api/service-categories/order', { ids })).data.data
+    },
+    async archive(id: number): Promise<ServiceCategory> {
+      return (await http.post(`/api/service-categories/${id}/archive`)).data.data
+    },
+    async restore(id: number): Promise<ServiceCategory> {
+      return (await http.post(`/api/service-categories/${id}/restore`)).data.data
+    },
+    async remove(id: number): Promise<void> {
+      await http.delete(`/api/service-categories/${id}`)
+    },
+  },
+  services: {
+    async list(
+      params: {
+        location_id?: number
+        category_id?: number
+        activity_type?: ActivityType
+        status?: ServiceStatus
+        search?: string
+      } = {},
+    ): Promise<Service[]> {
+      return (await http.get('/api/services', { params })).data.data
+    },
+    async create(input: ServiceInput): Promise<Service> {
+      return (await http.post('/api/services', input)).data.data
+    },
+    async update(id: number, input: ServiceInput): Promise<Service> {
+      return (await http.put(`/api/services/${id}`, input)).data.data
+    },
+    async uploadPhoto(id: number, file: File): Promise<Service> {
+      const form = new FormData()
+      form.append('photo', file)
+      return (await http.post(`/api/services/${id}/photo`, form)).data.data
+    },
+    async deletePhoto(id: number): Promise<void> {
+      await http.delete(`/api/services/${id}/photo`)
     },
   },
   vat: {

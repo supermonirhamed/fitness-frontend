@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Branch details (US-01.04): header with status and timezone, then tabs. Business hours:
-// US-01.06 and holidays US-01.07; facilities: US-01.08; services arrive with EP-02.
+// US-01.06 and holidays US-01.07; facilities: US-01.08; services: US-02.03.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -19,6 +19,7 @@ import EmptyState from '@/components/patterns/EmptyState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import BusinessHoursEditor from '@/components/locations/BusinessHoursEditor.vue'
+import ServicesPanel from '@/components/services/ServicesPanel.vue'
 import VatPanel from '@/components/locations/VatPanel.vue'
 import FacilitiesPanel from '@/components/locations/FacilitiesPanel.vue'
 import HourOverridesSection from '@/components/locations/HourOverridesSection.vue'
@@ -32,6 +33,7 @@ import {
   type BookingPolicyOptions,
   type LocationDetails,
   type LocationStaffMember,
+  type ServiceCategory,
 } from '@/api/tenant'
 import { statusOf, validationErrors } from '@/lib/http'
 import { toOverrides } from '@/lib/bookingPolicy'
@@ -183,7 +185,21 @@ watch(tab, (value) => {
   if (value === 'policies' && policyState.value === 'idle') loadPolicy()
 })
 
-const comingSoon = ['services'] as const
+// Services tab (US-02.03): the branch's catalog.
+const categories = ref<ServiceCategory[]>([])
+watch(
+  tab,
+  async (value) => {
+    if (value === 'services' && !categories.value.length) {
+      try {
+        categories.value = await tenantApi.serviceCategories.list()
+      } catch {
+        categories.value = []
+      }
+    }
+  },
+  { immediate: true },
+)
 
 // The facilities figure changes when facilities are added or archived.
 async function refreshStats() {
@@ -347,11 +363,11 @@ async function refreshStats() {
             />
           </TabPanel>
 
-          <TabPanel v-for="key in comingSoon" :key="key" :value="key">
-            <EmptyState
-              icon="pi-tags"
-              :title="t(`locationDetails.soon.${key}.title`)"
-              :body="t(`locationDetails.soon.${key}.body`)"
+          <TabPanel value="services">
+            <ServicesPanel
+              v-if="tab === 'services'"
+              :categories="categories"
+              :location-id="location.id"
             />
           </TabPanel>
 

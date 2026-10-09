@@ -77,6 +77,12 @@ const tenantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/tenant/account/SecurityView.vue'),
       },
       {
+        path: 'services',
+        name: 'tenant.services',
+        component: () => import('@/views/tenant/ServicesView.vue'),
+        meta: { permission: 'services.view' },
+      },
+      {
         path: 'facilities/:id(\\d+)/availability',
         name: 'tenant.facilities.availability',
         component: () => import('@/views/tenant/FacilityAvailabilityView.vue'),
