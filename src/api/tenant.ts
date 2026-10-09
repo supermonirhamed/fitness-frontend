@@ -284,6 +284,14 @@ export interface Service {
   photo_url: string | null
   bookable: boolean
   locations?: ServiceLocation[]
+  /** Staff who may deliver it (US-02.05); empty: anyone. */
+  staff?: { id: number; name: string }[]
+}
+
+export interface StaffOption {
+  id: number
+  name: string
+  roles: string[]
 }
 
 export interface ServiceInput {
@@ -303,6 +311,7 @@ export interface ServiceInput {
   gender: GenderRestriction
   equipment_notes: string | null
   locations: ServiceLocation[]
+  staff_ids?: number[]
 }
 
 /** A branch's VAT (US-01.14). Rates are "15.00"; each applies from its date. */
@@ -689,6 +698,9 @@ export const tenantApi = {
       } = {},
     ): Promise<Service[]> {
       return (await http.get('/api/services', { params })).data.data
+    },
+    async staffOptions(): Promise<StaffOption[]> {
+      return (await http.get('/api/services/staff-options')).data.data
     },
     async create(input: ServiceInput): Promise<Service> {
       return (await http.post('/api/services', input)).data.data

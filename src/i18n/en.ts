@@ -534,6 +534,10 @@ export default {
     bufferBefore: 'Setup before',
     bufferAfter: 'Cleanup after',
     bufferHint: 'Blocks the coach and the facility around each session. Clients do not see it.',
+    staff: 'Staff who deliver it',
+    anyStaff: 'Any staff member',
+    staffHint:
+      'Only these people are offered as coach when scheduling (unless the scheduler may override). Leave empty to allow anyone.',
     capacityHint: 'Sessions start with this; a facility can limit it.',
     branches: 'Branches offering it',
     branchesHint:

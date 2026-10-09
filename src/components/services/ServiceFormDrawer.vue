@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Drawer from 'primevue/drawer'
 import InputNumber from 'primevue/inputnumber'
+import MultiSelect from 'primevue/multiselect'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
@@ -21,6 +22,7 @@ import {
   type ServiceCategory,
   type ServiceInput,
   type ServiceLocation,
+  type StaffOption,
 } from '@/api/tenant'
 import { validationErrors, type ValidationErrors } from '@/lib/http'
 import { apiMessage } from '@/lib/apiErrors'
@@ -36,7 +38,7 @@ const props = defineProps<{
 }>()
 const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{ saved: [service: Service, created: boolean] }>()
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 const org = useOrganization()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
 const editing = computed(() => props.service !== null)
@@ -64,6 +66,17 @@ const form = reactive<ServiceInput>(blank())
 const links = reactive<
   Record<number, { on: boolean; capacity: number | null; price: number | null }>
 >({})
+const staffIds = ref<number[]>([])
+const staffOptions = ref<StaffOption[]>([])
+const staffLoaded = ref(false)
+async function loadStaff() {
+  try {
+    staffOptions.value = await tenantApi.services.staffOptions()
+  } finally {
+    staffLoaded.value = true
+  }
+}
+const roleName = (role: string) => (te(`roles.${role}`) ? t(`roles.${role}`) : role)
 const photo = ref<File | null>(null)
 const removePhoto = ref(false)
 const photoError = ref<string | null>(null)
@@ -137,6 +150,8 @@ watch(visible, (open) => {
       price: link?.price_override == null ? null : Number(link.price_override),
     }
   }
+  staffIds.value = (s?.staff ?? []).map((u) => u.id)
+  if (!staffLoaded.value) loadStaff()
   photo.value = null
   removePhoto.value = false
   photoError.value = null
@@ -161,6 +176,7 @@ async function submit() {
     status: editing.value ? form.status : form.status,
     equipment_notes: form.equipment_notes || null,
     locations,
+    staff_ids: staffIds.value,
   }
   try {
     let saved = props.service
@@ -369,6 +385,33 @@ async function submit() {
         <small v-if="locationsError" class="error">{{ locationsError }}</small>
       </fieldset>
 
+      <div class="field">
+        <label for="service-staff">{{ t('catalog.staff') }}</label>
+        <MultiSelect
+          v-model="staffIds"
+          input-id="service-staff"
+          :options="staffOptions"
+          option-label="name"
+          option-value="id"
+          filter
+          display="chip"
+          :loading="!staffLoaded"
+          :placeholder="t('catalog.anyStaff')"
+          :invalid="!!err('staff_ids')"
+          fluid
+        >
+          <template #option="{ option }">
+            <span class="staff-option">
+              <span>{{ option.name }}</span>
+              <small>{{ option.roles.map(roleName).join(', ') }}</small>
+            </span>
+          </template>
+        </MultiSelect>
+        <small :class="err('staff_ids') ? 'error' : 'hint'">{{
+          err('staff_ids') ?? t('catalog.staffHint')
+        }}</small>
+      </div>
+
       <details class="more">
         <summary>{{ t('catalog.moreDetails') }}</summary>
         <div class="more-body">
@@ -567,6 +610,15 @@ async function submit() {
 }
 .branches :deep(.override) {
   width: 100%;
+}
+.staff-option {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+}
+.staff-option small {
+  color: var(--text-muted);
 }
 .ages {
   display: flex;
