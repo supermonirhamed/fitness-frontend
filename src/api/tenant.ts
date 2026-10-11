@@ -604,6 +604,52 @@ export interface MySchedule {
   feed: boolean
 }
 
+/** A client (US-05.01). Contact details are null when `contact_hidden` (no clients.contact_view). */
+export interface Client {
+  id: number
+  member_id: string | null
+  first_name: string
+  last_name: string
+  name: string
+  mobile: string | null
+  email: string | null
+  address: string | null
+  national_id: string | null
+  contact_hidden: boolean
+  date_of_birth: string | null
+  age: number | null
+  gender: 'female' | 'male' | null
+  preferred_language: 'ar' | 'en' | null
+  home_location: { id: number; name: string } | null
+  marketing_consent: boolean
+  status: 'Active' | 'Inactive' | 'Blocked' | 'Lead'
+  photo_url: string | null
+  created_at: string | null
+}
+
+export interface ClientInput {
+  first_name: string
+  last_name: string
+  mobile: string | null
+  email: string | null
+  date_of_birth: string | null
+  gender: 'female' | 'male' | null
+  address: string | null
+  national_id: string | null
+  preferred_language: 'ar' | 'en' | null
+  home_location_id: number | null
+  marketing_consent: boolean
+}
+
+/** A client with the same mobile or email (US-05.01); hidden ones carry no details. */
+export interface ClientMatch {
+  id: number | null
+  name: string | null
+  member_id: string | null
+  matched_on: 'mobile' | 'email'
+  visible: boolean
+}
+
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
 
 /** A session with the conflicts it has now (Conflict Center, US-03.07). */
@@ -1119,6 +1165,33 @@ export const tenantApi = {
           params: { ...rest, ...(mine === undefined ? {} : { mine: mine ? 1 : 0 }) },
         })
       ).data
+    },
+  },
+  clients: {
+    async list(
+      params: { q?: string; page?: number; per_page?: number } = {},
+    ): Promise<{
+      data: Client[]
+      meta: { total: number; current_page: number; last_page: number }
+    }> {
+      return (await http.get('/api/clients', { params })).data
+    },
+    async get(id: number): Promise<Client> {
+      return (await http.get(`/api/clients/${id}`)).data.data
+    },
+    async create(input: ClientInput): Promise<Client> {
+      return (await http.post('/api/clients', input)).data.data
+    },
+    async duplicates(params: {
+      mobile?: string | null
+      email?: string | null
+    }): Promise<ClientMatch[]> {
+      return (await http.get('/api/clients/duplicates', { params })).data.data
+    },
+    async uploadPhoto(id: number, file: File): Promise<Client> {
+      const body = new FormData()
+      body.append('photo', file)
+      return (await http.post(`/api/clients/${id}/photo`, body)).data.data
     },
   },
   mySchedule: {

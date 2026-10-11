@@ -73,6 +73,18 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'schedule.view' },
       },
       {
+        path: 'clients',
+        name: 'tenant.clients',
+        component: () => import('@/views/tenant/clients/ClientsView.vue'),
+        meta: { permission: 'clients.view' },
+      },
+      {
+        path: 'clients/:id(\\d+)',
+        name: 'tenant.client',
+        component: () => import('@/views/tenant/clients/ClientProfileView.vue'),
+        meta: { permission: 'clients.view' },
+      },
+      {
         path: 'my-schedule',
         name: 'tenant.mySchedule',
         component: () => import('@/views/tenant/schedule/MyScheduleView.vue'),
