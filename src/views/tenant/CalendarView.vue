@@ -62,6 +62,7 @@ const auth = useStaffAuth()
 const org = useOrganization()
 const toast = useToast()
 const canCreate = computed(() => auth.can('schedule.create'))
+const canResolve = computed(() => auth.can('schedule.update'))
 const canEdit = (s: CalendarSession) =>
   auth.can('schedule.update') &&
   !s.locked &&
@@ -168,6 +169,15 @@ async function load() {
     if (mine === request) state.value = 'error'
   }
 }
+// Conflict Center badge (US-03.07)
+const conflictCount = ref(0)
+async function loadConflicts() {
+  if (!canResolve.value) return
+  conflictCount.value = await tenantApi.sessions
+    .conflicts(branch.value ? { location_id: branch.value.id } : {})
+    .then((r) => r.meta.sessions)
+    .catch(() => 0)
+}
 async function loadFacilities() {
   try {
     facilities.value = (
@@ -180,6 +190,7 @@ async function loadFacilities() {
 onMounted(async () => {
   load()
   loadFacilities()
+  loadConflicts()
   if (auth.can('services.view'))
     staff.value = await tenantApi.services.staffOptions().catch(() => [])
 })
@@ -190,6 +201,7 @@ watch(
     facilityIds.value = []
     load()
     loadFacilities()
+    loadConflicts()
   },
 )
 
@@ -405,6 +417,7 @@ function onUpdated(session: CalendarSession) {
     life: 4000,
   })
   load()
+  loadConflicts()
 }
 function onSlot(event: MouseEvent, column: Column) {
   if (!canCreate.value || event.target !== event.currentTarget) return
@@ -583,6 +596,17 @@ const zoneOf = (s: CalendarSession) =>
           ><i :class="option.icon" aria-hidden="true" />{{ option.label }}</template
         >
       </SelectButton>
+      <Button
+        v-if="canResolve"
+        size="small"
+        icon="pi pi-exclamation-triangle"
+        :label="t('calendar.conflicts')"
+        :badge="conflictCount ? String(conflictCount) : undefined"
+        badge-severity="warn"
+        :severity="conflictCount ? 'warn' : 'secondary'"
+        variant="outlined"
+        @click="router.push({ name: 'tenant.conflicts' })"
+      />
     </div>
 
     <Message v-if="ownOnly" severity="secondary" icon="pi pi-user" :closable="false">{{

@@ -474,6 +474,14 @@ export interface SeriesPreviewItem {
   conflicts: SessionConflictItem[]
 }
 
+export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
+
+/** A session with the conflicts it has now (Conflict Center, US-03.07). */
+export interface ConflictCenterItem {
+  session: CalendarSession
+  issues: SessionConflictItem[]
+}
+
 /** A series' weekly pattern (US-03.05), for the edit form. */
 export interface SeriesPattern {
   id: number
@@ -914,6 +922,18 @@ export const tenantApi = {
     },
     async update(id: number, input: SessionInput & { scope?: 'one' }): Promise<CalendarSession> {
       return (await http.put(`/api/sessions/${id}`, input)).data.data
+    },
+    async cancel(
+      id: number,
+      input: { reason: CancelReason; note: string | null },
+    ): Promise<CalendarSession> {
+      return (await http.post(`/api/sessions/${id}/cancel`, input)).data.data
+    },
+    async conflicts(params: { location_id?: number } = {}): Promise<{
+      data: ConflictCenterItem[]
+      meta: { sessions: number; hard: number; soft: number; issues: number }
+    }> {
+      return (await http.get('/api/sessions/conflicts', { params })).data
     },
     async series(id: number): Promise<SeriesPattern> {
       return (await http.get(`/api/session-series/${id}`)).data.data
