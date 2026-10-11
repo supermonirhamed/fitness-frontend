@@ -402,6 +402,17 @@ function onCreated(session: CalendarSession) {
   anchor.value = session.local.date
   load()
 }
+function onSeriesCreated(result: { sessions: number; skipped: number; firstDate: string | null }) {
+  toast.add({
+    severity: 'success',
+    summary: t('session.seriesCreated', result.sessions),
+    detail: result.skipped ? t('session.seriesSkipped', { n: result.skipped }) : undefined,
+    life: 5000,
+  })
+  if (result.firstDate) anchor.value = result.firstDate
+  if (view.value === 'day') view.value = 'week'
+  load()
+}
 onMounted(() => {
   if (route.query.new === '1' && canCreate.value) {
     newSession({
@@ -806,7 +817,12 @@ const zoneOf = (s: CalendarSession) =>
       </div>
     </div>
 
-    <NewSessionDrawer v-model:visible="drawerOpen" :prefill="prefill" @saved="onCreated" />
+    <NewSessionDrawer
+      v-model:visible="drawerOpen"
+      :prefill="prefill"
+      @saved="onCreated"
+      @series-saved="onSeriesCreated"
+    />
 
     <Popover ref="popover" @hide="selected = null">
       <div v-if="selected" class="pop">

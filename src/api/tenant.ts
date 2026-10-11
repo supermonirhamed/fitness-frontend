@@ -447,6 +447,25 @@ export interface SessionInput {
   confirm_warnings?: boolean
 }
 
+/** A weekly series (US-03.03): the session fields with the recurrence instead of a date. */
+export interface SeriesInput extends Omit<SessionInput, 'date'> {
+  starts_on: string
+  weekdays: number[]
+  every_weeks: number
+  ends: 'date' | 'count' | 'never'
+  ends_on?: string | null
+  occurrences?: number | null
+  skip_dates?: string[]
+}
+
+export interface SeriesPreviewItem {
+  date: string
+  start: string
+  end: string
+  starts_at: string
+  conflicts: SessionConflictItem[]
+}
+
 export interface SessionFormOptions {
   defaults: {
     duration: number
@@ -851,6 +870,14 @@ export const tenantApi = {
     },
     async create(input: SessionInput): Promise<CalendarSession> {
       return (await http.post('/api/sessions', input)).data.data
+    },
+    async previewSeries(input: SeriesInput): Promise<SeriesPreviewItem[]> {
+      return (await http.post('/api/session-series/preview', input)).data.data
+    },
+    async createSeries(
+      input: SeriesInput,
+    ): Promise<{ id: number; sessions: number; skipped: number; rolling: boolean }> {
+      return (await http.post('/api/session-series', input)).data.data
     },
     async list(
       filters: CalendarFilters,

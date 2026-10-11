@@ -3,13 +3,17 @@
 // facility, coach, local date and time (D4), duration and capacity from the service defaults (at
 // most the facility's), Draft / Published, and a live conflict panel (US-03.06). Hard conflicts
 // block saving; warnings (outside hours, holidays) are saved with "Save anyway".
+// "Weekly" turns it into a series (US-03.03): a preview lists each date with its flags, and
+// flagged dates can be skipped one by one before the sessions are created.
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import Drawer from 'primevue/drawer'
 import InputNumber from 'primevue/inputnumber'
+import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
+import RadioButton from 'primevue/radiobutton'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
@@ -24,11 +28,14 @@ import {
   type SessionConflictItem,
   type SessionFormOptions,
   type SessionInput,
+  type SeriesInput,
+  type SeriesPreviewItem,
 } from '@/api/tenant'
 import { ACTIVITY_ICONS, activityKey } from '@/lib/catalog'
 import { errorCode, apiMessage } from '@/lib/apiErrors'
 import { validationErrors, type ValidationErrors } from '@/lib/http'
-import { todayIn } from '@/lib/calendar'
+import { addDays, todayIn, weekday } from '@/lib/calendar'
+import { DAY_KEYS } from '@/lib/businessHours'
 import { zoneAbbreviation } from '@/lib/datetime'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -43,7 +50,10 @@ export interface SessionPrefill {
 
 const props = defineProps<{ prefill: SessionPrefill }>()
 const visible = defineModel<boolean>('visible', { required: true })
-const emit = defineEmits<{ saved: [session: CalendarSession] }>()
+const emit = defineEmits<{
+  saved: [session: CalendarSession]
+  seriesSaved: [result: { sessions: number; skipped: number; firstDate: string | null }]
+}>()
 const { t, locale } = useI18n()
 const auth = useStaffAuth()
 const org = useOrganization()
@@ -128,6 +138,13 @@ watch(visible, async (open) => {
   form.serviceId = null
   form.assistantIds = []
   form.status = 'Draft'
+  repeat.value = 'none'
+  weekdays.value = []
+  everyWeeks.value = 1
+  ends.value = 'date'
+  endsOn.value = null
+  previewItems.value = null
+  skips.value = []
   form.locationId =
     props.prefill.locationId ??
     auth.currentLocation?.id ??
@@ -186,7 +203,7 @@ watch(
   () => {
     clearTimeout(timer)
     const payload = input()
-    if (!payload || !visible.value || overCapacity.value) {
+    if (!payload || !visible.value || overCapacity.value || repeat.value === 'weekly') {
       conflicts.value = []
       return
     }
@@ -205,6 +222,141 @@ watch(
   },
 )
 
+// Repeat weekly (US-03.03)
+const repeat = ref<'none' | 'weekly'>('none')
+const weekdays = ref<number[]>([])
+const everyWeeks = ref(1)
+const ends = ref<'date' | 'count' | 'never'>('date')
+const endsOn = ref<Date | null>(null)
+const occurrences = ref(12)
+const previewItems = ref<SeriesPreviewItem[] | null>(null)
+const skips = ref<string[]>([])
+const repeatOptions = computed(() => [
+  { value: 'none', label: t('session.noRepeat') },
+  { value: 'weekly', label: t('session.weekly') },
+])
+const weekdayOrder = computed(() =>
+  Array.from({ length: 7 }, (_, i) => (firstDayOfWeek.value + i) % 7),
+)
+const dayShort = (d: number) => t(`session.days.${DAY_KEYS[d]}`)
+function toggleDay(d: number) {
+  weekdays.value = weekdays.value.includes(d)
+    ? weekdays.value.filter((x) => x !== d)
+    : [...weekdays.value, d]
+}
+watch(repeat, (r) => {
+  if (r !== 'weekly' || !form.date) return
+  if (!weekdays.value.length) weekdays.value = [weekday(ymd(form.date))]
+  if (!endsOn.value) endsOn.value = new Date(`${addDays(ymd(form.date), 8 * 7)}T12:00:00`)
+})
+function seriesInput(confirm = false): SeriesInput | null {
+  const one = input(confirm)
+  if (!one || !weekdays.value.length) return null
+  if (ends.value === 'date' && !endsOn.value) return null
+  const { date, ...rest } = one
+  return {
+    ...rest,
+    starts_on: date,
+    weekdays: weekdays.value,
+    every_weeks: everyWeeks.value,
+    ends: ends.value,
+    ends_on: ends.value === 'date' ? ymd(endsOn.value) : null,
+    occurrences: ends.value === 'count' ? occurrences.value : null,
+    skip_dates: skips.value,
+  }
+}
+const kept = computed(() => (previewItems.value ?? []).filter((i) => !skips.value.includes(i.date)))
+const keptSoft = computed(() => kept.value.some((i) => i.conflicts.some((c) => c.level === 'soft')))
+const keptHard = computed(() => kept.value.some((i) => i.conflicts.some((c) => c.level === 'hard')))
+function toggleSkip(date: string) {
+  skips.value = skips.value.includes(date)
+    ? skips.value.filter((d) => d !== date)
+    : [...skips.value, date]
+}
+const dateLabel = (date: string) =>
+  new Intl.DateTimeFormat(locale.value, {
+    numberingSystem: 'latn',
+    timeZone: 'UTC',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(`${date}T12:00:00Z`))
+
+function failed(e: unknown) {
+  const code = errorCode(e)
+  if (
+    code === 'session_conflicts' ||
+    code === 'needs_confirmation' ||
+    code === 'outside_hours_forbidden'
+  ) {
+    const list =
+      (e as { response?: { data?: { conflicts?: (SessionConflictItem & { date?: string })[] } } })
+        .response?.data?.conflicts ?? []
+    if (previewItems.value) {
+      // Flag the refused dates in the preview.
+      for (const c of list) {
+        const item = previewItems.value.find((i) => i.date === c.date)
+        if (item && !item.conflicts.some((x) => x.code === c.code)) item.conflicts.push(c)
+      }
+    } else {
+      conflicts.value = list.length ? list : conflicts.value
+    }
+    formError.value = apiMessage(e) ?? null
+  } else {
+    errors.value = validationErrors(e)
+    formError.value = Object.keys(errors.value).length
+      ? t('locationForm.checkFields')
+      : (apiMessage(e) ?? t('common.genericError'))
+  }
+}
+
+async function showPreview() {
+  const payload = seriesInput()
+  if (!payload) return
+  saving.value = true
+  errors.value = {}
+  formError.value = null
+  try {
+    const items = await tenantApi.sessions.previewSeries({ ...payload, skip_dates: [] })
+    previewItems.value = items
+    // Flagged dates start skipped; the user can keep them.
+    skips.value = items.filter((i) => i.conflicts.length).map((i) => i.date)
+  } catch (e) {
+    failed(e)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function createSeries() {
+  const payload = seriesInput(keptSoft.value)
+  if (!payload) return
+  saving.value = true
+  formError.value = null
+  try {
+    const result = await tenantApi.sessions.createSeries(payload)
+    emit('seriesSaved', {
+      sessions: result.sessions,
+      skipped: result.skipped,
+      firstDate: kept.value[0]?.date ?? null,
+    })
+    visible.value = false
+  } catch (e) {
+    failed(e)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function submit() {
+  if (repeat.value === 'weekly') {
+    if (previewItems.value) await createSeries()
+    else await showPreview()
+  } else {
+    await save()
+  }
+}
+
 async function save() {
   const payload = input(soft.value > 0)
   if (!payload) return
@@ -216,30 +368,23 @@ async function save() {
     emit('saved', session)
     visible.value = false
   } catch (e) {
-    const code = errorCode(e)
-    if (
-      code === 'session_conflicts' ||
-      code === 'needs_confirmation' ||
-      code === 'outside_hours_forbidden'
-    ) {
-      conflicts.value =
-        (e as { response?: { data?: { conflicts?: SessionConflictItem[] } } }).response?.data
-          ?.conflicts ?? conflicts.value
-      formError.value = apiMessage(e) ?? null
-    } else {
-      errors.value = validationErrors(e)
-      formError.value = Object.keys(errors.value).length
-        ? t('locationForm.checkFields')
-        : (apiMessage(e) ?? t('common.genericError'))
-    }
+    failed(e)
   } finally {
     saving.value = false
   }
 }
 
-const canSave = computed(
-  () => !!input() && !hard.value && !overCapacity.value && !saving.value && !checking.value,
-)
+const canSave = computed(() => {
+  if (saving.value || overCapacity.value) return false
+  if (repeat.value === 'weekly')
+    return previewItems.value ? kept.value.length > 0 && !keptHard.value : !!seriesInput()
+  return !!input() && !hard.value && !checking.value
+})
+const saveLabel = computed(() => {
+  if (repeat.value === 'weekly')
+    return previewItems.value ? t('session.createN', kept.value.length) : t('session.preview')
+  return soft.value && !hard.value ? t('session.saveAnyway') : t('session.save')
+})
 const subtitle = computed(() =>
   t('session.timesIn', {
     zone: `${zoneAbbreviation(timezone.value, locale.value)} · ${timezone.value}`,
@@ -264,7 +409,7 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
       </div>
     </template>
 
-    <form id="session-form" class="form" @submit.prevent="save">
+    <form v-if="!previewItems" id="session-form" class="form" @submit.prevent="submit">
       <Message v-if="formError" severity="error" :closable="false" role="alert">{{
         formError
       }}</Message>
@@ -435,7 +580,87 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
         </FormField>
       </div>
 
-      <section class="conflicts">
+      <section class="repeat">
+        <FormField :label="t('session.repeat')">
+          <SelectButton
+            v-model="repeat"
+            :options="repeatOptions"
+            option-label="label"
+            option-value="value"
+            :allow-empty="false"
+            :aria-label="t('session.repeat')"
+          />
+        </FormField>
+        <template v-if="repeat === 'weekly'">
+          <div class="days" role="group" :aria-label="t('session.onDays')">
+            <Button
+              v-for="d in weekdayOrder"
+              :key="d"
+              size="small"
+              :label="dayShort(d)"
+              :severity="weekdays.includes(d) ? undefined : 'secondary'"
+              :variant="weekdays.includes(d) ? undefined : 'outlined'"
+              :aria-pressed="weekdays.includes(d)"
+              @click="toggleDay(d)"
+            />
+          </div>
+          <div class="every">
+            <span>{{ t('session.every') }}</span>
+            <InputNumber
+              v-model="everyWeeks"
+              :min="1"
+              :max="12"
+              show-buttons
+              class="every__input"
+              :aria-label="t('session.every')"
+            />
+            <span>{{ t('session.weeks') }}</span>
+          </div>
+          <div class="ends">
+            <span class="ends__label">{{ t('session.ends') }}</span>
+            <div class="ends__row">
+              <RadioButton v-model="ends" input-id="ends-date" value="date" />
+              <label for="ends-date">{{ t('session.onDate') }}</label>
+              <DatePicker
+                v-if="ends === 'date'"
+                v-model="endsOn"
+                :first-day-of-week="firstDayOfWeek"
+                date-format="yy-mm-dd"
+                :min-date="form.date ?? undefined"
+                show-icon
+                icon-display="input"
+                class="ends__input"
+                :invalid="!!err('ends_on')"
+              />
+            </div>
+            <div class="ends__row">
+              <RadioButton v-model="ends" input-id="ends-count" value="count" />
+              <label for="ends-count">{{ t('session.after') }}</label>
+              <InputNumber
+                v-if="ends === 'count'"
+                v-model="occurrences"
+                :min="1"
+                :max="260"
+                :suffix="` ${t('session.times')}`"
+                class="ends__input"
+                :invalid="!!err('occurrences')"
+              />
+            </div>
+            <div class="ends__row">
+              <RadioButton v-model="ends" input-id="ends-never" value="never" />
+              <label for="ends-never"
+                >{{ t('session.never') }}
+                <small class="muted">{{ t('session.neverHint') }}</small></label
+              >
+            </div>
+            <small v-if="err('ends_on') || err('occurrences') || err('weekdays')" class="error">{{
+              err('ends_on') ?? err('occurrences') ?? err('weekdays')
+            }}</small>
+          </div>
+        </template>
+      </section>
+
+      <section v-if="repeat === 'none'" class="conflicts">
         <div class="conflicts__head">
           <span class="conflicts__title">{{ t('session.conflicts') }}</span>
           <i v-if="checking" class="pi pi-spin pi-spinner muted" aria-hidden="true" />
@@ -452,10 +677,57 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
       </section>
     </form>
 
+    <!-- Series preview (US-03.03): each date, its flags, and a box to keep or skip it. -->
+    <div v-else class="form">
+      <Message v-if="formError" severity="error" :closable="false" role="alert">{{
+        formError
+      }}</Message>
+      <Message :severity="skips.length ? 'warn' : 'info'" :closable="false">
+        {{ t('session.previewSummary', { make: kept.length, skip: skips.length }) }}
+        <div v-if="ends === 'never'">{{ t('session.rollingNote') }}</div>
+      </Message>
+      <ul class="occurrences">
+        <li
+          v-for="(item, i) in previewItems"
+          :key="item.date"
+          :class="['occ', { 'occ--skipped': skips.includes(item.date) }]"
+        >
+          <Checkbox
+            :model-value="!skips.includes(item.date)"
+            binary
+            :input-id="`occ-${item.date}`"
+            @update:model-value="toggleSkip(item.date)"
+          />
+          <span class="occ__n num">#{{ i + 1 }}</span>
+          <label :for="`occ-${item.date}`" class="occ__when"
+            >{{ dateLabel(item.date) }} ·
+            <span dir="ltr">{{ item.start }}–{{ item.end }}</span></label
+          >
+          <Tag
+            v-for="c in item.conflicts"
+            :key="c.code"
+            class="tag-sm"
+            :severity="c.level === 'hard' ? 'danger' : 'warn'"
+            :icon="c.code === 'holiday' ? 'pi pi-calendar-times' : 'pi pi-exclamation-triangle'"
+            :value="c.who ? `${c.title} · ${c.who}` : c.title"
+          />
+          <Tag v-if="skips.includes(item.date)" class="tag-sm" :value="t('session.skipped')" />
+        </li>
+      </ul>
+    </div>
+
     <template #footer>
       <div class="footer">
+        <Button
+          v-if="previewItems"
+          :label="t('wizard.back')"
+          icon="pi pi-arrow-left pi-dir"
+          severity="secondary"
+          variant="text"
+          @click="previewItems = null"
+        />
         <span
-          v-if="conflicts.length"
+          v-else-if="repeat === 'none' && conflicts.length"
           :class="['footer__state', hard ? 'footer__state--hard' : 'footer__state--soft']"
         >
           <i
@@ -471,13 +743,7 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
           variant="text"
           @click="visible = false"
         />
-        <Button
-          type="submit"
-          form="session-form"
-          :label="soft && !hard ? t('session.saveAnyway') : t('session.save')"
-          :loading="saving"
-          :disabled="!canSave"
-        />
+        <Button :label="saveLabel" :loading="saving" :disabled="!canSave" @click="submit" />
       </div>
     </template>
   </Drawer>
@@ -548,6 +814,88 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
   height: 10px;
   border-radius: 3px;
   flex: none;
+}
+.repeat {
+  border-top: 1px solid var(--border-default);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.days {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.every {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.every__input,
+.every__input :deep(input) {
+  width: 110px;
+  flex: none;
+}
+.ends {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ends__label {
+  font: var(--text-small);
+  font-weight: 500;
+}
+.ends__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 36px;
+}
+.ends__input,
+.ends__input :deep(input) {
+  width: 180px;
+  flex: none;
+}
+.error {
+  font: var(--text-caption);
+  color: var(--sev-danger-fg);
+}
+.occurrences {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+}
+.occ {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.occ:last-child {
+  border-bottom: 0;
+}
+.occ--skipped {
+  background: var(--surface-sunken);
+}
+.occ__n {
+  width: 28px;
+  font: var(--text-caption);
+  color: var(--text-muted);
+}
+.occ__when {
+  flex: 1;
+  font: 500 14px var(--font-sans);
+  cursor: pointer;
+}
+.occ--skipped .occ__when {
+  text-decoration: line-through;
+  color: var(--text-muted);
 }
 .conflicts {
   border-top: 1px solid var(--border-default);
