@@ -18,6 +18,7 @@ import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import CancelSessionDialog from '@/components/schedule/CancelSessionDialog.vue'
 import SessionDrawer from '@/components/schedule/SessionDrawer.vue'
+import SubstituteCoachDrawer from '@/components/schedule/SubstituteCoachDrawer.vue'
 import {
   tenantApi,
   type CalendarSession,
@@ -119,6 +120,11 @@ function onSeriesUpdated(result: SeriesUpdateResult) {
     life: 5000,
   })
   load()
+}
+const substituteOpen = ref(false)
+function substitute(s: CalendarSession) {
+  editing.value = s
+  substituteOpen.value = true
 }
 const cancelOpen = ref(false)
 const cancelling = ref<CalendarSession | null>(null)
@@ -263,7 +269,7 @@ function onCancelled(result: { cancelled: number; name: string | null }) {
               size="small"
               icon="pi pi-user-edit"
               :label="t('conflictCenter.reassignCoach')"
-              @click="edit(item.session)"
+              @click="substitute(item.session)"
             />
             <Button
               v-if="has(item, FACILITY_CODES)"
@@ -311,6 +317,7 @@ function onCancelled(result: { cancelled: number; name: string | null }) {
       @updated="onUpdated"
       @series-updated="onSeriesUpdated"
     />
+    <SubstituteCoachDrawer v-model:visible="substituteOpen" :session="editing" @saved="onUpdated" />
     <CancelSessionDialog
       v-model:visible="cancelOpen"
       :session="cancelling"

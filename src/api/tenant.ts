@@ -390,6 +390,8 @@ export interface CalendarSession {
   location: { id: number; name: string; timezone: string }
   facility: { id: number; name: string; capacity: number }
   coaches: { id: number; name: string }[]
+  /** Substituted (US-03.13): the coach who was replaced. */
+  original_coach: { id: number; name: string | null } | null
   series_id: number | null
   /** A day of an event (US-03.10). */
   event_id: number | null
@@ -556,6 +558,16 @@ export type CancelTarget =
   | { mode: 'ids'; ids: number[] }
   | { mode: 'following'; session_id: number }
   | { mode: 'range'; location_id: number; from: string; to: string }
+
+/** Who could take over a session (US-03.13), best first. */
+export interface SubstituteCandidate {
+  id: number
+  name: string
+  current: boolean
+  eligible: boolean
+  level: 'hard' | 'soft' | null
+  issues: SessionConflictItem[]
+}
 
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
 
@@ -1005,6 +1017,15 @@ export const tenantApi = {
     },
     async update(id: number, input: SessionInput & { scope?: 'one' }): Promise<CalendarSession> {
       return (await http.put(`/api/sessions/${id}`, input)).data.data
+    },
+    async substitutes(id: number): Promise<SubstituteCandidate[]> {
+      return (await http.get(`/api/sessions/${id}/substitutes`)).data.data
+    },
+    async substitute(
+      id: number,
+      input: { coach_id: number; notify: boolean; confirm_warnings?: boolean },
+    ): Promise<CalendarSession> {
+      return (await http.post(`/api/sessions/${id}/substitute`, input)).data.data
     },
     async setStatus(input: {
       ids?: number[]

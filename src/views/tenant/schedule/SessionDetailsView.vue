@@ -26,6 +26,7 @@ import StatusBanner from '@/components/patterns/StatusBanner.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import CancelSessionDialog from '@/components/schedule/CancelSessionDialog.vue'
 import SessionDrawer, { type SessionPrefill } from '@/components/schedule/SessionDrawer.vue'
+import SubstituteCoachDrawer from '@/components/schedule/SubstituteCoachDrawer.vue'
 import {
   tenantApi,
   type CalendarSession,
@@ -185,6 +186,15 @@ function onCreated(created: CalendarSession) {
   })
 }
 const cancelOpen = ref(false)
+const substituteOpen = ref(false)
+function onSubstituted(updated: CalendarSession) {
+  toast.add({
+    severity: 'success',
+    summary: t('substitute.done', { name: updated.coaches[0]?.name ?? '' }),
+    life: 4000,
+  })
+  load()
+}
 function onCancelled(result: { cancelled: number; name: string | null }) {
   toast.add({
     severity: 'info',
@@ -219,7 +229,11 @@ async function publishSeries() {
 const moreItems = computed<MenuItem[]>(() => {
   const items: MenuItem[] = []
   if (canEdit.value)
-    items.push({ label: t('sessionPage.substitute'), icon: 'pi pi-user-edit', command: edit })
+    items.push({
+      label: t('sessionPage.substitute'),
+      icon: 'pi pi-user-edit',
+      command: () => (substituteOpen.value = true),
+    })
   if (canCreate.value)
     items.push({ label: t('sessionPage.duplicate'), icon: 'pi pi-copy', command: duplicate })
   // A draft series is released at once (US-03.11).
@@ -309,7 +323,10 @@ const moreItems = computed<MenuItem[]>(() => {
           >
           <span><i class="pi pi-building" aria-hidden="true" />{{ session.facility.name }}</span>
           <span v-if="session.coaches[0]"
-            ><i class="pi pi-user" aria-hidden="true" />{{ session.coaches[0].name }}</span
+            ><i class="pi pi-user" aria-hidden="true" />{{ session.coaches[0].name }}
+            <small v-if="session.original_coach" class="sub-note">{{
+              t('substitute.original', { name: session.original_coach.name })
+            }}</small></span
           >
           <span v-if="session.event"
             ><i class="pi pi-star" aria-hidden="true" />{{
@@ -536,6 +553,11 @@ const moreItems = computed<MenuItem[]>(() => {
         @series-updated="onSeriesUpdated"
         @saved="onCreated"
       />
+      <SubstituteCoachDrawer
+        v-model:visible="substituteOpen"
+        :session="session"
+        @saved="onSubstituted"
+      />
       <CancelSessionDialog
         v-model:visible="cancelOpen"
         :session="session"
@@ -577,6 +599,11 @@ const moreItems = computed<MenuItem[]>(() => {
 :deep(.page-header) i.pi-star {
   font-size: 12px;
   margin-inline-end: 6px;
+}
+.sub-note {
+  margin-inline-start: 4px;
+  font: var(--text-caption);
+  color: var(--sev-warn-fg);
 }
 .issues {
   padding: 16px;
