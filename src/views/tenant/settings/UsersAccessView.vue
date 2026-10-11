@@ -10,7 +10,11 @@ import DataTable from 'primevue/datatable'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import BranchChips from '@/components/patterns/BranchChips.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import NoPermission from '@/components/patterns/NoPermission.vue'
+import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import LocationAccessDialog from '@/components/roles/LocationAccessDialog.vue'
 import { tenantApi, type Location, type StaffAccess } from '@/api/tenant'
@@ -169,36 +173,24 @@ function openMenu(event: Event, user: StaffAccess) {
 </script>
 
 <template>
-  <section class="card">
+  <section class="list">
     <div
       v-if="state === 'loading'"
-      class="skeleton"
+      class="skeleton card"
       aria-busy="true"
       :aria-label="t('common.loading')"
     >
       <Skeleton v-for="n in 5" :key="n" height="40px" />
     </div>
 
-    <EmptyState
-      v-else-if="state === 'forbidden'"
-      icon="pi-lock"
-      :title="t('permissions.forbidden')"
-      :body="t('permissions.forbiddenHint')"
-    />
+    <NoPermission v-else-if="state === 'forbidden'" class="card" />
 
-    <EmptyState
+    <ErrorState
       v-else-if="state === 'error'"
-      icon="pi-exclamation-triangle"
+      class="card"
       :title="t('access.loadError')"
-    >
-      <Button
-        severity="secondary"
-        variant="outlined"
-        icon="pi pi-replay pi-dir"
-        :label="t('common.retry')"
-        @click="load"
-      />
-    </EmptyState>
+      @retry="load"
+    />
 
     <template v-else>
       <div class="intro">
@@ -224,8 +216,13 @@ function openMenu(event: Event, user: StaffAccess) {
         </template>
         <Column :header="t('access.columns.person')">
           <template #body="{ data }">
-            <div class="person">{{ data.name }}</div>
-            <div class="sub ltr-isolate">{{ data.email }}</div>
+            <div class="person-chip">
+              <PersonAvatar :name="data.name" />
+              <div>
+                <div class="person">{{ data.name }}</div>
+                <div class="sub ltr-isolate">{{ data.email }}</div>
+              </div>
+            </div>
           </template>
         </Column>
         <Column :header="t('access.columns.roles')">
@@ -263,9 +260,7 @@ function openMenu(event: Event, user: StaffAccess) {
                 :aria-label="t('access.orgWideRole')"
               />
             </span>
-            <div v-else-if="data.location_ids.length" class="tags">
-              <Tag v-for="name in branchesOf(data)" :key="name" :value="name" severity="info" />
-            </div>
+            <BranchChips v-else-if="data.location_ids.length" :names="branchesOf(data)" :max="3" />
             <span v-else class="none"
               ><i class="pi pi-exclamation-circle" aria-hidden="true" />{{ t('access.none') }}</span
             >
@@ -335,11 +330,20 @@ function openMenu(event: Event, user: StaffAccess) {
 </template>
 
 <style scoped>
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .card {
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
-  overflow: hidden;
+}
+.person-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .skeleton {
   display: flex;
@@ -351,8 +355,6 @@ function openMenu(event: Event, user: StaffAccess) {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
 }
 .intro p {
   margin: 0;

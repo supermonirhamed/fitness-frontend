@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import InputOtp from 'primevue/inputotp'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Message from 'primevue/message'
@@ -136,16 +138,19 @@ function backToPassword() {
 
     <div class="field">
       <label for="email">{{ t('tenantApp.signIn.email') }}</label>
-      <InputText
-        id="email"
-        v-model.trim="form.email"
-        type="email"
-        dir="ltr"
-        autocomplete="username"
-        required
-        fluid
-        :invalid="!!error && !lockedFor"
-      />
+      <IconField>
+        <InputIcon class="pi pi-envelope" />
+        <InputText
+          id="email"
+          v-model.trim="form.email"
+          type="email"
+          dir="ltr"
+          autocomplete="username"
+          required
+          fluid
+          :invalid="!!error && !lockedFor"
+        />
+      </IconField>
     </div>
     <div class="field">
       <label for="password">{{ t('tenantApp.signIn.password') }}</label>
