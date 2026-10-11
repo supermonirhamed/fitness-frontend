@@ -547,6 +547,7 @@ const canNext = computed(() => {
             :max="1000"
             :invalid="!!largestFacility(l.id) && (capacityOf(l.id) ?? 0) > largestFacility(l.id)"
             :aria-label="t('catalog.capacityAt', { branch: l.name })"
+            fluid
             @update:model-value="capacityAt[l.id] = $event"
           />
         </div>

@@ -74,6 +74,22 @@
   color: var(--text-secondary);
 }
 
+/* SplitButton: one joined control — square inner corners (logical, so RTL works) and a divider. */
+.p-splitbutton {
+  border-radius: var(--radius-button);
+}
+.p-splitbutton .p-splitbutton-button {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+.p-splitbutton .p-splitbutton-dropdown {
+  width: var(--control-h);
+  padding: 0;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  border-inline-start: 1px solid rgb(255 255 255 / 0.3);
+}
+
 /* Text inputs, selects — components/forms/InputText.jsx, Select.jsx */
 .p-inputtext,
 .p-select,
@@ -262,6 +278,15 @@
 .p-selectbutton.p-selectbutton-fluid {
   display: flex;
   align-self: stretch;
+  width: 100%;
+}
+.p-selectbutton.p-selectbutton-fluid .p-togglebutton {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.p-selectbutton.p-selectbutton-fluid .p-togglebutton-content {
+  width: 100%;
+  justify-content: center;
 }
 
 /* ToggleSwitch — components/forms/ToggleSwitch.jsx: 40×22 track, 18px knob */
