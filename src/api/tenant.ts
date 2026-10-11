@@ -287,6 +287,8 @@ export interface Service {
   default_capacity: number | null
   buffer_before: number
   buffer_after: number
+  /** Appointments (US-03.09): minutes between slot starts; null: back to back. */
+  slot_interval: number | null
   /** How it can be paid for (US-02.08). */
   allow_membership: boolean
   allow_package: boolean
@@ -325,6 +327,7 @@ export interface ServiceInput {
   default_capacity: number | null
   buffer_before: number | null
   buffer_after: number | null
+  slot_interval?: number | null
   allow_membership: boolean
   allow_package: boolean
   allow_drop_in: boolean
@@ -496,6 +499,17 @@ export interface SessionDetails extends CalendarSession {
     at: string | null
     changed: string[]
     reason: string | null
+  }[]
+}
+
+/** Free appointment slots of one day (US-03.09), local times at the branch. */
+export interface AppointmentDay {
+  date: string
+  slots: {
+    start: string
+    end: string
+    starts_at: string
+    coaches: { id: number; name: string; facility_id: number }[]
   }[]
 }
 
@@ -986,6 +1000,31 @@ export const tenantApi = {
           params: { ...rest, ...(mine === undefined ? {} : { mine: mine ? 1 : 0 }) },
         })
       ).data
+    },
+  },
+  appointments: {
+    async slots(params: {
+      service_id: number
+      location_id: number
+      from: string
+      days?: number
+      coach_id?: number | null
+    }): Promise<{
+      data: AppointmentDay[]
+      meta: { duration: number; interval: number; timezone: string }
+    }> {
+      return (await http.get('/api/appointments/slots', { params })).data
+    },
+    async book(input: {
+      service_id: number
+      location_id: number
+      coach_id: number
+      facility_id?: number | null
+      date: string
+      start_time: string
+      confirm_warnings?: boolean
+    }): Promise<CalendarSession> {
+      return (await http.post('/api/appointments', input)).data.data
     },
   },
   programs: {

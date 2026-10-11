@@ -1,3 +1,4 @@
+import { useI18n } from 'vue-i18n'
 import type { ActivityType, Program, Translated } from '@/api/tenant'
 
 /** Category icons to pick from (PrimeIcons). */
@@ -72,4 +73,16 @@ export function programEnrollment(
   return p.enrollment_mode === 'Term' && p.term_start && p.term_end
     ? `${t('programs.modes.Term')} · ${day(p.term_start)} – ${day(p.term_end)}`
     : t('programs.modes.Rolling')
+}
+
+/** Appointment slot intervals (US-03.09), as on the backend (Service::SLOT_INTERVALS). */
+export const SLOT_INTERVALS = [5, 10, 15, 20, 30, 45, 60, 90, 120]
+
+/** Options for the slot interval picker: back to back (the duration), then every N minutes. */
+export function useSlotIntervals() {
+  const { t } = useI18n()
+  return (duration: number | null) => [
+    { value: null, label: t('catalog.slotBackToBack', { n: duration ?? 0 }) },
+    ...SLOT_INTERVALS.map((n) => ({ value: n, label: t('catalog.slotEvery', { n }) })),
+  ]
 }

@@ -27,7 +27,13 @@ import {
 } from '@/api/tenant'
 import { validationErrors, type ValidationErrors } from '@/lib/http'
 import { apiMessage } from '@/lib/apiErrors'
-import { ACTIVITY_ICONS, activityKey, emptyTranslated, translatedErrors } from '@/lib/catalog'
+import {
+  ACTIVITY_ICONS,
+  activityKey,
+  emptyTranslated,
+  translatedErrors,
+  useSlotIntervals,
+} from '@/lib/catalog'
 import { useOrganization } from '@/stores/organization'
 
 const props = defineProps<{
@@ -53,6 +59,7 @@ const blank = (): ServiceInput => ({
   default_capacity: 20,
   buffer_before: 0,
   buffer_after: 0,
+  slot_interval: null,
   allow_membership: false,
   allow_package: false,
   allow_drop_in: true,
@@ -135,6 +142,7 @@ const genderOptions = computed(() =>
   (['Any', 'Male', 'Female'] as const).map((g) => ({ value: g, label: t(`catalog.gender.${g}`) })),
 )
 const err = (field: string) => errors.value[field]?.[0]
+const slotIntervalOptions = useSlotIntervals()
 
 // Booking & payment (US-02.08): free excludes paid options.
 const PAID = ['allow_membership', 'allow_package', 'allow_drop_in'] as const
@@ -172,6 +180,7 @@ watch(visible, (open) => {
           default_capacity: s.default_capacity,
           buffer_before: s.buffer_before,
           buffer_after: s.buffer_after,
+          slot_interval: s.slot_interval,
           allow_membership: s.allow_membership,
           allow_package: s.allow_package,
           allow_drop_in: s.allow_drop_in,
@@ -401,6 +410,22 @@ async function submit() {
         class="under"
         >{{ err('buffer_before') ?? err('buffer_after') ?? t('catalog.bufferHint') }}</small
       >
+
+      <div v-if="form.activity_type === 'Appointment'" class="field">
+        <label for="service-slot-interval">{{ t('catalog.slotInterval') }}</label>
+        <Select
+          v-model="form.slot_interval"
+          input-id="service-slot-interval"
+          :options="slotIntervalOptions(form.default_duration)"
+          option-label="label"
+          option-value="value"
+          :invalid="!!err('slot_interval')"
+          fluid
+        />
+        <small :class="err('slot_interval') ? 'error' : 'hint'">{{
+          err('slot_interval') ?? t('catalog.slotIntervalHint')
+        }}</small>
+      </div>
 
       <fieldset class="field branches">
         <legend class="label">{{ t('catalog.branches') }} *</legend>

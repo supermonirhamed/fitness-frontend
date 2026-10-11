@@ -35,7 +35,7 @@ import {
   type ServiceStatus,
   type StaffOption,
 } from '@/api/tenant'
-import { ACTIVITY_ICONS, activityKey, emptyTranslated } from '@/lib/catalog'
+import { ACTIVITY_ICONS, activityKey, emptyTranslated, useSlotIntervals } from '@/lib/catalog'
 import { validationErrors, type ValidationErrors } from '@/lib/http'
 import { apiMessage } from '@/lib/apiErrors'
 import { useFormat } from '@/composables/useFormat'
@@ -64,6 +64,7 @@ const form = reactive<ServiceInput>({
   default_capacity: 15,
   buffer_before: 0,
   buffer_after: 0,
+  slot_interval: null,
   allow_membership: false,
   allow_package: false,
   allow_drop_in: true,
@@ -220,6 +221,7 @@ const saving = ref<ServiceStatus | null>(null)
 const errors = ref<ValidationErrors>({})
 const formError = ref<string | null>(null)
 const err = (field: string) => errors.value[field]?.[0]
+const slotIntervalOptions = useSlotIntervals()
 const STEP_OF: [RegExp, number][] = [
   [/^(name|description|category_id|color|skill_level|age_|gender|equipment)/, 1],
   [/^(default_|buffer_)/, 2],
@@ -502,6 +504,22 @@ const canNext = computed(() => {
             :step="5"
             :suffix="` ${t('catalog.minutes')}`"
             show-buttons
+            fluid
+          />
+        </FormField>
+        <FormField
+          v-if="form.activity_type === 'Appointment'"
+          :label="t('catalog.slotInterval')"
+          for="w-slot"
+          :help="t('catalog.slotIntervalHint')"
+          :error="err('slot_interval')"
+        >
+          <Select
+            v-model="form.slot_interval"
+            input-id="w-slot"
+            :options="slotIntervalOptions(form.default_duration)"
+            option-label="label"
+            option-value="value"
             fluid
           />
         </FormField>

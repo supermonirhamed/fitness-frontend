@@ -14,8 +14,10 @@ import MultiSelect from 'primevue/multiselect'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
+import SplitButton from 'primevue/splitbutton'
 import Skeleton from 'primevue/skeleton'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
+import AppointmentDrawer from '@/components/schedule/AppointmentDrawer.vue'
 import SessionDrawer, { type SessionPrefill } from '@/components/schedule/SessionDrawer.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
@@ -404,6 +406,29 @@ function newSession(p: SessionPrefill = {}) {
   prefill.value = { locationId: branch.value?.id ?? null, date: anchor.value, ...p }
   drawerOpen.value = true
 }
+// New ▾: session or series, appointment from availability (US-03.09).
+const appointmentOpen = ref(false)
+const createItems = computed(() => [
+  {
+    label: t('calendar.newSessionOrSeries'),
+    icon: 'pi pi-calendar-plus',
+    command: () => newSession(),
+  },
+  {
+    label: t('appointment.title'),
+    icon: 'pi pi-user',
+    command: () => (appointmentOpen.value = true),
+  },
+])
+function onAppointment(session: CalendarSession) {
+  toast.add({
+    severity: 'success',
+    summary: t('appointment.booked', { name: session.service.name }),
+    life: 5000,
+  })
+  anchor.value = session.local.date
+  load()
+}
 // Edit (US-03.04)
 function editSession(s: CalendarSession) {
   popover.value?.hide()
@@ -529,7 +554,14 @@ const zoneOf = (s: CalendarSession) =>
         :allow-empty="false"
         :aria-label="t('calendar.view')"
       />
-      <Button v-if="canCreate" icon="pi pi-plus" :label="t('session.new')" @click="newSession()" />
+      <SplitButton
+        v-if="canCreate"
+        icon="pi pi-plus"
+        :label="t('session.new')"
+        :model="createItems"
+        :menu-button-props="{ 'aria-label': t('calendar.moreCreate') }"
+        @click="newSession()"
+      />
     </div>
 
     <div class="filters">
@@ -883,6 +915,12 @@ const zoneOf = (s: CalendarSession) =>
       </div>
     </div>
 
+    <AppointmentDrawer
+      v-model:visible="appointmentOpen"
+      :location-id="branch?.id ?? null"
+      :date="anchor"
+      @saved="onAppointment"
+    />
     <SessionDrawer
       v-model:visible="drawerOpen"
       :prefill="prefill"

@@ -160,6 +160,7 @@ function toInput(s: Service, status: ServiceStatus): ServiceInput {
     default_capacity: s.default_capacity,
     buffer_before: s.buffer_before,
     buffer_after: s.buffer_after,
+    slot_interval: s.slot_interval,
     allow_membership: s.allow_membership,
     allow_package: s.allow_package,
     allow_drop_in: s.allow_drop_in,
