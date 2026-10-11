@@ -22,6 +22,10 @@ const { theme, toggle: toggleTheme } = useTheme()
 const nav = computed<NavItem[]>(() => [
   { key: 'today', icon: 'pi-sun', to: '/', exact: true },
   ...(auth.can('schedule.view') ? [{ key: 'calendar', icon: 'pi-calendar', to: '/calendar' }] : []),
+  // Coaches' own schedule (US-03.14); others reach it from the user menu.
+  ...(auth.can('schedule.view') && auth.user?.roles.some((r) => COACHING_ROLES.includes(r))
+    ? [{ key: 'mySchedule', icon: 'pi-clock', to: '/my-schedule' }]
+    : []),
   ...(auth.can('services.view') ? [{ key: 'services', icon: 'pi-th-large', to: '/services' }] : []),
   ...(allowedPages(STAFF_PAGES, (p) => auth.can(p)).length
     ? [{ key: 'staff', icon: 'pi-id-card', to: '/staff' }]
@@ -35,7 +39,18 @@ const nav = computed<NavItem[]>(() => [
     : []),
 ])
 
+const COACHING_ROLES = ['Coach', 'Personal Trainer']
+
 const userMenu = computed(() => [
+  ...(auth.can('schedule.view')
+    ? [
+        {
+          label: t('mySchedule.title'),
+          icon: 'pi pi-clock',
+          command: () => router.push({ name: 'tenant.mySchedule' }),
+        },
+      ]
+    : []),
   {
     label: t('shell.profile'),
     icon: 'pi pi-user',

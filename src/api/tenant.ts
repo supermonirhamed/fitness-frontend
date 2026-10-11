@@ -569,6 +569,24 @@ export interface SubstituteCandidate {
   issues: SessionConflictItem[]
 }
 
+/** The signed-in staff member's own schedule (US-03.14). */
+export interface MySchedule {
+  sessions: CalendarSession[]
+  availability: {
+    location: { id: number; name: string | null; timezone: string | null }
+    weekly: WeeklyHours
+  }[]
+  time_off: {
+    starts_at: string
+    ends_at: string
+    all_day: boolean
+    reason: string | null
+    status: 'Approved' | 'Pending'
+  }[]
+  /** A calendar feed link exists. */
+  feed: boolean
+}
+
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
 
 /** A session with the conflicts it has now (Conflict Center, US-03.07). */
@@ -1084,6 +1102,17 @@ export const tenantApi = {
           params: { ...rest, ...(mine === undefined ? {} : { mine: mine ? 1 : 0 }) },
         })
       ).data
+    },
+  },
+  mySchedule: {
+    async schedule(from: string, days = 14): Promise<MySchedule> {
+      return (await http.get('/api/me/schedule', { params: { from, days } })).data.data
+    },
+    async newCalendarFeed(): Promise<{ url: string }> {
+      return (await http.post('/api/me/calendar-feed')).data.data
+    },
+    async revokeCalendarFeed(): Promise<void> {
+      await http.delete('/api/me/calendar-feed')
     },
   },
   appointments: {
