@@ -377,6 +377,53 @@ export interface ProgramInput {
 }
 
 /** A branch's VAT (US-01.14). Rates are "15.00"; each applies from its date. */
+
+/** A session on the calendar (US-03.01); times in UTC and in the branch's local time (D4). */
+export type SessionStatus = 'Draft' | 'Published' | 'Cancelled' | 'Completed'
+
+export interface CalendarSession {
+  id: number
+  service: { id: number; name: string | null; color: string | null; activity_type: ActivityType }
+  location: { id: number; name: string; timezone: string }
+  facility: { id: number; name: string; capacity: number }
+  coaches: { id: number; name: string }[]
+  series_id: number | null
+  starts_at: string
+  ends_at: string
+  local: { date: string; start: string; end: string }
+  capacity: number | null
+  booked: number
+  waitlist: number
+  status: SessionStatus
+}
+
+export interface CalendarBranch {
+  id: number
+  name: string
+  timezone: string
+  business_hours: WeeklyHours | null
+  closures: {
+    label: string
+    start_date: string
+    end_date: string
+    closed: boolean
+    hours: TimeRange[]
+  }[]
+}
+
+export interface CalendarFilters {
+  from: string
+  to: string
+  location_id?: number
+  facility_ids?: number[]
+  coach_ids?: number[]
+  service_id?: number
+  category_id?: number
+  activity_type?: ActivityType
+  statuses?: string[]
+  mine?: boolean
+}
+
 export interface VatSettings {
   enabled: boolean
   prices_include_vat: boolean
@@ -748,6 +795,18 @@ export const tenantApi = {
     },
     async remove(id: number): Promise<void> {
       await http.delete(`/api/service-categories/${id}`)
+    },
+  },
+  sessions: {
+    async list(
+      filters: CalendarFilters,
+    ): Promise<{ data: CalendarSession[]; branches: CalendarBranch[] }> {
+      const { mine, ...rest } = filters
+      return (
+        await http.get('/api/sessions', {
+          params: { ...rest, ...(mine === undefined ? {} : { mine: mine ? 1 : 0 }) },
+        })
+      ).data
     },
   },
   programs: {

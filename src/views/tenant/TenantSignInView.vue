@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { landingRouteName } from '@/lib/permissions'
 import { nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -46,7 +47,12 @@ function startCountdown(seconds: number) {
 }
 onBeforeUnmount(() => clearInterval(countdown))
 
-const done = () => router.replace((route.query.redirect as string) || { name: 'tenant.today' })
+const done = () =>
+  router.replace(
+    (route.query.redirect as string) || {
+      name: landingRouteName(auth.user?.roles ?? [], (p) => auth.can(p)),
+    },
+  )
 
 async function showError(e: unknown) {
   const { kind, seconds } = signInError(e)

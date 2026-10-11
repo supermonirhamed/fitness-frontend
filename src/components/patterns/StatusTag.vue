@@ -12,6 +12,7 @@ const SEVERITY: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'seconda
     Inactive: 'secondary',
     Archived: 'secondary',
     Cancelled: 'contrast',
+    Completed: 'info',
     Provisioning: 'info',
     Invited: 'info',
     Suspended: 'danger',

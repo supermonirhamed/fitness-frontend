@@ -21,6 +21,7 @@ const { theme, toggle: toggleTheme } = useTheme()
 // Check-in are added as their stories ship. Items are filtered by permission (US-00.07).
 const nav = computed<NavItem[]>(() => [
   { key: 'today', icon: 'pi-sun', to: '/', exact: true },
+  ...(auth.can('schedule.view') ? [{ key: 'calendar', icon: 'pi-calendar', to: '/calendar' }] : []),
   ...(auth.can('services.view') ? [{ key: 'services', icon: 'pi-th-large', to: '/services' }] : []),
   ...(allowedPages(STAFF_PAGES, (p) => auth.can(p)).length
     ? [{ key: 'staff', icon: 'pi-id-card', to: '/staff' }]

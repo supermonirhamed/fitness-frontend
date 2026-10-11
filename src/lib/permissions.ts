@@ -79,3 +79,12 @@ export function permissionDiff(
     removed: order.filter((p) => was.has(p) && !now.has(p)),
   }
 }
+
+/** Roles whose day runs on the calendar: it is their landing page after sign-in (US-03.01). */
+const CALENDAR_FIRST = ['Receptionist', 'Coach']
+
+export function landingRouteName(roles: string[], can: (permission: string) => boolean): string {
+  return can('schedule.view') && roles.some((r) => CALENDAR_FIRST.includes(r))
+    ? 'tenant.calendar'
+    : 'tenant.today'
+}

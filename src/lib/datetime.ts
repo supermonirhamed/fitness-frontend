@@ -50,7 +50,6 @@ export function formatTime(
   }).format(date)
 }
 
-/** "GMT+3" / "غرينتش+٣"-style short name of a zone at a moment (shown when screens mix zones). */
 /** Names people in the region use (the design shows "AST", "GST"); Intl only knows them for some locales. */
 const ZONE_NAMES: Record<string, string> = {
   'Asia/Riyadh': 'AST',

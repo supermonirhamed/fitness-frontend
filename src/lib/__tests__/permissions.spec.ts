@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   allowedPages,
   allowedSettingsPages,
+  landingRouteName,
   permissionDiff,
   specialActions,
   STAFF_PAGES,
@@ -55,5 +56,15 @@ describe('permissionDiff', () => {
       added: [],
       removed: [],
     })
+  })
+})
+
+describe('landingRouteName', () => {
+  const can = (granted: string[]) => (p: string) => granted.includes(p)
+  it('sends reception and coaches to the calendar', () => {
+    expect(landingRouteName(['Receptionist'], can(['schedule.view']))).toBe('tenant.calendar')
+    expect(landingRouteName(['Coach'], can(['schedule.view']))).toBe('tenant.calendar')
+    expect(landingRouteName(['Organization Owner'], can(['schedule.view']))).toBe('tenant.today')
+    expect(landingRouteName(['Coach'], can([]))).toBe('tenant.today')
   })
 })

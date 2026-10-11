@@ -67,6 +67,12 @@ const tenantRoutes: RouteRecordRaw[] = [
     children: [
       { path: '', name: 'tenant.today', component: () => import('@/views/tenant/TodayView.vue') },
       {
+        path: 'calendar',
+        name: 'tenant.calendar',
+        component: () => import('@/views/tenant/CalendarView.vue'),
+        meta: { permission: 'schedule.view' },
+      },
+      {
         path: 'account/profile',
         name: 'tenant.profile',
         component: () => import('@/views/tenant/account/ProfileView.vue'),
