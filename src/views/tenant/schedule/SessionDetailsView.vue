@@ -24,6 +24,7 @@ import PageHeader from '@/components/patterns/PageHeader.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusBanner from '@/components/patterns/StatusBanner.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
+import WhyNotMessage from '@/components/patterns/WhyNotMessage.vue'
 import CancelSessionDialog from '@/components/schedule/CancelSessionDialog.vue'
 import SessionDrawer, { type SessionPrefill } from '@/components/schedule/SessionDrawer.vue'
 import SubstituteCoachDrawer from '@/components/schedule/SubstituteCoachDrawer.vue'
@@ -83,6 +84,26 @@ const canCancel = computed(
 )
 const canCreate = computed(() => auth.can('schedule.create'))
 const cancelled = computed(() => session.value?.status === 'Cancelled')
+
+// Why it can't take a booking now, in the booking rules' words (US-03.15).
+const whyNot = computed(() => {
+  const b = session.value?.booking
+  if (!b?.reason) return null
+  const p = b.params
+  const reason =
+    b.reason === 'full' && Number(p.waiting) > 0
+      ? t('bookability.fullWaiting', { n: p.waiting })
+      : b.reason === 'not_open'
+        ? t('bookability.not_open', { days: p.days, date: dayLabel(String(p.date)) })
+        : t(`bookability.${b.reason}`, p)
+  const severity: 'warn' | 'error' | 'info' =
+    b.reason === 'draft' || b.reason === 'not_open'
+      ? 'info'
+      : b.reason === 'full'
+        ? 'warn'
+        : 'error'
+  return { reason, severity, detail: b.reason === 'draft' ? t('bookability.draftDetail') : null }
+})
 
 const dayLabel = (ymd: string) =>
   new Intl.DateTimeFormat(locale.value, {
@@ -365,7 +386,11 @@ const moreItems = computed<MenuItem[]>(() => {
           />
         </template>
         <template #primary>
-          <span v-tooltip.bottom="t('sessionPage.bookingsLater')">
+          <span
+            v-tooltip.bottom="
+              whyNot && !session.booking.can_book ? whyNot.reason : t('sessionPage.bookingsLater')
+            "
+          >
             <Button icon="pi pi-plus" :label="t('sessionPage.addBooking')" disabled />
           </span>
         </template>
@@ -384,6 +409,12 @@ const moreItems = computed<MenuItem[]>(() => {
         severity="secondary"
         icon="pi-lock"
         :title="t('calendar.pastReadOnly')"
+      />
+      <WhyNotMessage
+        v-if="whyNot && !['cancelled', 'completed'].includes(session.booking.reason ?? '')"
+        :reason="whyNot.reason"
+        :detail="whyNot.detail"
+        :severity="whyNot.severity"
       />
       <div v-if="session.issues.length" class="panel issues">
         <span class="issues__title">{{ t('sessionPage.issuesTitle') }}</span>

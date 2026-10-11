@@ -492,6 +492,23 @@ export interface SessionDetails extends CalendarSession {
     rolling: boolean
   } | null
   policy: BookingPolicy
+  /** Can it take a booking now, and if not, why (US-03.15). */
+  booking: {
+    state: 'available' | 'almost' | 'full' | 'full_waitlist' | 'cancelled'
+    can_book: boolean
+    can_waitlist: boolean
+    reason:
+      | 'cancelled'
+      | 'completed'
+      | 'started'
+      | 'not_open'
+      | 'closed'
+      | 'full_waitlist_closed'
+      | 'full'
+      | 'draft'
+      | null
+    params: Record<string, string | number>
+  }
   event: {
     id: number
     capacity: number

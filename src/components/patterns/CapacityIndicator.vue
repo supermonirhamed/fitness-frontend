@@ -21,18 +21,35 @@ const full = computed(() => !!props.capacity && props.booked >= props.capacity)
 const state = computed(() =>
   props.cancelled ? 'cancelled' : full.value ? 'full' : ratio.value >= 0.8 ? 'almost' : 'available',
 )
+// Said in words too, not by colour alone (screen readers, colour blindness).
+const spoken = computed(() =>
+  [
+    props.capacity === null
+      ? t('capacity.bookedOpen', { booked: props.booked })
+      : t('capacity.booked', { booked: props.booked, capacity: props.capacity }),
+    t(`capacity.states.${state.value}`),
+    props.waitlist > 0 && !props.cancelled ? t('capacity.waiting', props.waitlist) : null,
+  ]
+    .filter(Boolean)
+    .join(' · '),
+)
 </script>
 
 <template>
-  <span :class="['cap', `cap--${size}`, { 'cap--cancelled': cancelled }]">
-    <span class="cap__line">
+  <span
+    :class="['cap', `cap--${size}`, `cap--${state}`, { 'cap--cancelled': cancelled }]"
+    role="img"
+    :aria-label="spoken"
+    :title="spoken"
+  >
+    <span class="cap__line" aria-hidden="true">
       <span dir="ltr" class="num">{{ booked }} / {{ capacity ?? '∞' }}</span>
       <span v-if="full && !cancelled" class="cap__full">{{ t('calendar.full') }}</span>
       <span v-if="waitlist > 0 && !cancelled" class="cap__wait" :title="t('calendar.waitlist')"
         >+{{ waitlist }}</span
       >
     </span>
-    <span v-if="bar && capacity" class="cap__track"
+    <span v-if="bar && capacity" class="cap__track" aria-hidden="true"
       ><span
         class="cap__fill"
         :style="{ width: `${Math.min(100, ratio * 100)}%`, background: `var(--cap-${state})` }"
