@@ -1,50 +1,56 @@
 <script setup lang="ts">
-// The service catalog (US-02.02/03, list & filters US-02.10): search, filters, bulk publish /
-// archive / add to branch, create and edit. Branch-limited staff see their branches' services.
+// The service catalog (US-02.02/03, list & filters US-02.10), laid out as the design's services
+// table (ui_kits/admin/ServicesScreen.jsx): filter bar above, whole-row click to the service,
+// dark bulk bar for publish / add to branch / archive. Branch-limited staff see their branches' services.
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
-import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
+import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
-import Tag from 'primevue/tag'
+import BranchChips from '@/components/patterns/BranchChips.vue'
+import BulkActionBar from '@/components/patterns/BulkActionBar.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
-import ServiceBookingRulesDialog from '@/components/services/ServiceBookingRulesDialog.vue'
-import ServiceFormDrawer from '@/components/services/ServiceFormDrawer.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import FilterBar from '@/components/patterns/FilterBar.vue'
+import StatusTag from '@/components/patterns/StatusTag.vue'
 import {
   ACTIVITY_TYPES,
   tenantApi,
   type ActivityType,
-  type Location,
   type Service,
   type ServiceCategory,
-  type ServiceStatus,
   type StaffOption,
 } from '@/api/tenant'
-import { ACTIVITY_ICONS, activityKey, durationParts } from '@/lib/catalog'
+import { ACTIVITY_ICONS, activityKey } from '@/lib/catalog'
 import { apiMessage } from '@/lib/apiErrors'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ categories: ServiceCategory[]; locationId?: number | null }>()
-const { t, locale } = useI18n()
+const emit = defineEmits<{ create: [] }>()
+const { t } = useI18n()
 const toast = useToast()
+const router = useRouter()
 const auth = useStaffAuth()
 const canCreate = computed(() => auth.can('services.create'))
 const canUpdate = computed(() => auth.can('services.update'))
 
+// "active" = not archived, the design's default status filter.
+type StatusFilter = 'active' | 'Published' | 'Draft' | 'Archived'
+
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const services = ref<Service[]>([])
-const locations = ref<Location[]>([])
 const search = ref('')
-const category = ref<number | null>(null)
-const type = ref<ActivityType | null>(null)
-const status = ref<ServiceStatus | null>(null)
+const category = ref<number | 'all'>('all')
+const type = ref<ActivityType | 'all'>('all')
+const status = ref<StatusFilter>('active')
 const branch = ref<number | null>(null)
 const coach = ref<number | null>(null)
 const coaches = ref<StaffOption[]>([])
@@ -53,30 +59,23 @@ const branches = computed(() => auth.user?.switchable_locations ?? [])
 async function load() {
   state.value = 'loading'
   try {
-    services.value = await tenantApi.services.list({
+    const list = await tenantApi.services.list({
       ...(props.locationId ? { location_id: props.locationId } : {}),
-      ...(category.value ? { category_id: category.value } : {}),
-      ...(type.value ? { activity_type: type.value } : {}),
-      ...(status.value ? { status: status.value } : {}),
+      ...(category.value !== 'all' ? { category_id: category.value } : {}),
+      ...(type.value !== 'all' ? { activity_type: type.value } : {}),
+      ...(status.value !== 'active' ? { status: status.value } : {}),
       ...(!props.locationId && branch.value ? { location_id: branch.value } : {}),
       ...(coach.value ? { staff_id: coach.value } : {}),
       ...(search.value.trim() ? { search: search.value.trim() } : {}),
     })
+    services.value = status.value === 'active' ? list.filter((s) => s.status !== 'Archived') : list
     state.value = 'ready'
   } catch {
     state.value = 'error'
   }
 }
-async function loadLocations() {
-  try {
-    locations.value = await tenantApi.locations()
-  } catch {
-    locations.value = []
-  }
-}
 onMounted(async () => {
   load()
-  if (canCreate.value || canUpdate.value) loadLocations()
   try {
     coaches.value = await tenantApi.services.staffOptions()
   } catch {
@@ -89,42 +88,77 @@ watch(search, () => {
   timer = setTimeout(load, 300)
 })
 watch([category, type, status, branch, coach, () => props.locationId], load)
+defineExpose({ load })
 
-const typeOptions = computed(() =>
-  ACTIVITY_TYPES.map((v) => ({ value: v, label: t(`catalog.types.${activityKey(v)}`) })),
-)
-const statusOptions = computed(() =>
-  (['Draft', 'Published', 'Archived'] as const).map((v) => ({
+const categoryOptions = computed(() => [
+  { value: 'all', label: t('catalog.allCategories') },
+  ...props.categories.map((c) => ({ value: c.id, label: c.display_name ?? '' })),
+])
+const typeOptions = computed(() => [
+  { value: 'all', label: t('catalog.allTypes'), icon: null as string | null },
+  ...ACTIVITY_TYPES.map((v) => ({
     value: v,
-    label: t(`catalog.status.${v}`),
+    label: t(`catalog.types.${activityKey(v)}`),
+    icon: ACTIVITY_ICONS[v],
+  })),
+])
+const statusOptions = computed(() =>
+  (['active', 'Published', 'Draft', 'Archived'] as const).map((v) => ({
+    value: v,
+    label: v === 'active' ? t('catalog.notArchived') : t(`catalog.status.${v}`),
   })),
 )
-const severity = (s: ServiceStatus) =>
-  s === 'Published' ? 'success' : s === 'Draft' ? 'info' : 'secondary'
-const duration = (minutes: number) => {
-  const { h, m } = durationParts(minutes)
-  return [h ? t('catalog.hours', { n: h }) : null, m ? t('catalog.mins', { n: m }) : null]
-    .filter(Boolean)
-    .join(' ')
-}
-const branchNames = (s: Service) =>
-  (s.locations ?? []).map((l) => l.name).join(locale.value === 'ar' ? '، ' : ', ')
 const filtered = computed(
   () =>
-    !!(search.value || category.value || type.value || status.value || branch.value || coach.value),
+    !!(
+      search.value ||
+      category.value !== 'all' ||
+      type.value !== 'all' ||
+      status.value !== 'active' ||
+      branch.value ||
+      coach.value
+    ),
 )
 
-const drawerOpen = ref(false)
-const editing = ref<Service | null>(null)
-function open(service: Service | null = null) {
-  editing.value = service
-  drawerOpen.value = true
+// "Branch, coach" sit behind one button (design: FilterBar onMoreFilters), with chips when set.
+const more = ref<InstanceType<typeof Popover>>()
+const moreCount = computed(() => (branch.value ? 1 : 0) + (coach.value ? 1 : 0))
+const chips = computed(() => [
+  ...(branch.value
+    ? [
+        {
+          key: 'branch',
+          label: branches.value.find((b) => b.id === branch.value)?.name ?? '',
+          clear: () => (branch.value = null),
+        },
+      ]
+    : []),
+  ...(coach.value
+    ? [
+        {
+          key: 'coach',
+          label: coaches.value.find((c) => c.id === coach.value)?.name ?? '',
+          clear: () => (coach.value = null),
+        },
+      ]
+    : []),
+])
+function clearFilters() {
+  search.value = ''
+  category.value = 'all'
+  type.value = 'all'
+  status.value = 'active'
+  branch.value = null
+  coach.value = null
 }
-const rulesOpen = ref(false)
-const rulesFor = ref<Service | null>(null)
-function openRules(service: Service) {
-  rulesFor.value = service
-  rulesOpen.value = true
+
+/** Name missing in one language (design: pi-language warning next to the name). */
+const missingName = (s: Service) => !s.name.ar?.trim() || !s.name.en?.trim()
+const branchNames = (s: Service) => (s.locations ?? []).map((l) => l.name ?? '')
+function open(s: Service, event?: Event) {
+  // The selection checkbox lives in the row; ticking it must not open the service.
+  if ((event?.target as HTMLElement | null)?.closest('.no-click, .p-checkbox')) return
+  router.push({ name: 'tenant.services.show', params: { id: s.id } })
 }
 
 // Bulk actions (US-02.10)
@@ -133,16 +167,26 @@ watch(
   services,
   () => (selected.value = selected.value.filter((s) => services.value.some((x) => x.id === s.id))),
 )
-const bulkBranch = ref<number | null>(null)
 const bulkBusy = ref(false)
 const archiveOpen = ref(false)
-async function bulk(action: 'publish' | 'archive' | 'add_location') {
+const branchMenu = ref<InstanceType<typeof Menu>>()
+const branchItems = computed<MenuItem[]>(() =>
+  branches.value.map((b) => ({
+    label: b.name,
+    icon: 'pi pi-building',
+    command: () => bulk('add_location', b.id),
+  })),
+)
+async function bulk(
+  action: 'publish' | 'archive' | 'add_location',
+  locationId: number | null = null,
+) {
   bulkBusy.value = true
   try {
     const changed = await tenantApi.services.bulk(
       selected.value.map((s) => s.id),
       action,
-      action === 'add_location' ? bulkBranch.value : null,
+      locationId,
     )
     toast.add({
       severity: 'success',
@@ -151,7 +195,6 @@ async function bulk(action: 'publish' | 'archive' | 'add_location') {
     })
     archiveOpen.value = false
     selected.value = []
-    bulkBranch.value = null
     load()
   } catch (e) {
     // e.g. a selected service has upcoming sessions: it is archived on its own page (US-02.12).
@@ -161,38 +204,16 @@ async function bulk(action: 'publish' | 'archive' | 'add_location') {
     bulkBusy.value = false
   }
 }
-
-function onSaved(saved: Service, created: boolean) {
-  toast.add({
-    severity: 'success',
-    summary: t(created ? 'catalog.serviceCreated' : 'catalog.serviceSaved', {
-      name: saved.display_name,
-    }),
-    life: 3000,
-  })
-  load()
-}
 </script>
 
 <template>
   <div class="panel">
-    <div class="toolbar">
-      <IconField class="search">
-        <InputIcon class="pi pi-search" />
-        <InputText
-          v-model="search"
-          :placeholder="t('catalog.search')"
-          :aria-label="t('catalog.search')"
-          fluid
-        />
-      </IconField>
+    <FilterBar v-model:search="search" :placeholder="t('catalog.searchBoth')">
       <Select
         v-model="category"
-        :options="categories"
-        option-label="display_name"
-        option-value="id"
-        :placeholder="t('catalog.allCategories')"
-        show-clear
+        :options="categoryOptions"
+        option-label="label"
+        option-value="value"
         class="filter"
         :aria-label="t('catalog.category')"
       />
@@ -201,159 +222,183 @@ function onSaved(saved: Service, created: boolean) {
         :options="typeOptions"
         option-label="label"
         option-value="value"
-        :placeholder="t('catalog.allTypes')"
-        show-clear
         class="filter"
         :aria-label="t('catalog.activityType')"
-      />
+      >
+        <template #option="{ option }">
+          <span class="option"
+            ><i v-if="option.icon" :class="['pi', option.icon]" aria-hidden="true" />{{
+              option.label
+            }}</span
+          >
+        </template>
+      </Select>
       <Select
         v-model="status"
         :options="statusOptions"
         option-label="label"
         option-value="value"
-        :placeholder="t('catalog.allStatuses')"
-        show-clear
-        class="filter"
+        class="filter filter--status"
         :aria-label="t('catalog.statusLabel')"
       />
-      <Select
-        v-if="!locationId && branches.length > 1"
-        v-model="branch"
-        :options="branches"
-        option-label="name"
-        option-value="id"
-        :placeholder="t('catalog.allBranches')"
-        show-clear
-        class="filter"
-        :aria-label="t('catalog.columns.branches')"
-      />
-      <Select
-        v-if="coaches.length"
-        v-model="coach"
-        :options="coaches"
-        option-label="name"
-        option-value="id"
-        :placeholder="t('catalog.anyCoach')"
-        show-clear
-        filter
-        class="filter"
-        :aria-label="t('catalog.coach')"
-      />
-      <span class="spacer" />
       <Button
-        v-if="canCreate"
-        icon="pi pi-plus"
-        :label="t('catalog.newService')"
-        :disabled="!categories.length"
-        @click="open()"
-      />
-    </div>
-
-    <div v-if="state === 'loading'" class="stack">
-      <Skeleton v-for="n in 4" :key="n" height="52px" />
-    </div>
-    <EmptyState
-      v-else-if="state === 'error'"
-      icon="pi-exclamation-triangle"
-      :title="t('catalog.loadError')"
-    >
-      <Button severity="secondary" variant="outlined" :label="t('common.retry')" @click="load" />
-    </EmptyState>
-    <EmptyState
-      v-else-if="!services.length"
-      :icon="filtered ? 'pi-filter-slash' : 'pi-tags'"
-      :title="filtered ? t('catalog.noMatches') : t('catalog.noServices')"
-      :body="
-        filtered ? '' : categories.length ? t('catalog.noServicesHint') : t('catalog.categoryFirst')
-      "
-    >
-      <Button
-        v-if="canCreate && !filtered && categories.length"
-        icon="pi pi-plus"
-        :label="t('catalog.newService')"
-        @click="open()"
-      />
-    </EmptyState>
-    <div
-      v-if="state === 'ready' && canUpdate && selected.length"
-      class="bulk"
-      role="region"
-      :aria-label="t('catalog.bulk.label')"
-    >
-      <span class="count">{{ t('catalog.bulk.selected', selected.length) }}</span>
-      <Button
-        size="small"
-        icon="pi pi-check"
-        :label="t('catalog.bulk.publish')"
-        :loading="bulkBusy"
-        @click="bulk('publish')"
-      />
-      <Button
-        size="small"
+        v-if="(!locationId && branches.length > 1) || coaches.length"
+        :label="t('catalog.moreFilters')"
+        icon="pi pi-filter"
         severity="secondary"
         variant="outlined"
-        icon="pi pi-box"
-        :label="t('catalog.bulk.archive')"
-        @click="archiveOpen = true"
+        :badge="moreCount ? String(moreCount) : undefined"
+        @click="more?.toggle($event)"
       />
-      <span v-if="!locationId" class="add-branch">
-        <Select
-          v-model="bulkBranch"
-          :options="branches"
-          option-label="name"
-          option-value="id"
-          :placeholder="t('catalog.bulk.pickBranch')"
-          size="small"
-          :aria-label="t('catalog.bulk.pickBranch')"
-        />
-        <Button
-          size="small"
-          severity="secondary"
-          variant="outlined"
-          icon="pi pi-plus"
-          :label="t('catalog.bulk.addToBranch')"
-          :disabled="!bulkBranch"
-          :loading="bulkBusy"
-          @click="bulk('add_location')"
-        />
+      <Popover ref="more">
+        <div class="more">
+          <label v-if="!locationId && branches.length > 1" class="more__field">
+            <span>{{ t('catalog.columns.branches') }}</span>
+            <Select
+              v-model="branch"
+              :options="branches"
+              option-label="name"
+              option-value="id"
+              :placeholder="t('catalog.allBranches')"
+              show-clear
+              fluid
+            />
+          </label>
+          <label v-if="coaches.length" class="more__field">
+            <span>{{ t('catalog.coach') }}</span>
+            <Select
+              v-model="coach"
+              :options="coaches"
+              option-label="name"
+              option-value="id"
+              :placeholder="t('catalog.anyCoach')"
+              show-clear
+              filter
+              fluid
+            />
+          </label>
+        </div>
+      </Popover>
+    </FilterBar>
+
+    <div v-if="chips.length" class="chips">
+      <span v-for="chip in chips" :key="chip.key" class="chip">
+        {{ chip.label }}
+        <button type="button" :aria-label="t('catalog.removeFilter')" @click="chip.clear">
+          <i class="pi pi-times" aria-hidden="true" />
+        </button>
       </span>
       <Button
         size="small"
         variant="text"
         severity="secondary"
-        :label="t('catalog.bulk.clear')"
-        @click="selected = []"
+        :label="t('catalog.clearAll')"
+        @click="clearFilters"
       />
     </div>
+
+    <BulkActionBar
+      v-if="canUpdate && selected.length"
+      :label="t('catalog.bulk.selected', selected.length)"
+      @clear="selected = []"
+    >
+      <Button
+        size="small"
+        icon="pi pi-send"
+        :label="t('catalog.bulk.publish')"
+        :loading="bulkBusy"
+        @click="bulk('publish')"
+      />
+      <template v-if="!locationId && branches.length">
+        <Button
+          size="small"
+          icon="pi pi-building"
+          :label="t('catalog.bulk.addToBranch')"
+          :disabled="bulkBusy"
+          aria-haspopup="true"
+          @click="branchMenu?.toggle($event)"
+        />
+        <Menu ref="branchMenu" :model="branchItems" popup />
+      </template>
+      <Button
+        size="small"
+        icon="pi pi-inbox"
+        :label="t('catalog.bulk.archive')"
+        :disabled="bulkBusy"
+        @click="archiveOpen = true"
+      />
+    </BulkActionBar>
+
+    <div v-if="state === 'loading'" class="card" aria-busy="true" :aria-label="t('common.loading')">
+      <div v-for="n in 5" :key="n" class="skeleton-row">
+        <Skeleton width="40%" /><Skeleton width="15%" /><Skeleton width="15%" />
+      </div>
+    </div>
+    <ErrorState
+      v-else-if="state === 'error'"
+      class="card"
+      :title="t('catalog.loadError')"
+      @retry="load"
+    />
+    <EmptyState
+      v-else-if="!services.length && filtered"
+      class="card"
+      compact
+      icon="pi-search"
+      :title="t('catalog.noMatches')"
+    >
+      <Button severity="secondary" :label="t('catalog.clearAll')" @click="clearFilters" />
+    </EmptyState>
+    <EmptyState
+      v-else-if="!services.length"
+      class="card"
+      icon="pi-th-large"
+      :title="t('catalog.noServices')"
+      :body="categories.length ? t('catalog.noServicesHint') : t('catalog.categoryFirst')"
+    >
+      <Button
+        v-if="canCreate && categories.length"
+        icon="pi pi-plus"
+        :label="t('catalog.newService')"
+        @click="emit('create')"
+      />
+    </EmptyState>
+
     <DataTable
-      v-if="state === 'ready' && services.length"
+      v-else
       v-model:selection="selected"
       :value="services"
       data-key="id"
-      size="small"
-      class="table"
+      :row-class="() => 'row-click'"
+      @row-click="open($event.data, $event.originalEvent)"
     >
-      <Column v-if="canUpdate" selection-mode="multiple" header-style="width: 3rem" />
+      <Column
+        v-if="canUpdate"
+        selection-mode="multiple"
+        header-style="width: 44px"
+        body-class="no-click"
+      />
       <Column :header="t('catalog.columns.service')">
         <template #body="{ data }">
           <div class="name-cell">
             <span
               class="swatch"
-              :style="{ background: data.color ?? 'var(--border-default)' }"
+              :style="{ background: data.color ?? 'var(--border-strong)' }"
               aria-hidden="true"
             />
-            <div>
-              <RouterLink
-                :to="{ name: 'tenant.services.show', params: { id: data.id } }"
-                class="name"
-                >{{ data.display_name }}</RouterLink
-              >
-              <div class="sub">
-                <i :class="['pi', data.category?.icon]" aria-hidden="true" />
-                {{ data.category?.display_name }}
-              </div>
-            </div>
+            <span class="name">{{ data.display_name }}</span>
+            <i
+              v-if="missingName(data)"
+              v-tooltip.top="t('catalog.nameMissing')"
+              class="pi pi-language missing"
+              :aria-label="t('catalog.nameMissing')"
+            />
           </div>
+        </template>
+      </Column>
+      <Column :header="t('catalog.category')">
+        <template #body="{ data }">
+          <span class="nowrap">{{ data.category?.display_name }}</span>
         </template>
       </Column>
       <Column :header="t('catalog.columns.type')">
@@ -366,47 +411,25 @@ function onSaved(saved: Service, created: boolean) {
           >
         </template>
       </Column>
-      <Column :header="t('catalog.columns.defaults')">
+      <Column :header="t('catalog.columns.duration')" header-class="end" body-class="end">
         <template #body="{ data }">
-          <span class="num">{{ duration(data.default_duration) }}</span>
-          <span v-if="data.default_capacity" class="sub">
-            · {{ t('catalog.people', data.default_capacity) }}</span
-          >
+          <span v-if="data.activity_type !== 'Open Access'" class="num nowrap">{{
+            t('catalog.minShort', { n: data.default_duration })
+          }}</span>
+          <span v-else class="muted">—</span>
+        </template>
+      </Column>
+      <Column :header="t('catalog.columns.capacity')" header-class="end" body-class="end">
+        <template #body="{ data }">
+          <span v-if="data.default_capacity" class="num">{{ data.default_capacity }}</span>
+          <span v-else class="muted">—</span>
         </template>
       </Column>
       <Column v-if="!locationId" :header="t('catalog.columns.branches')">
-        <template #body="{ data }"
-          ><span class="sub">{{ branchNames(data) || '—' }}</span></template
-        >
+        <template #body="{ data }"><BranchChips :names="branchNames(data)" /></template>
       </Column>
       <Column :header="t('catalog.columns.status')">
-        <template #body="{ data }"
-          ><Tag :severity="severity(data.status)" :value="t(`catalog.status.${data.status}`)"
-        /></template>
-      </Column>
-      <Column class="actions-col">
-        <template #body="{ data }">
-          <Button
-            v-tooltip.top="t('serviceRules.short')"
-            icon="pi pi-sliders-h"
-            severity="secondary"
-            variant="text"
-            rounded
-            size="small"
-            :aria-label="t('serviceRules.open', { name: data.display_name })"
-            @click="openRules(data)"
-          />
-          <Button
-            v-if="canUpdate"
-            icon="pi pi-pencil"
-            severity="secondary"
-            variant="text"
-            rounded
-            size="small"
-            :aria-label="t('catalog.edit', { name: data.display_name })"
-            @click="open(data)"
-          />
-        </template>
+        <template #body="{ data }"><StatusTag :status="data.status" /></template>
       </Column>
     </DataTable>
 
@@ -415,22 +438,9 @@ function onSaved(saved: Service, created: boolean) {
       :title="t('catalog.bulk.archiveTitle', selected.length)"
       :description="t('catalog.bulk.archiveBody')"
       :confirm-label="t('catalog.bulk.archive')"
-      destructive
       :loading="bulkBusy"
+      destructive
       @confirm="bulk('archive')"
-    />
-    <ServiceBookingRulesDialog
-      v-model:visible="rulesOpen"
-      :service="rulesFor"
-      :can-edit="canUpdate"
-    />
-    <ServiceFormDrawer
-      v-model:visible="drawerOpen"
-      :service="editing"
-      :categories="categories"
-      :locations="locations"
-      :location-id="locationId"
-      @saved="onSaved"
     />
   </div>
 </template>
@@ -439,69 +449,110 @@ function onSaved(saved: Service, created: boolean) {
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.search {
-  min-width: 200px;
-  flex: 1;
-  max-width: 300px;
+  gap: 12px;
 }
 .filter {
-  min-width: 150px;
+  width: 160px;
 }
-.spacer {
-  flex: 1;
+.filter--status {
+  width: 150px;
 }
-.stack {
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.option i {
+  color: var(--text-muted);
+}
+.more {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 12px;
+  width: 260px;
 }
-.bulk {
+.more__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: var(--text-small);
+  font-weight: 500;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding-inline: 10px 6px;
+  border-radius: 999px;
+  background: var(--primary-subtle);
+  color: var(--primary-subtle-text);
+  font: 500 12px/1 var(--font-sans);
+}
+.chip button {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--primary);
+  justify-content: center;
+}
+.chip i {
+  font-size: 9px;
+}
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--primary) 6%, var(--surface-card));
 }
-.bulk .count {
-  font-weight: var(--fw-medium);
-  margin-inline-end: var(--space-2);
-}
-.add-branch {
-  display: inline-flex;
-  gap: var(--space-2);
+.skeleton-row {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 .name-cell {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
+  align-items: center;
+  gap: 10px;
 }
 .swatch {
   width: 10px;
-  height: 36px;
+  height: 10px;
   border-radius: 3px;
-  flex-shrink: 0;
+  flex: none;
 }
 .name {
-  font-weight: var(--fw-medium);
+  font: 500 14px/1.4 var(--font-sans);
 }
-.sub {
-  font: var(--text-caption);
-  color: var(--text-muted);
+.missing {
+  font-size: 12px;
+  color: var(--sev-warn-fg);
 }
 .type {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.type i {
+  font-size: 13px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.muted {
+  color: var(--text-muted);
 }
 </style>

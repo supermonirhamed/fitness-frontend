@@ -1,32 +1,32 @@
 <script setup lang="ts">
-// Programs (US-02.09): term or rolling offerings clients enroll into.
+// Programs (US-02.09): term or rolling offerings clients enroll into. Table as in the design
+// (ServicesScreen.jsx programs tab): whole-row click opens the program.
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Skeleton from 'primevue/skeleton'
-import Tag from 'primevue/tag'
+import BranchChips from '@/components/patterns/BranchChips.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import StatusTag from '@/components/patterns/StatusTag.vue'
 import ProgramFormDrawer from '@/components/services/ProgramFormDrawer.vue'
-import {
-  tenantApi,
-  type Location,
-  type Program,
-  type ServiceCategory,
-  type ServiceStatus,
-} from '@/api/tenant'
+import { tenantApi, type Location, type Program, type ServiceCategory } from '@/api/tenant'
+import { programEnrollment } from '@/lib/catalog'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 defineProps<{ categories: ServiceCategory[] }>()
-const { t, locale } = useI18n()
+const emit = defineEmits<{ changed: [] }>()
+const { t } = useI18n()
 const toast = useToast()
+const router = useRouter()
 const format = useFormat()
 const auth = useStaffAuth()
 const canCreate = computed(() => auth.can('services.create'))
-const canUpdate = computed(() => auth.can('services.update'))
 
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const programs = ref<Program[]>([])
@@ -43,7 +43,7 @@ async function load() {
 }
 onMounted(async () => {
   load()
-  if (canCreate.value || canUpdate.value) {
+  if (canCreate.value) {
     try {
       locations.value = await tenantApi.locations()
     } catch {
@@ -52,57 +52,52 @@ onMounted(async () => {
   }
 })
 
-const day = (ymd: string) => format.date(`${ymd}T00:00:00Z`, 'UTC')
-const enrollment = (p: Program) =>
-  p.enrollment_mode === 'Term' && p.term_start && p.term_end
-    ? `${t('programs.modes.Term')} · ${day(p.term_start)} – ${day(p.term_end)}`
-    : t('programs.modes.Rolling')
-const severity = (s: ServiceStatus) =>
-  s === 'Published' ? 'success' : s === 'Draft' ? 'info' : 'secondary'
+const enrollment = (p: Program) => programEnrollment(p, t, format)
+const ages = (p: Program) =>
+  p.age_min === null && p.age_max === null ? '—' : `${p.age_min ?? 0}–${p.age_max ?? '+'}`
+const branchNames = (p: Program) => (p.locations ?? []).map((l) => l.name)
+const open = (p: Program) => router.push({ name: 'tenant.programs.show', params: { id: p.id } })
 
 const drawerOpen = ref(false)
-const editing = ref<Program | null>(null)
-function open(program: Program | null = null) {
-  editing.value = program
+function create() {
   drawerOpen.value = true
 }
-function onSaved(saved: Program, created: boolean) {
+defineExpose({ create })
+function onSaved(saved: Program) {
   toast.add({
     severity: 'success',
-    summary: t(created ? 'catalog.serviceCreated' : 'catalog.serviceSaved', {
-      name: saved.display_name,
-    }),
+    summary: t('catalog.serviceCreated', { name: saved.display_name }),
     life: 3000,
   })
   load()
+  emit('changed')
 }
 </script>
-
 <template>
   <div class="panel">
-    <div class="toolbar">
-      <p class="note">{{ t('programs.intro') }}</p>
-      <span class="spacer" />
+    <div v-if="canCreate" class="toolbar">
       <Button
-        v-if="canCreate"
         icon="pi pi-plus"
         :label="t('programs.new')"
+        severity="secondary"
         :disabled="!categories.length"
-        @click="open()"
+        @click="create"
       />
     </div>
-    <div v-if="state === 'loading'" class="stack">
-      <Skeleton v-for="n in 3" :key="n" height="52px" />
+    <div v-if="state === 'loading'" class="card" aria-busy="true" :aria-label="t('common.loading')">
+      <div v-for="n in 3" :key="n" class="skeleton-row">
+        <Skeleton width="40%" /><Skeleton width="20%" />
+      </div>
     </div>
-    <EmptyState
+    <ErrorState
       v-else-if="state === 'error'"
-      icon="pi-exclamation-triangle"
+      class="card"
       :title="t('catalog.loadError')"
-    >
-      <Button severity="secondary" variant="outlined" :label="t('common.retry')" @click="load" />
-    </EmptyState>
+      @retry="load"
+    />
     <EmptyState
       v-else-if="!programs.length"
+      class="card"
       icon="pi-sitemap"
       :title="t('programs.none')"
       :body="categories.length ? t('programs.noneHint') : t('catalog.categoryFirst')"
@@ -111,55 +106,51 @@ function onSaved(saved: Program, created: boolean) {
         v-if="canCreate && categories.length"
         icon="pi pi-plus"
         :label="t('programs.new')"
-        @click="open()"
+        @click="create"
       />
     </EmptyState>
-    <DataTable v-else :value="programs" data-key="id" size="small">
+    <DataTable
+      v-else
+      :value="programs"
+      data-key="id"
+      :row-class="() => 'row-click'"
+      @row-click="open($event.data)"
+    >
       <Column :header="t('programs.columns.program')">
         <template #body="{ data }">
-          <div class="name">{{ data.display_name }}</div>
-          <div class="sub">
-            <i :class="['pi', data.category?.icon]" aria-hidden="true" />
-            {{ data.category?.display_name }}
+          <div class="name-cell">
+            <span
+              class="swatch"
+              :style="{ background: data.category?.color ?? 'var(--border-strong)' }"
+              aria-hidden="true"
+            />
+            <span class="name">{{ data.display_name }}</span>
           </div>
         </template>
       </Column>
       <Column :header="t('programs.columns.enrollment')">
+        <template #body="{ data }">{{ enrollment(data) }}</template>
+      </Column>
+      <Column :header="t('programs.columns.ages')">
         <template #body="{ data }"
-          ><span class="sub">{{ enrollment(data) }}</span></template
+          ><span class="num" dir="ltr">{{ ages(data) }}</span></template
         >
       </Column>
       <Column :header="t('catalog.columns.branches')">
-        <template #body="{ data }">
-          <span class="sub">{{
-            (data.locations ?? [])
-              .map((l: { name: string }) => l.name)
-              .join(locale === 'ar' ? '، ' : ', ')
-          }}</span>
-        </template>
+        <template #body="{ data }"><BranchChips :names="branchNames(data)" /></template>
       </Column>
       <Column :header="t('catalog.columns.status')">
-        <template #body="{ data }"
-          ><Tag :severity="severity(data.status)" :value="t(`catalog.status.${data.status}`)"
-        /></template>
+        <template #body="{ data }"><StatusTag :status="data.status" /></template>
       </Column>
-      <Column v-if="canUpdate" class="actions-col">
-        <template #body="{ data }">
-          <Button
-            icon="pi pi-pencil"
-            severity="secondary"
-            variant="text"
-            rounded
-            size="small"
-            :aria-label="t('catalog.edit', { name: data.display_name })"
-            @click="open(data)"
-          />
-        </template>
+      <Column header-class="row-end" body-class="row-end">
+        <template #body
+          ><i class="pi pi-chevron-right pi-dir row-chevron" aria-hidden="true"
+        /></template>
       </Column>
     </DataTable>
     <ProgramFormDrawer
       v-model:visible="drawerOpen"
-      :program="editing"
+      :program="null"
       :categories="categories"
       :locations="locations"
       @saved="onSaved"
@@ -171,32 +162,35 @@ function onSaved(saved: Program, created: boolean) {
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 12px;
 }
 .toolbar {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  justify-content: flex-end;
 }
-.spacer {
-  flex: 1;
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
 }
-.note {
-  margin: 0;
-  font: var(--text-small);
-  color: var(--text-muted);
-}
-.stack {
+.skeleton-row {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  gap: 24px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
 }
 .name {
-  font-weight: var(--fw-medium);
-}
-.sub {
-  font: var(--text-caption);
-  color: var(--text-muted);
+  font: 500 14px var(--font-sans);
 }
 </style>

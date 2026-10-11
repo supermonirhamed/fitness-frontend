@@ -290,6 +290,11 @@
 }
 
 /* Tabs — components/navigation/Tabs.jsx: 42px tabs, primary text + 2px inset bar */
+.p-tablist,
+.p-tablist-content,
+.p-tabs {
+  background: transparent;
+}
 .p-tablist-tab-list {
   gap: 4px;
   background: transparent;
@@ -396,6 +401,24 @@
 }
 .p-datatable .p-datatable-tbody > tr.row-click {
   cursor: pointer;
+}
+/* Numeric columns: end-aligned (design: align 'end'), with the header to match. */
+.p-datatable td.end {
+  text-align: end;
+}
+.p-datatable th.end .p-datatable-column-header-content {
+  justify-content: flex-end;
+}
+/* Trailing chevron / single action column. */
+.p-datatable td.row-end,
+.p-datatable th.row-end {
+  width: 1%;
+  white-space: nowrap;
+  text-align: end;
+}
+.row-chevron {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* Tag — components/data/Tag.jsx: 24px, radius 4, 12px semibold; severities from the design's sev-* tokens */

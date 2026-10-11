@@ -51,8 +51,23 @@ export function formatTime(
 }
 
 /** "GMT+3" / "غرينتش+٣"-style short name of a zone at a moment (shown when screens mix zones). */
+/** Names people in the region use (the design shows "AST", "GST"); Intl only knows them for some locales. */
+const ZONE_NAMES: Record<string, string> = {
+  'Asia/Riyadh': 'AST',
+  'Asia/Kuwait': 'AST',
+  'Asia/Bahrain': 'AST',
+  'Asia/Qatar': 'AST',
+  'Asia/Aden': 'AST',
+  'Asia/Baghdad': 'AST',
+  'Asia/Dubai': 'GST',
+  'Asia/Muscat': 'GST',
+}
+
 export function zoneAbbreviation(timeZone: string, locale: string, at = new Date()): string {
-  return parts(at, locale, { timeZone, timeZoneName: 'short' }).timeZoneName ?? timeZone
+  if (ZONE_NAMES[timeZone]) return ZONE_NAMES[timeZone]
+  // Western digits in both languages (design: "Numbers & time").
+  const lang = locale.startsWith('ar') ? 'en' : locale
+  return parts(at, lang, { timeZone, timeZoneName: 'short' }).timeZoneName ?? timeZone
 }
 
 /** Whether a list spans more than one timezone, so times need the zone next to them. */

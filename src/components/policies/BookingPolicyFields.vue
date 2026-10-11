@@ -5,6 +5,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import InputNumber from 'primevue/inputnumber'
 import SelectButton from 'primevue/selectbutton'
+import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import SettingRow from '@/components/patterns/SettingRow.vue'
 import SettingsCard from '@/components/patterns/SettingsCard.vue'
@@ -129,9 +130,11 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
 
         <div v-if="!overriding(field)" class="inherited">
           <span class="value">{{ describe(field, inherited!) }}</span>
-          <span class="source">{{
-            t('bookingPolicy.inheritedFrom', { level: inheritedSources?.[field] ?? inheritedLabel })
-          }}</span>
+          <Tag
+            class="tag-sm"
+            icon="pi pi-building"
+            :value="inheritedSources?.[field] ?? inheritedLabel"
+          />
         </div>
 
         <template v-else>
@@ -208,18 +211,13 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
 }
 .inherited {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 12px;
-  border-radius: var(--radius-input);
-  background: var(--surface-sunken);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 36px;
 }
 .inherited .value {
-  font: 500 14px/1.4 var(--font-sans);
-}
-.inherited .source {
-  font: var(--text-caption);
-  color: var(--text-muted);
+  font: var(--text-body);
 }
 .error {
   font: var(--text-caption);

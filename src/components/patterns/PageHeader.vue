@@ -39,6 +39,7 @@ const more = ref<InstanceType<typeof Menu>>()
     <div class="page-header__row">
       <div class="page-header__text">
         <div class="page-header__title-row">
+          <slot name="leading" />
           <h1>{{ title }}</h1>
           <slot name="status" />
         </div>

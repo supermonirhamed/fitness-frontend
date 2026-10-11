@@ -29,7 +29,9 @@ describe('formatTime', () => {
 
 describe('zones', () => {
   it('names zones and detects screens that mix them', () => {
-    expect(zoneAbbreviation('Asia/Riyadh', 'en', moment)).toBe('GMT+3')
+    expect(zoneAbbreviation('Asia/Riyadh', 'en', moment)).toBe('AST')
+    expect(zoneAbbreviation('Asia/Dubai', 'ar', moment)).toBe('GST')
+    expect(zoneAbbreviation('Africa/Cairo', 'ar', moment)).toMatch(/^(GMT\+\d|EE[S]?T)/)
     expect(mixesZones(['Asia/Riyadh', 'Asia/Riyadh'])).toBe(false)
     expect(mixesZones(['Asia/Riyadh', 'Asia/Dubai'])).toBe(true)
   })

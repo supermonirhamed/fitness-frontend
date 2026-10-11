@@ -83,6 +83,25 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'services.view' },
       },
       {
+        path: 'services/categories',
+        name: 'tenant.services.categories',
+        component: () => import('@/views/tenant/CategoriesView.vue'),
+        meta: { permission: 'services.view' },
+      },
+      {
+        path: 'services/new',
+        name: 'tenant.services.new',
+        component: () => import('@/views/tenant/ServiceWizardView.vue'),
+        meta: { permission: 'services.create' },
+      },
+      {
+        path: 'services/programs/:id(\\d+)',
+        name: 'tenant.programs.show',
+        component: () => import('@/views/tenant/ProgramDetailsView.vue'),
+        meta: { permission: 'services.view' },
+        props: (route) => ({ id: Number(route.params.id) }),
+      },
+      {
         path: 'services/:id(\\d+)',
         name: 'tenant.services.show',
         component: () => import('@/views/tenant/ServiceDetailsView.vue'),

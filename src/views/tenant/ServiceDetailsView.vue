@@ -12,10 +12,15 @@ import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import Tag from 'primevue/tag'
-import Message from 'primevue/message'
 import ArchiveServiceDialog from '@/components/services/ArchiveServiceDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
+import StatusBanner from '@/components/patterns/StatusBanner.vue'
+import StatusTag from '@/components/patterns/StatusTag.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import ServiceBookingRules from '@/components/services/ServiceBookingRules.vue'
 import ServiceFormDrawer from '@/components/services/ServiceFormDrawer.vue'
@@ -34,6 +39,7 @@ import { actionKey, fieldChanges } from '@/lib/audit'
 import { ACTIVITY_ICONS, activityKey, durationParts } from '@/lib/catalog'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
+import type { MenuItem } from 'primevue/menuitem'
 
 const props = defineProps<{ id: number }>()
 const route = useRoute()
@@ -59,8 +65,6 @@ async function load() {
 onMounted(load)
 watch(() => props.id, load)
 
-const severity = (s: ServiceStatus) =>
-  s === 'Published' ? 'success' : s === 'Draft' ? 'info' : 'secondary'
 const minutes = (n: number) => {
   const { h, m } = durationParts(n)
   return (
@@ -179,6 +183,54 @@ function toInput(s: Service, status: ServiceStatus): ServiceInput {
   }
 }
 
+const readOnly = computed(() => service.value?.status === 'Archived')
+const missingName = computed(
+  () => !!service.value && (!service.value.name.ar?.trim() || !service.value.name.en?.trim()),
+)
+// Header "⋯" menu (design: Unpublish / Archive, or Restore when archived).
+const moreItems = computed<MenuItem[]>(() => {
+  const s = service.value
+  if (!s || !canEdit.value) return []
+  if (s.status === 'Archived')
+    return [{ label: t('archive.restore'), icon: 'pi pi-replay pi-dir', command: restore }]
+  return [
+    s.status === 'Published'
+      ? {
+          label: t('details.unpublish'),
+          icon: 'pi pi-eye-slash',
+          command: () => setStatus('draft'),
+        }
+      : {
+          label: t('catalog.bulk.publish'),
+          icon: 'pi pi-send',
+          command: () => setStatus('publish'),
+        },
+    { separator: true },
+    {
+      label: t('catalog.bulk.archive'),
+      icon: 'pi pi-inbox',
+      command: () => (archiveOpen.value = true),
+    },
+  ]
+})
+
+// Branches tab: capacity per branch against the largest facility there (design).
+const facilities = ref<{ location_id: number; capacity: number }[] | null>(null)
+watch(
+  tab,
+  async (value) => {
+    if (value !== 'branches' || facilities.value) return
+    facilities.value = await tenantApi.facilities.list().catch(() => [])
+  },
+  { immediate: true },
+)
+const largestFacility = (locationId: number) => {
+  const caps = (facilities.value ?? [])
+    .filter((f) => f.location_id === locationId)
+    .map((f) => f.capacity)
+  return caps.length ? Math.max(...caps) : null
+}
+
 // Activity (needs audit.view)
 const activity = ref<AuditEntry[] | null>(null)
 const activityState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -210,106 +262,150 @@ const changedFields = (entry: AuditEntry) =>
 
 <template>
   <div class="page">
-    <RouterLink :to="{ name: 'tenant.services' }" class="back">
-      <i class="pi pi-arrow-left pi-dir" aria-hidden="true" />{{ t('catalog.title') }}
-    </RouterLink>
-
     <div
       v-if="state === 'loading'"
       class="skeleton"
       aria-busy="true"
       :aria-label="t('common.loading')"
     >
-      <Skeleton height="48px" width="40%" />
+      <Skeleton height="20px" width="20%" />
+      <Skeleton height="32px" width="40%" />
       <Skeleton height="200px" />
     </div>
     <EmptyState
       v-else-if="state === 'missing'"
-      icon="pi-lock"
+      class="panel"
+      icon="pi-search"
       :title="t('details.missing')"
       :body="t('details.missingHint')"
-    />
-    <EmptyState
-      v-else-if="state === 'error' || !service"
-      icon="pi-exclamation-triangle"
-      :title="t('catalog.loadError')"
     >
-      <Button severity="secondary" variant="outlined" :label="t('common.retry')" @click="load" />
+      <RouterLink :to="{ name: 'tenant.services' }">{{ t('catalog.title') }}</RouterLink>
     </EmptyState>
+    <ErrorState
+      v-else-if="state === 'error' || !service"
+      class="panel"
+      :title="t('catalog.loadError')"
+      @retry="load"
+    />
 
     <template v-else>
-      <PageHeader :title="service.display_name ?? ''">
-        <template #status>
+      <PageHeader
+        :title="service.display_name ?? ''"
+        :breadcrumb="[
+          { label: t('catalog.title'), to: { name: 'tenant.services' } },
+          { label: service.display_name ?? '' },
+        ]"
+        :more-items="moreItems"
+      >
+        <template #leading>
           <span
-            class="dot"
-            :style="{ background: service.color ?? 'var(--border-default)' }"
+            class="title-swatch"
+            :style="{ background: service.color ?? 'var(--border-strong)' }"
             aria-hidden="true"
           />
+        </template>
+        <template #status>
+          <StatusTag :status="service.status" />
           <span class="type"
             ><i :class="['pi', ACTIVITY_ICONS[service.activity_type]]" aria-hidden="true" />{{
               t(`catalog.types.${activityKey(service.activity_type)}`)
             }}</span
           >
-          <Tag
-            :severity="severity(service.status)"
-            :value="t(`catalog.status.${service.status}`)"
-          />
         </template>
-        <template v-if="canEdit" #actions>
+        <template #meta>
+          <span>{{ service.category?.display_name }}</span>
+          <span v-if="service.activity_type !== 'Open Access'" class="num"
+            >{{ t('catalog.minShort', { n: service.default_duration }) }}
+            <template v-if="service.default_capacity">
+              · {{ t('catalog.people', service.default_capacity) }}</template
+            ></span
+          >
+        </template>
+        <template v-if="canEdit && !readOnly" #actions>
           <Button
-            v-if="service.status === 'Draft'"
-            icon="pi pi-check"
-            :label="t('catalog.bulk.publish')"
+            icon="pi pi-pencil"
+            :label="t('common.edit')"
             severity="secondary"
             variant="outlined"
-            :loading="busy"
-            @click="setStatus('publish')"
+            @click="openEdit"
           />
-          <Button
-            v-else-if="service.status === 'Published'"
-            icon="pi pi-eye-slash"
-            :label="t('details.unpublish')"
-            severity="secondary"
-            variant="outlined"
-            :loading="busy"
-            @click="setStatus('draft')"
-          />
-          <Button
-            v-if="service.status === 'Archived'"
-            icon="pi pi-replay pi-dir"
-            :label="t('archive.restore')"
-            severity="secondary"
-            variant="outlined"
-            :loading="busy"
-            @click="restore"
-          />
-          <Button
-            v-else
-            icon="pi pi-box"
-            :label="t('catalog.bulk.archive')"
-            severity="secondary"
-            variant="outlined"
-            @click="archiveOpen = true"
-          />
-          <Button icon="pi pi-pencil" :label="t('locationForm.edit')" @click="openEdit" />
         </template>
       </PageHeader>
 
-      <Message v-if="service.status === 'Draft'" severity="info" :closable="false">{{
-        t('details.draftBanner')
-      }}</Message>
-      <Message v-else-if="service.status === 'Archived'" severity="warn" :closable="false">{{
-        t('details.archivedBanner')
-      }}</Message>
+      <StatusBanner
+        v-if="service.status === 'Draft'"
+        severity="info"
+        icon="pi-eye-slash"
+        :title="t('details.draftTitle')"
+      >
+        {{ t('details.draftBanner') }}
+        <template v-if="canEdit" #action>
+          <Button
+            size="small"
+            :label="t('catalog.bulk.publish')"
+            :loading="busy"
+            @click="setStatus('publish')"
+          />
+        </template>
+      </StatusBanner>
+      <StatusBanner
+        v-else-if="service.status === 'Archived'"
+        severity="secondary"
+        icon="pi-inbox"
+        :title="t('details.archivedTitle')"
+      >
+        {{ t('details.archivedBanner') }}
+        <template v-if="canEdit" #action>
+          <Button
+            size="small"
+            variant="outlined"
+            severity="secondary"
+            icon="pi pi-replay pi-dir"
+            :label="t('archive.restore')"
+            :loading="busy"
+            @click="restore"
+          />
+        </template>
+      </StatusBanner>
+      <StatusBanner
+        v-if="missingName"
+        severity="warn"
+        icon="pi-language"
+        :title="t('catalog.nameMissing')"
+      >
+        {{ t('wizard.nameBoth') }}
+        <template v-if="canEdit && !readOnly" #action>
+          <Button
+            size="small"
+            variant="outlined"
+            severity="warn"
+            :label="t('details.addName')"
+            @click="openEdit"
+          />
+        </template>
+      </StatusBanner>
 
       <Tabs v-model:value="tab" scrollable>
         <TabList>
           <Tab value="overview">{{ t('details.tabs.overview') }}</Tab>
-          <Tab value="branches">{{ t('details.tabs.branches') }}</Tab>
-          <Tab value="staff">{{ t('details.tabs.staff') }}</Tab>
-          <Tab value="facilities">{{ t('details.tabs.facilities') }}</Tab>
+          <Tab value="branches"
+            >{{ t('details.tabs.branches')
+            }}<span class="tab-count">{{ service.locations?.length ?? 0 }}</span></Tab
+          >
+          <Tab value="staff"
+            >{{ t('details.tabs.staff') }}
+            <span v-if="service.staff?.length" class="tab-count">{{
+              service.staff.length
+            }}</span></Tab
+          >
+          <Tab value="facilities"
+            >{{ t('details.tabs.facilities') }}
+            <span v-if="service.facilities?.length" class="tab-count">{{
+              service.facilities.length
+            }}</span></Tab
+          >
           <Tab value="rules">{{ t('details.tabs.rules') }}</Tab>
-          <Tab value="pricing" disabled v-tooltip.top="t('details.pricingSoon')">{{
+          <Tab v-tooltip.top="t('details.pricingSoon')" value="pricing" disabled>{{
             t('details.tabs.pricing')
           }}</Tab>
           <Tab value="sessions">{{ t('details.tabs.sessions') }}</Tab>
@@ -318,88 +414,122 @@ const changedFields = (entry: AuditEntry) =>
         <TabPanels>
           <TabPanel value="overview">
             <div class="overview">
-              <img
-                v-if="service.photo_url"
-                :src="service.photo_url"
-                :alt="t('catalog.photoAlt')"
-                class="photo"
-              />
-              <dl>
-                <dt>{{ t('catalog.category') }}</dt>
-                <dd>
-                  <i :class="['pi', service.category?.icon]" aria-hidden="true" />
-                  {{ service.category?.display_name }}
-                </dd>
-                <dt>{{ t('catalog.duration') }}</dt>
-                <dd>{{ minutes(service.default_duration) }}</dd>
-                <template v-if="service.default_capacity">
-                  <dt>{{ t('catalog.capacity') }}</dt>
-                  <dd>{{ t('catalog.people', service.default_capacity) }}</dd>
-                </template>
-                <dt>{{ t('details.buffers') }}</dt>
-                <dd>
-                  {{
-                    t('details.bufferValues', {
-                      before: minutes(service.buffer_before),
-                      after: minutes(service.buffer_after),
-                    })
-                  }}
-                </dd>
-                <dt>{{ t('catalog.payment') }}</dt>
-                <dd>{{ payments }}</dd>
-                <dt>{{ t('details.audience') }}</dt>
-                <dd>{{ audience }}</dd>
-                <template v-if="service.equipment_notes">
-                  <dt>{{ t('catalog.equipment') }}</dt>
-                  <dd class="pre">{{ service.equipment_notes }}</dd>
-                </template>
-                <dt>{{ t('catalog.description') }}</dt>
-                <dd class="pre">{{ service.display_description || '—' }}</dd>
-              </dl>
+              <div class="panel overview__main">
+                <div class="names">
+                  <div>
+                    <div class="caption">العربية</div>
+                    <div class="names__value" dir="rtl">{{ service.name.ar || '—' }}</div>
+                  </div>
+                  <div>
+                    <div class="caption">English</div>
+                    <div
+                      :class="['names__value', { 'names__value--missing': !service.name.en }]"
+                      dir="ltr"
+                    >
+                      {{ service.name.en || t('details.missingName') }}
+                    </div>
+                  </div>
+                </div>
+                <dl class="facts">
+                  <dt>{{ t('catalog.skillLevel') }}</dt>
+                  <dd>{{ audience }}</dd>
+                  <template v-if="service.activity_type !== 'Open Access'">
+                    <dt>{{ t('details.buffers') }}</dt>
+                    <dd>
+                      {{
+                        t('details.bufferValues', {
+                          before: minutes(service.buffer_before),
+                          after: minutes(service.buffer_after),
+                        })
+                      }}
+                    </dd>
+                  </template>
+                  <dt>{{ t('wizard.acceptedWith') }}</dt>
+                  <dd>{{ payments }}</dd>
+                  <template v-if="service.equipment_notes">
+                    <dt>{{ t('catalog.equipment') }}</dt>
+                    <dd class="pre">{{ service.equipment_notes }}</dd>
+                  </template>
+                  <dt>{{ t('catalog.description') }}</dt>
+                  <dd class="pre">{{ service.display_description || '—' }}</dd>
+                </dl>
+              </div>
+              <div class="overview__side">
+                <img
+                  v-if="service.photo_url"
+                  :src="service.photo_url"
+                  :alt="t('catalog.photoAlt')"
+                  class="photo"
+                />
+                <div class="panel stat">
+                  <div class="caption">{{ t('details.tabs.sessions') }}</div>
+                  <div class="stat__value num">—</div>
+                  <div class="stat__hint">{{ t('details.noSessionsHint') }}</div>
+                </div>
+              </div>
             </div>
           </TabPanel>
 
           <TabPanel value="branches">
             <EmptyState
               v-if="!service.locations?.length"
+              class="panel"
               icon="pi-building"
               :title="t('details.noBranches')"
             />
-            <ul v-else class="list">
-              <li v-for="l in service.locations" :key="l.location_id">
-                <RouterLink
-                  :to="{
-                    name: 'tenant.locations.show',
-                    params: { id: l.location_id },
-                    query: { tab: 'services' },
-                  }"
-                  class="name"
-                  >{{ l.name }}</RouterLink
-                >
-                <span class="sub">
-                  {{
-                    l.capacity_override
-                      ? t('details.capacityAt', { n: l.capacity_override })
-                      : t('details.defaultCapacity')
-                  }}
-                  <template v-if="l.price_override !== null">
-                    · {{ format.money(Number(l.price_override)) }}</template
+            <DataTable v-else :value="service.locations" data-key="location_id">
+              <Column :header="t('catalog.columns.branches')">
+                <template #body="{ data }">
+                  <RouterLink
+                    :to="{
+                      name: 'tenant.locations.show',
+                      params: { id: data.location_id },
+                      query: { tab: 'services' },
+                    }"
+                    >{{ data.name }}</RouterLink
                   >
-                </span>
-              </li>
-            </ul>
+                </template>
+              </Column>
+              <Column :header="t('catalog.columns.capacity')" header-class="end" body-class="end">
+                <template #body="{ data }">
+                  <span class="num">{{
+                    data.capacity_override ?? service.default_capacity ?? '—'
+                  }}</span>
+                </template>
+              </Column>
+              <Column :header="t('details.limit')" header-class="end" body-class="end">
+                <template #body="{ data }">
+                  <span class="num muted">{{ largestFacility(data.location_id) ?? '—' }}</span>
+                </template>
+              </Column>
+              <Column>
+                <template #body="{ data }">
+                  <Tag
+                    v-if="data.capacity_override !== null"
+                    class="tag-sm"
+                    severity="help"
+                    icon="pi pi-th-large"
+                    :value="t('details.thisService')"
+                  />
+                  <Tag v-else class="tag-sm" :value="t('details.default')" />
+                </template>
+              </Column>
+            </DataTable>
           </TabPanel>
 
           <TabPanel value="staff">
             <EmptyState
               v-if="!service.staff?.length"
+              class="panel"
+              compact
               icon="pi-users"
               :title="t('details.anyStaff')"
               :body="t('details.anyStaffHint')"
             />
-            <ul v-else class="list">
+            <ul v-else class="panel rows">
               <li v-for="u in service.staff" :key="u.id">
-                <span class="name">{{ u.name }}</span>
+                <PersonAvatar :name="u.name" />
+                <span class="rows__name">{{ u.name }}</span>
               </li>
             </ul>
           </TabPanel>
@@ -407,18 +537,21 @@ const changedFields = (entry: AuditEntry) =>
           <TabPanel value="facilities">
             <EmptyState
               v-if="!service.facilities?.length"
+              class="panel"
+              compact
               icon="pi-th-large"
               :title="t('details.noFacilities')"
               :body="t('details.noFacilitiesHint')"
             />
-            <ul v-else class="list">
+            <ul v-else class="panel rows">
               <li v-for="f in service.facilities" :key="f.id">
+                <span class="tile" aria-hidden="true"><i class="pi pi-th-large" /></span>
                 <RouterLink
                   :to="{ name: 'tenant.facilities.availability', params: { id: f.id } }"
-                  class="name"
+                  class="rows__name"
                   >{{ f.name }}</RouterLink
                 >
-                <span class="sub">{{
+                <span class="muted">{{
                   service.locations?.find((l) => l.location_id === f.location_id)?.name
                 }}</span>
               </li>
@@ -426,11 +559,16 @@ const changedFields = (entry: AuditEntry) =>
           </TabPanel>
 
           <TabPanel value="rules">
-            <ServiceBookingRules v-if="tab === 'rules'" :service="service" :can-edit="canEdit" />
+            <ServiceBookingRules
+              v-if="tab === 'rules'"
+              :service="service"
+              :can-edit="canEdit && !readOnly"
+            />
           </TabPanel>
 
           <TabPanel value="sessions">
             <EmptyState
+              class="panel"
               icon="pi-calendar"
               :title="t('details.noSessions')"
               :body="t('details.noSessionsHint')"
@@ -441,31 +579,34 @@ const changedFields = (entry: AuditEntry) =>
             <div v-if="activityState === 'loading'" class="skeleton">
               <Skeleton v-for="n in 3" :key="n" height="40px" />
             </div>
-            <EmptyState
+            <ErrorState
               v-else-if="activityState === 'error'"
-              icon="pi-exclamation-triangle"
-              :title="t('common.genericError')"
-            >
-              <Button
-                severity="secondary"
-                variant="outlined"
-                :label="t('common.retry')"
-                @click="loadActivity"
-              />
-            </EmptyState>
+              class="panel"
+              compact
+              @retry="loadActivity"
+            />
             <EmptyState
               v-else-if="!activity?.length"
+              class="panel"
+              compact
               icon="pi-history"
               :title="t('details.noActivity')"
             />
-            <ol v-else class="timeline">
+            <ol v-else class="panel timeline">
               <li v-for="entry in activity" :key="entry.id">
-                <span class="when">{{ format.dateTime(entry.created_at) }}</span>
-                <span class="what">
-                  <strong>{{ entry.actor?.name ?? t('details.system') }}</strong> ·
-                  {{ actionLabel(entry.action) }}
-                  <small v-if="changedFields(entry)" class="sub">{{ changedFields(entry) }}</small>
-                </span>
+                <span class="timeline__dot" aria-hidden="true" />
+                <div>
+                  <div class="timeline__title">
+                    {{ actionLabel(entry.action) }}
+                    <small v-if="changedFields(entry)" class="muted"
+                      >· {{ changedFields(entry) }}</small
+                    >
+                  </div>
+                  <div class="timeline__meta">
+                    {{ format.dateTime(entry.created_at) }} ·
+                    {{ entry.actor?.name ?? t('details.system') }}
+                  </div>
+                </div>
               </li>
             </ol>
           </TabPanel>
@@ -492,112 +633,168 @@ const changedFields = (entry: AuditEntry) =>
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-}
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font: var(--text-small);
-  color: var(--text-secondary);
-  text-decoration: none;
-  width: fit-content;
+  gap: 16px;
 }
 .skeleton {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 12px;
 }
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
+.panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+}
+.title-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: none;
 }
 .type {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  font: var(--text-small);
+  gap: 6px;
   color: var(--text-secondary);
+  font: var(--text-small);
 }
 .overview {
-  display: flex;
-  gap: var(--space-5);
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-.photo {
-  width: 240px;
-  max-width: 100%;
-  aspect-ratio: 3 / 2;
-  object-fit: cover;
-  border-radius: var(--radius-card);
-  border: 1px solid var(--border-subtle);
-}
-dl {
-  flex: 1;
-  min-width: 260px;
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-2) var(--space-5);
-  margin: 0;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
 }
-dt {
-  font: var(--text-small);
+.overview__main {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.overview__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.names {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.caption {
+  font: var(--text-caption);
+  font-weight: 400;
   color: var(--text-muted);
 }
-dd {
+.names__value {
+  font: var(--text-h3);
+}
+.names__value--missing {
+  color: var(--sev-warn-fg);
+}
+.facts {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 10px 24px;
   margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
+}
+.facts dt {
+  color: var(--text-secondary);
+}
+.facts dd {
+  margin: 0;
 }
 .pre {
   white-space: pre-line;
 }
-.list,
-.timeline {
+.photo {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-default);
+}
+.stat {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stat__value {
+  font: var(--text-display);
+}
+.stat__hint {
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+.muted {
+  color: var(--text-muted);
+}
+.rows {
   margin: 0;
   padding: 0;
   list-style: none;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
 }
-.list li,
-.timeline li {
+.rows li {
   display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
-.list li + li,
-.timeline li + li {
-  border-top: 1px solid var(--border-subtle);
+.rows li:last-child {
+  border-bottom: 0;
 }
-.timeline li {
-  justify-content: flex-start;
+.rows__name {
+  flex: 1;
+  font: 500 14px var(--font-sans);
 }
-.when {
-  min-width: 160px;
-  font: var(--text-caption);
-  color: var(--text-muted);
+.tile {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--primary-subtle);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.what {
+.timeline {
+  margin: 0;
+  padding: 20px;
+  list-style: none;
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
-.name {
-  font-weight: var(--fw-medium);
+.timeline li {
+  display: flex;
+  gap: 12px;
+  position: relative;
 }
-.sub {
-  font: var(--text-caption);
-  color: var(--text-muted);
+.timeline__dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex: none;
 }
-@media (max-width: 560px) {
-  dl {
+.timeline__title {
+  font: 500 14px/1.4 var(--font-sans);
+}
+.timeline__meta {
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+@media (max-width: 900px) {
+  .overview {
     grid-template-columns: 1fr;
   }
-  .timeline li {
-    flex-direction: column;
+}
+@media (max-width: 560px) {
+  .names,
+  .facts {
+    grid-template-columns: 1fr;
   }
 }
 </style>

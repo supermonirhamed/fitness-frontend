@@ -1,4 +1,4 @@
-import type { ActivityType, Translated } from '@/api/tenant'
+import type { ActivityType, Program, Translated } from '@/api/tenant'
 
 /** Category icons to pick from (PrimeIcons). */
 export const CATEGORY_ICONS = [
@@ -60,4 +60,16 @@ export function translatedErrors(errors: Record<string, string[]>, field: string
 /** Durations as "1 h 30 min" pieces for display. */
 export function durationParts(minutes: number): { h: number; m: number } {
   return { h: Math.floor(minutes / 60), m: minutes % 60 }
+}
+
+/** "Term · 1 Sep – 15 Jan" or "Rolling monthly". */
+export function programEnrollment(
+  p: Program,
+  t: (key: string) => string,
+  format: { date: (iso: string, zone?: string) => string },
+): string {
+  const day = (ymd: string) => format.date(`${ymd}T00:00:00Z`, 'UTC')
+  return p.enrollment_mode === 'Term' && p.term_start && p.term_end
+    ? `${t('programs.modes.Term')} · ${day(p.term_start)} – ${day(p.term_end)}`
+    : t('programs.modes.Rolling')
 }

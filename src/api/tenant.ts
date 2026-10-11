@@ -754,6 +754,9 @@ export const tenantApi = {
     async list(params: { location_id?: number; status?: ServiceStatus } = {}): Promise<Program[]> {
       return (await http.get('/api/programs', { params })).data.data
     },
+    async get(id: number): Promise<Program> {
+      return (await http.get(`/api/programs/${id}`)).data.data
+    },
     async create(input: ProgramInput): Promise<Program> {
       return (await http.post('/api/programs', input)).data.data
     },
