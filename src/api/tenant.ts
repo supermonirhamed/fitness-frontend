@@ -388,6 +388,10 @@ export interface CalendarSession {
   facility: { id: number; name: string; capacity: number }
   coaches: { id: number; name: string }[]
   series_id: number | null
+  /** Edited apart from its series (US-03.04). */
+  exception: boolean
+  /** Started or cancelled: not edited. */
+  locked: boolean
   starts_at: string
   ends_at: string
   local: { date: string; start: string; end: string }
@@ -870,6 +874,15 @@ export const tenantApi = {
     },
     async create(input: SessionInput): Promise<CalendarSession> {
       return (await http.post('/api/sessions', input)).data.data
+    },
+    async checkUpdate(id: number, input: SessionInput): Promise<SessionConflictItem[]> {
+      return (await http.post(`/api/sessions/${id}/check`, input)).data.data.conflicts
+    },
+    async update(
+      id: number,
+      input: SessionInput & { scope?: 'one' | 'following' | 'all' },
+    ): Promise<CalendarSession> {
+      return (await http.put(`/api/sessions/${id}`, input)).data.data
     },
     async previewSeries(input: SeriesInput): Promise<SeriesPreviewItem[]> {
       return (await http.post('/api/session-series/preview', input)).data.data

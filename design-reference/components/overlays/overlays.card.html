@@ -1,0 +1,15 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Overlays" subtitle="Drawer (end side) · Dialog · ConfirmDialog (destructive) · Popover" -->
+<!doctype html><html dir="ltr"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../dev/ds-dev-loader.js" data-root="../.."></script>
+<style>body{padding:20px;background:var(--surface-card)}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.c{display:flex;flex-direction:column;gap:14px}.lbl{font:500 11px var(--font-mono);color:var(--text-muted);width:84px;flex:none}.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+window.__dsReady.then(D=>{
+const {Drawer,ConfirmDialog,Dialog,Popover,Button,Field,InputText,RadioButton}=D;
+const frame={position:'relative',height:360,borderRadius:10,overflow:'hidden',background:'var(--bg-app)',border:'1px solid var(--border-default)'};
+ReactDOM.createRoot(root).render(<div style={{display:'grid',gridTemplateColumns:'1.2fr 1fr',gap:16}}><div style={frame}><Drawer inline width={300} header="New client" subheader="Olaya branch" footer={<><Button label="Cancel" variant="text" severity="secondary"/><Button label="Save"/></>}><div className="c"><Field label="First name" required><InputText value="سارة"/></Field><Field label="Mobile"><InputText dir="ltr" prefix="+966" value="055 123 4567"/></Field></div></Drawer></div><div style={frame}><ConfirmDialog inline severity="danger" header="Cancel session?" message="15 bookings and 3 waitlist entries will be cancelled. Clients will be notified." acceptLabel="Cancel session" rejectLabel="Keep"/></div></div>);
+});
+</script></body></html>

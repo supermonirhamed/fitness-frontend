@@ -1,0 +1,4 @@
+import React from 'react';
+import { Button } from '../buttons/Button.jsx';
+export function ErrorState({title="Couldn't load this",message='Check your connection and try again.',retryLabel='Retry',onRetry,compact=false,style}){
+return <div style={{display:'flex',flexDirection:'column',alignItems:'center',textAlign:'center',gap:10,padding:compact?'24px 16px':'48px 24px',...style}}><span style={{width:56,height:56,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--sev-danger-bg)',color:'var(--sev-danger-fg)'}}><i className="pi pi-exclamation-circle" style={{fontSize:24}}></i></span><div style={{font:'var(--text-h3)',color:'var(--text-primary)'}}>{title}</div><div style={{font:'var(--text-body)',color:'var(--text-secondary)'}}>{message}</div>{onRetry!==null&&<Button label={retryLabel} icon="pi-refresh" severity="secondary" onClick={onRetry}/>}</div>;}

@@ -1,0 +1,3 @@
+import React from 'react';
+export function TimeLabel({time,end,zone,showZone=false,date,strong=false,style}){
+return <span dir="ltr" style={{display:'inline-flex',alignItems:'center',gap:6,font:(strong?'600':'500')+' 14px/1.3 var(--font-sans)',fontVariantNumeric:'tabular-nums',color:'var(--text-primary)',unicodeBidi:'isolate',...style}}>{date&&<span style={{color:'var(--text-secondary)',fontWeight:400}}>{date}</span>}<span>{time}{end&&<>–{end}</>}</span>{showZone&&zone&&<span style={{height:18,padding:'0 5px',borderRadius:4,background:'var(--surface-sunken)',color:'var(--text-secondary)',font:'600 10px/18px var(--font-sans)',letterSpacing:'.03em'}}>{zone}</span>}</span>;}

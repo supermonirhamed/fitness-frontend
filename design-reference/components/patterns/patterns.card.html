@@ -1,0 +1,15 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Patterns — status & capacity" subtitle="StatusTag · CapacityIndicator · SessionCard · PersonChip · TimeLabel · Money" -->
+<!doctype html><html dir="ltr"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../dev/ds-dev-loader.js" data-root="../.."></script>
+<style>body{padding:20px;background:var(--surface-card)}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.c{display:flex;flex-direction:column;gap:14px}.lbl{font:500 11px var(--font-mono);color:var(--text-muted);width:84px;flex:none}.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+window.__dsReady.then(D=>{
+const {StatusTag,CapacityIndicator,SessionCard,PersonChip,TimeLabel,Money,VatSummary}=D;
+const st=['draft','published','full','waitlist','cancelled','completed','expired','late-cancel','no-show','checked-in','inactive','blocked'];
+ReactDOM.createRoot(root).render(<div className="c" style={{gap:16}}><div className="r" style={{gap:6}}>{st.map(s=><StatusTag key={s} status={s}/>)}</div><div className="r" style={{gap:28}}><CapacityIndicator booked={6} capacity={15}/><CapacityIndicator booked={13} capacity={15}/><CapacityIndicator booked={15} capacity={15}/><CapacityIndicator booked={15} capacity={15} waitlist={3}/><CapacityIndicator booked={9} capacity={15} cancelled/></div><div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}><SessionCard service="Yoga Flow" color="var(--svc-2)" time="18:00" end="19:00" coach="Noura" facility="Studio A" booked={11} capacity={15}/><SessionCard service="HIIT" color="var(--svc-3)" time="19:00" end="19:45" coach="Khalid" facility="Hall" booked={20} capacity={20} waitlist={3}/><SessionCard service="Kids Swim" color="var(--svc-1)" time="17:00" coach="Faisal" facility="Pool" booked={0} capacity={8} status="draft"/><SessionCard service="Pilates" color="var(--svc-4)" time="20:00" coach="Reem" facility="Studio B" booked={9} capacity={12} status="cancelled"/></div><div className="r" style={{gap:28}}><PersonChip name="سارة العتيبي" secondary="M-10234"/><PersonChip name="Omar (child)" secondary="via Ahmed Al-Harbi"/><TimeLabel time="18:00" end="19:00" zone="AST" showZone/><Money amount={172.5} strong/><span dir="rtl"><Money amount={172.5} locale="ar" strong/></span></div></div>);
+});
+</script></body></html>

@@ -1,0 +1,6 @@
+import React from 'react';
+import { Dialog } from './Dialog.jsx';
+import { Button } from '../buttons/Button.jsx';
+export function ConfirmDialog({visible=true,header,message,detail,severity='default',icon,acceptLabel='Confirm',rejectLabel='Cancel',onAccept,onReject,inline=false,acceptDisabled=false}){
+const danger=severity==='danger';
+return <Dialog visible={visible} onHide={onReject} inline={inline} width={440} closable={false} footer={<><Button label={rejectLabel} severity="secondary" variant="text" onClick={onReject}/><Button label={acceptLabel} severity={danger?'danger':'primary'} onClick={onAccept} disabled={acceptDisabled}/></>}><div style={{display:'flex',gap:14,paddingTop:8}}><span style={{width:40,height:40,flex:'none',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:danger?'var(--sev-danger-bg)':'var(--primary-subtle)',color:danger?'var(--sev-danger-fg)':'var(--primary)'}}><i className={'pi '+(icon||(danger?'pi-exclamation-triangle':'pi-question-circle'))} style={{fontSize:18}}></i></span><div><div style={{font:'var(--text-h3)'}}>{header}</div><div style={{font:'var(--text-body)',color:'var(--text-secondary)',marginTop:4}}>{message}</div>{detail&&<div style={{marginTop:12}}>{detail}</div>}</div></div></Dialog>;}

@@ -16,7 +16,7 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
-import NewSessionDrawer, { type SessionPrefill } from '@/components/schedule/NewSessionDrawer.vue'
+import SessionDrawer, { type SessionPrefill } from '@/components/schedule/SessionDrawer.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
@@ -61,6 +61,10 @@ const auth = useStaffAuth()
 const org = useOrganization()
 const toast = useToast()
 const canCreate = computed(() => auth.can('schedule.create'))
+const canEdit = (s: CalendarSession) =>
+  auth.can('schedule.update') &&
+  !s.locked &&
+  (!ownOnly.value || s.coaches.some((c) => c.id === auth.user?.id))
 
 // The branch the calendar is about: the switcher's pick, or the only branch.
 const branch = computed(
@@ -374,14 +378,32 @@ const selected = ref<CalendarSession | null>(null)
 function select(s: CalendarSession, event: Event) {
   selected.value = s
   popover.value?.hide()
-  requestAnimationFrame(() => popover.value?.show(event))
+  // The event loses its currentTarget once handled: keep the card to align to.
+  const target = event.currentTarget as HTMLElement
+  requestAnimationFrame(() => popover.value?.show(event, target))
 }
 // New session (US-03.02): from the button, an empty slot of the day view, or another page's link.
 const drawerOpen = ref(false)
 const prefill = ref<SessionPrefill>({})
+const editing = ref<CalendarSession | null>(null)
 function newSession(p: SessionPrefill = {}) {
+  editing.value = null
   prefill.value = { locationId: branch.value?.id ?? null, date: anchor.value, ...p }
   drawerOpen.value = true
+}
+// Edit (US-03.04)
+function editSession(s: CalendarSession) {
+  popover.value?.hide()
+  editing.value = s
+  drawerOpen.value = true
+}
+function onUpdated(session: CalendarSession) {
+  toast.add({
+    severity: 'success',
+    summary: t('session.updated', { name: session.service.name }),
+    life: 4000,
+  })
+  load()
 }
 function onSlot(event: MouseEvent, column: Column) {
   if (!canCreate.value || event.target !== event.currentTarget) return
@@ -817,10 +839,12 @@ const zoneOf = (s: CalendarSession) =>
       </div>
     </div>
 
-    <NewSessionDrawer
+    <SessionDrawer
       v-model:visible="drawerOpen"
       :prefill="prefill"
+      :session="editing"
       @saved="onCreated"
+      @updated="onUpdated"
       @series-saved="onSeriesCreated"
     />
 
@@ -855,10 +879,22 @@ const zoneOf = (s: CalendarSession) =>
           :cancelled="selected.status === 'Cancelled'"
         />
         <div v-if="selected.series_id" class="pop__note">
-          <i class="pi pi-replay" aria-hidden="true" />{{ t('calendar.inSeries') }}
+          <i class="pi pi-replay" aria-hidden="true" />{{
+            selected.exception ? t('session.exception') : t('calendar.inSeries')
+          }}
         </div>
         <div v-if="selected.status === 'Completed'" class="pop__note">
           <i class="pi pi-lock" aria-hidden="true" />{{ t('calendar.pastReadOnly') }}
+        </div>
+        <div v-if="canEdit(selected)" class="pop__actions">
+          <Button
+            :label="t('calendar.edit')"
+            icon="pi pi-pencil"
+            severity="secondary"
+            variant="outlined"
+            size="small"
+            @click="editSession(selected)"
+          />
         </div>
       </div>
     </Popover>
@@ -1151,6 +1187,13 @@ const zoneOf = (s: CalendarSession) =>
 .pop__note i {
   font-size: 10px;
   margin-inline-end: 4px;
+}
+.pop__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
 }
 @media (max-width: 767px) {
   .list__row {

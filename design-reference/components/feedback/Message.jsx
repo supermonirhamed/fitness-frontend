@@ -1,0 +1,6 @@
+import React from 'react';
+const ICONS={info:'pi-info-circle',success:'pi-check-circle',warn:'pi-exclamation-triangle',danger:'pi-times-circle',secondary:'pi-info-circle',contrast:'pi-info-circle'};
+export function Message({severity='info',title,children,icon,closable=false,onClose,action,variant='subtle',style}){
+const solid=variant==='solid';
+const box={display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:'var(--radius-input)',border:'1px solid var(--sev-'+severity+'-border)',background:solid?'var(--sev-'+severity+'-solid)':'var(--sev-'+severity+'-bg)',color:solid?'#fff':'var(--sev-'+severity+'-fg)',font:'var(--text-small)',...style};
+return <div role={severity==='danger'?'alert':'status'} style={box}><i className={'pi '+(icon||ICONS[severity])} style={{fontSize:16,marginTop:2,flex:'none'}}></i><div style={{flex:1,minWidth:0}}>{title&&<div style={{fontWeight:600}}>{title}</div>}{children&&<div style={{color:solid?'#fff':'var(--text-primary)'}}>{children}</div>}</div>{action&&<div style={{flex:'none',alignSelf:'center'}}>{action}</div>}{closable&&<button type="button" aria-label="Close" onClick={onClose} style={{border:0,background:'transparent',color:'inherit',cursor:'pointer',padding:2}}><i className="pi pi-times"></i></button>}</div>;}

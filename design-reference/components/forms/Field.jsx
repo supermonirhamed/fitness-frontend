@@ -1,0 +1,3 @@
+import React from 'react';
+export function Field({label,htmlFor,required=false,help,error,children,style}){
+return <div style={{display:'flex',flexDirection:'column',gap:6,minWidth:0,...style}}>{label&&<label htmlFor={htmlFor} style={{font:'var(--text-small)',fontWeight:500,color:'var(--text-primary)'}}>{label}{required&&<span aria-hidden="true" style={{color:'var(--sev-danger-fg)',marginInlineStart:2}}>*</span>}</label>}{children}{error?<div style={{display:'flex',gap:6,alignItems:'center',font:'var(--text-caption)',fontWeight:400,color:'var(--sev-danger-fg)'}}><i className="pi pi-exclamation-circle" style={{fontSize:12}}></i>{error}</div>:help?<div style={{font:'var(--text-caption)',fontWeight:400,color:'var(--text-muted)'}}>{help}</div>:null}</div>;}

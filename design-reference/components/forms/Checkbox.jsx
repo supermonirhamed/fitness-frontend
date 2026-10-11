@@ -1,0 +1,5 @@
+import React from 'react';
+export function Checkbox({checked=false,indeterminate=false,onChange,label,disabled=false,invalid=false,id,size=18}){
+const on=checked||indeterminate;
+const box={width:size,height:size,flex:'none',borderRadius:4,display:'inline-flex',alignItems:'center',justifyContent:'center',border:'1px solid '+(invalid?'var(--sev-danger-solid)':on?'var(--primary)':'var(--border-strong)'),background:disabled?'var(--surface-sunken)':on?'var(--primary)':'var(--surface-card)',color:'var(--text-on-primary)',transition:'background var(--dur-fast)'};
+return <label style={{display:'inline-flex',alignItems:'center',gap:8,cursor:disabled?'not-allowed':'pointer',color:disabled?'var(--text-disabled)':'var(--text-primary)',font:'var(--text-body)'}}><input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={e=>onChange&&onChange(e.target.checked)} style={{position:'absolute',opacity:0,width:0,height:0}}/><span style={box} aria-hidden="true">{indeterminate?<i className="pi pi-minus" style={{fontSize:size*.55}}></i>:checked?<i className="pi pi-check" style={{fontSize:size*.55}}></i>:null}</span>{label}</label>;}

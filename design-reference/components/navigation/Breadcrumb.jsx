@@ -1,0 +1,4 @@
+import React from 'react';
+export function Breadcrumb({items=[],home}){
+const all=home?[home,...items]:items;
+return <nav aria-label="Breadcrumb"><ol style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6,margin:0,padding:0,listStyle:'none',font:'var(--text-small)'}}>{all.map((it,i)=>{const last=i===all.length-1;return <li key={i} style={{display:'flex',alignItems:'center',gap:6}}>{last?<span aria-current="page" style={{color:'var(--text-primary)',fontWeight:500}}>{it.icon&&<i className={'pi '+it.icon} style={{marginInlineEnd:4}}></i>}{it.label}</span>:<a href={it.href||'#'} onClick={it.onClick} style={{color:'var(--text-secondary)'}}>{it.icon&&<i className={'pi '+it.icon} style={{marginInlineEnd:it.label?4:0}}></i>}{it.label}</a>}{!last&&<i className="pi pi-chevron-right pi-dir" style={{fontSize:10,color:'var(--text-muted)'}}></i>}</li>;})}</ol></nav>;}

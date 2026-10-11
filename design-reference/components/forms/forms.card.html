@@ -1,0 +1,32 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Forms" subtitle="Text, number, select, multi, autocomplete, date, toggles — default, focus, invalid, disabled" -->
+<!doctype html><html dir="ltr"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="../../dev/ds-dev-loader.js" data-root="../.."></script>
+<style>body{padding:20px;background:var(--surface-card)}.r{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.c{display:flex;flex-direction:column;gap:14px}.lbl{font:500 11px var(--font-mono);color:var(--text-muted);width:84px;flex:none}.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}</style></head><body><div id="root"></div>
+<script type="text/babel">
+window.__dsReady.then(D=>{
+const {Field,InputText,InputNumber,Select,MultiSelect,AutoComplete,DatePicker,Textarea,Checkbox,RadioButton,ToggleSwitch,FileUpload}=D;
+function App(){const [q,setQ]=React.useState('سار');const [sel,setSel]=React.useState('f1');const [ms,setMs]=React.useState(['c1','c2','c3']);const [t,setT]=React.useState(true);const [r,setR]=React.useState('one');const [d,setD]=React.useState('2026-10-07');
+const sug=[{label:'سارة العتيبي',sub:'M-10234 · 0551234567',alerts:[{icon:'pi-file-edit',label:'Waiver missing'}]},{label:'Sara Al-Qahtani',sub:'M-10871 · 0569876543'}];
+return <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
+<Field label="Client"><AutoComplete value={q} onChange={setQ} suggestions={sug} placeholder="Name, phone, member ID"/></Field>
+<Field label="Facility" required><Select value={sel} onChange={setSel} options={[{label:'Studio A',value:'f1',meta:'20'},{label:'Pool',value:'f2',meta:'12'},{label:'Court 2',value:'f3',disabled:true,sub:'Busy 18:00–19:00'}]}/></Field>
+<Field label="Coaches"><MultiSelect value={ms} onChange={setMs} options={[{label:'Khalid',value:'c1'},{label:'Noura',value:'c2'},{label:'Faisal',value:'c3'}]}/></Field>
+<Field label="Price"><InputNumber mode="currency" value={150}/></Field>
+<Field label="VAT"><InputNumber mode="percent" value={15}/></Field>
+<Field label="Duration"><InputNumber mode="minutes" value={60} showButtons step={15}/></Field>
+<Field label="Date"><DatePicker value={d} onChange={setD}/></Field>
+<Field label="Mobile" error="A client with this mobile already exists"><InputText value="0551234567" invalid dir="ltr" prefix="+966"/></Field>
+<Field label="Member ID" help="Assigned automatically"><InputText value="M-10235" disabled/></Field>
+<div className="c" style={{gap:10}}><Checkbox checked label="Marketing SMS"/><Checkbox indeterminate label="Select all"/><Checkbox label="Disabled" disabled/></div>
+<div className="c" style={{gap:10}}><RadioButton name="s" value="one" checked={r==='one'} onChange={setR} label="This session only"/><RadioButton name="s" value="all" checked={r==='all'} onChange={setR} label="All in series"/></div>
+<div className="c" style={{gap:10}}><ToggleSwitch checked={t} onChange={setT} label="Waitlist on"/><ToggleSwitch label="Notify clients"/></div>
+<div style={{gridColumn:'span 2'}}><Field label="Note"><Textarea placeholder="Visible to managers" rows={2} maxLength={200} value="Prefers morning sessions"/></Field></div>
+<Field label="Logo"><FileUpload/></Field>
+</div>;}
+ReactDOM.createRoot(root).render(<App/>);
+});
+</script></body></html>

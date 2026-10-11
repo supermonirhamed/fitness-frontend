@@ -1,0 +1,4 @@
+import React from 'react';
+export function BulkActionBar({count=0,label,actions,onClear,clearLabel='Clear selection',style}){
+if(!count)return null;
+return <div role="toolbar" style={{display:'flex',alignItems:'center',gap:12,padding:'8px 8px 8px 16px',paddingInlineStart:16,paddingInlineEnd:8,borderRadius:'var(--radius-card)',background:'var(--surface-inverse)',color:'var(--text-inverse)',boxShadow:'var(--shadow-2)',...style}}><span style={{font:'600 14px var(--font-sans)',fontVariantNumeric:'tabular-nums'}}>{label||count+' selected'}</span><button type="button" onClick={onClear} style={{border:0,background:'transparent',color:'inherit',opacity:.75,font:'500 13px var(--font-sans)',cursor:'pointer',textDecoration:'underline'}}>{clearLabel}</button><span style={{flex:1}}></span><div style={{display:'flex',gap:6}}>{actions}</div></div>;}

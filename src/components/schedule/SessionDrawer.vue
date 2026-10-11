@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// New session (US-03.02), as the design's drawer (ui_kits/admin/SessionDrawer.jsx): service, branch,
+// New session (US-03.02) and Edit session (US-03.04), as the design's drawer (ui_kits/admin/SessionDrawer.jsx): service, branch,
 // facility, coach, local date and time (D4), duration and capacity from the service defaults (at
 // most the facility's), Draft / Published, and a live conflict panel (US-03.06). Hard conflicts
 // block saving; warnings (outside hours, holidays) are saved with "Save anyway".
 // "Weekly" turns it into a series (US-03.03): a preview lists each date with its flags, and
 // flagged dates can be skipped one by one before the sessions are created.
+// Editing keeps the service and branch; a series occurrence asks what the change applies to.
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
@@ -19,6 +20,7 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import ConflictList from '@/components/patterns/ConflictList.vue'
+import EditScopeDialog, { type EditScope } from '@/components/schedule/EditScopeDialog.vue'
 import FormField from '@/components/patterns/FormField.vue'
 import TimeField from '@/components/patterns/TimeField.vue'
 import {
@@ -48,16 +50,18 @@ export interface SessionPrefill {
   start?: string
 }
 
-const props = defineProps<{ prefill: SessionPrefill }>()
+const props = defineProps<{ prefill: SessionPrefill; session?: CalendarSession | null }>()
 const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{
   saved: [session: CalendarSession]
+  updated: [session: CalendarSession]
   seriesSaved: [result: { sessions: number; skipped: number; firstDate: string | null }]
 }>()
 const { t, locale } = useI18n()
 const auth = useStaffAuth()
 const org = useOrganization()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
+const editing = computed(() => props.session ?? null)
 
 const services = ref<Service[]>([])
 const options = ref<SessionFormOptions | null>(null)
@@ -145,6 +149,22 @@ watch(visible, async (open) => {
   endsOn.value = null
   previewItems.value = null
   skips.value = []
+  const s = editing.value
+  if (s) {
+    form.serviceId = s.service.id
+    form.locationId = s.location.id
+    form.facilityId = s.facility.id
+    form.coachId = s.coaches[0]?.id ?? null
+    form.assistantIds = s.coaches.slice(1).map((c) => c.id)
+    form.date = new Date(`${s.local.date}T12:00:00`)
+    form.start = s.local.start
+    form.duration = Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60000)
+    form.capacity = s.capacity ?? 1
+    form.status = s.status === 'Draft' ? 'Draft' : 'Published'
+    const loaded = await tenantApi.sessions.options(s.service.id, s.location.id).catch(() => null)
+    if (visible.value && editing.value?.id === s.id) options.value = loaded
+    return
+  }
   form.locationId =
     props.prefill.locationId ??
     auth.currentLocation?.id ??
@@ -166,6 +186,7 @@ watch(
   async ([serviceId, locationId]) => {
     options.value = null
     if (!serviceId || !locationId) return
+    if (editing.value) return // loaded on open; the session's own values stay
     if (!branchOptions.value.some((b) => b.value === locationId)) {
       form.locationId = branchOptions.value[0]?.value ?? null
       return
@@ -211,7 +232,9 @@ watch(
       const mine = ++checkId
       checking.value = true
       try {
-        const found = await tenantApi.sessions.check(payload)
+        const found = editing.value
+          ? await tenantApi.sessions.checkUpdate(editing.value.id, payload)
+          : await tenantApi.sessions.check(payload)
         if (mine === checkId) conflicts.value = found
       } catch {
         if (mine === checkId) conflicts.value = []
@@ -349,6 +372,11 @@ async function createSeries() {
 }
 
 async function submit() {
+  if (editing.value) {
+    if (editing.value.series_id) scopeOpen.value = true
+    else await update('one')
+    return
+  }
   if (repeat.value === 'weekly') {
     if (previewItems.value) await createSeries()
     else await showPreview()
@@ -374,6 +402,37 @@ async function save() {
   }
 }
 
+// Edit (US-03.04): a series occurrence first asks what the change applies to.
+const scopeOpen = ref(false)
+const moved = computed(() => {
+  const s = editing.value
+  return (
+    !!s &&
+    (s.facility.id !== form.facilityId ||
+      s.local.date !== ymd(form.date) ||
+      s.local.start !== form.start ||
+      Date.parse(s.ends_at) - Date.parse(s.starts_at) !== form.duration * 60000)
+  )
+})
+async function update(scope: EditScope) {
+  const payload = input(soft.value > 0)
+  if (!payload || !editing.value) return
+  saving.value = true
+  errors.value = {}
+  formError.value = null
+  try {
+    const session = await tenantApi.sessions.update(editing.value.id, { ...payload, scope })
+    scopeOpen.value = false
+    emit('updated', session)
+    visible.value = false
+  } catch (e) {
+    scopeOpen.value = false
+    failed(e)
+  } finally {
+    saving.value = false
+  }
+}
+
 const canSave = computed(() => {
   if (saving.value || overCapacity.value) return false
   if (repeat.value === 'weekly')
@@ -381,6 +440,8 @@ const canSave = computed(() => {
   return !!input() && !hard.value && !checking.value
 })
 const saveLabel = computed(() => {
+  if (editing.value)
+    return soft.value && !hard.value ? t('session.saveAnyway') : t('session.saveChanges')
   if (repeat.value === 'weekly')
     return previewItems.value ? t('session.createN', kept.value.length) : t('session.preview')
   return soft.value && !hard.value ? t('session.saveAnyway') : t('session.save')
@@ -398,13 +459,15 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
   <Drawer
     v-model:visible="visible"
     :position="position"
-    :header="t('session.newTitle')"
+    :header="editing ? t('session.editTitle') : t('session.newTitle')"
     class="session-drawer"
     :block-scroll="true"
   >
     <template #header>
       <div class="head">
-        <div class="head__title">{{ t('session.newTitle') }}</div>
+        <div class="head__title">
+          {{ editing ? t('session.editTitle') : t('session.newTitle') }}
+        </div>
         <div class="head__sub" dir="auto">{{ subtitle }}</div>
       </div>
     </template>
@@ -414,7 +477,28 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
         formError
       }}</Message>
 
-      <FormField :label="t('session.service')" for="s-service" required :error="err('service_id')">
+      <FormField
+        v-if="editing"
+        :label="t('session.service')"
+        :help="editing.exception ? t('session.exception') : undefined"
+      >
+        <div class="svc-chip">
+          <span
+            class="swatch"
+            :style="{ background: editing.service.color ?? 'var(--svc-1)' }"
+            aria-hidden="true"
+          />
+          <span class="svc-chip__name">{{ editing.service.name }}</span>
+          <span class="svc-chip__meta">{{ editing.location.name }}</span>
+        </div>
+      </FormField>
+      <FormField
+        v-else
+        :label="t('session.service')"
+        for="s-service"
+        required
+        :error="err('service_id')"
+      >
         <Select
           v-model="form.serviceId"
           input-id="s-service"
@@ -444,12 +528,17 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
           </template>
         </Select>
       </FormField>
-      <div v-if="options" class="defaults-note">
+      <div v-if="options && !editing" class="defaults-note">
         <i class="pi pi-sparkles" aria-hidden="true" />{{ t('session.defaultsFilled') }}
       </div>
 
       <div class="grid">
-        <FormField :label="t('session.branch')" for="s-branch" :error="err('location_id')">
+        <FormField
+          v-if="!editing"
+          :label="t('session.branch')"
+          for="s-branch"
+          :error="err('location_id')"
+        >
           <Select
             v-model="form.locationId"
             input-id="s-branch"
@@ -580,7 +669,7 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
         </FormField>
       </div>
 
-      <section class="repeat">
+      <section v-if="!editing" class="repeat">
         <FormField :label="t('session.repeat')">
           <SelectButton
             v-model="repeat"
@@ -747,6 +836,13 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
       </div>
     </template>
   </Drawer>
+  <EditScopeDialog
+    v-model:visible="scopeOpen"
+    :moved="moved"
+    :unavailable="{ following: t('session.editScope.later'), all: t('session.editScope.later') }"
+    :loading="saving"
+    @confirm="update"
+  />
 </template>
 
 <style scoped>
@@ -806,6 +902,23 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
 }
 .opt__sub {
   display: block;
+  font: var(--text-caption);
+  color: var(--text-muted);
+}
+.svc-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+}
+.svc-chip__name {
+  flex: 1;
+  font: 500 14px var(--font-sans);
+}
+.svc-chip__meta {
   font: var(--text-caption);
   color: var(--text-muted);
 }
