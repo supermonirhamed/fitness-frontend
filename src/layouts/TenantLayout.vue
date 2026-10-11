@@ -8,18 +8,27 @@ import AppHeader from '@/components/shell/AppHeader.vue'
 import BranchSwitcher from '@/components/shell/BranchSwitcher.vue'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
-import { allowedSettingsPages } from '@/lib/permissions'
+import { allowedPages, allowedSettingsPages, STAFF_PAGES } from '@/lib/permissions'
+import { useTheme } from '@/composables/useTheme'
 
 const { t, te, locale } = useI18n()
 const org = useOrganization()
 const auth = useStaffAuth()
 const router = useRouter()
+const { theme, toggle: toggleTheme } = useTheme()
 
-// Items are added as their stories ship (Calendar, Bookings, Clients, …) and filtered by permission (US-00.07).
+// The design's sidebar order (shell/Sidebar.jsx NAV_ITEMS). Calendar, Bookings, Clients and
+// Check-in are added as their stories ship. Items are filtered by permission (US-00.07).
 const nav = computed<NavItem[]>(() => [
   { key: 'today', icon: 'pi-sun', to: '/', exact: true },
-  ...(auth.can('services.view') ? [{ key: 'services', icon: 'pi-tags', to: '/services' }] : []),
-  // Shown when the user can open at least one settings page (US-00.07).
+  ...(auth.can('services.view') ? [{ key: 'services', icon: 'pi-th-large', to: '/services' }] : []),
+  ...(allowedPages(STAFF_PAGES, (p) => auth.can(p)).length
+    ? [{ key: 'staff', icon: 'pi-id-card', to: '/staff' }]
+    : []),
+  ...(auth.can('locations.view')
+    ? [{ key: 'branches', icon: 'pi-building', to: '/branches' }]
+    : []),
+  // Shown when the user can open at least one settings page.
   ...(allowedSettingsPages((p) => auth.can(p)).length
     ? [{ key: 'settings', icon: 'pi-cog', to: '/settings' }]
     : []),
@@ -35,6 +44,11 @@ const userMenu = computed(() => [
     label: t('shell.security'),
     icon: 'pi pi-shield',
     command: () => router.push({ name: 'tenant.security' }),
+  },
+  {
+    label: theme.value === 'dark' ? t('shell.lightMode') : t('shell.darkMode'),
+    icon: theme.value === 'dark' ? 'pi pi-sun' : 'pi pi-moon',
+    command: toggleTheme,
   },
 ])
 
@@ -57,7 +71,10 @@ async function signOut() {
 </script>
 
 <template>
-  <div class="shell">
+  <div
+    class="shell"
+    :style="{ '--content-start': collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)' }"
+  >
     <AppSidebar
       class="shell__sidebar"
       :items="nav"

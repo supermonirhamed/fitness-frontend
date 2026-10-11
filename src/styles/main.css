@@ -10,6 +10,7 @@
 @import './tokens/typography.css' layer(base);
 @import './tokens/base.css' layer(base);
 @import 'primeicons/primeicons.css';
+@import './primevue.css' layer(components);
 
 .ltr-isolate {
   direction: ltr;

@@ -2,15 +2,25 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
-import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
-import EmptyState from '@/components/patterns/EmptyState.vue'
+import SelectButton from 'primevue/selectbutton'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import NoPermission from '@/components/patterns/NoPermission.vue'
+import SettingRow from '@/components/patterns/SettingRow.vue'
+import SettingsCard from '@/components/patterns/SettingsCard.vue'
+import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
 import { tenantApi, type RegionalSettings } from '@/api/tenant'
 import { errorCode } from '@/lib/apiErrors'
 import { statusOf, validationErrors } from '@/lib/http'
-import { formatDate, formatTime, type DatePattern, type TimeFormat } from '@/lib/datetime'
+import {
+  formatDate,
+  formatTime,
+  zoneAbbreviation,
+  type DatePattern,
+  type TimeFormat,
+} from '@/lib/datetime'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
 
@@ -49,15 +59,40 @@ const dateOptions = computed(() =>
     label: formatDate(sample, f as DatePattern, form.value?.timezone, locale.value),
   })),
 )
-const timeOptions = computed(() =>
-  options.value.time_formats.map((f) => ({
-    value: f,
-    label: `${t(`regional.clock.${f}`)} — ${formatTime(sample, f as TimeFormat, form.value?.timezone, locale.value)}`,
+// The design offers Saturday, Sunday and Monday; another saved day stays selectable.
+const weekOptions = computed(() =>
+  [
+    6,
+    0,
+    1,
+    ...(form.value && ![6, 0, 1].includes(form.value.week_start) ? [form.value.week_start] : []),
+  ].map((i) => ({ value: i, label: t(`regional.days.${dayKeys[i]}`) })),
+)
+const clockOptions = computed(() =>
+  options.value.time_formats.map((f) => ({ value: f, label: t(`regional.clock.${f}`) })),
+)
+const timeExample = computed(() =>
+  options.value.time_formats
+    .map((f) => formatTime(sample, f as TimeFormat, form.value?.timezone, locale.value))
+    .join(' / '),
+)
+const dateExample = computed(() =>
+  form.value
+    ? formatDate(sample, form.value.date_format as DatePattern, form.value.timezone, locale.value)
+    : '',
+)
+const timezoneOptions = computed(() =>
+  timezones.map((zone) => ({
+    value: zone,
+    label: zone,
+    meta: zoneAbbreviation(zone, locale.value),
   })),
 )
-const weekOptions = computed(() =>
-  dayKeys.map((day, i) => ({ value: i, label: t(`regional.days.${day}`) })),
-)
+
+function discard() {
+  form.value = saved.value ? { ...saved.value } : null
+  error.value = null
+}
 const dirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(saved.value))
 
 function currencyName(code: string): string {
@@ -113,179 +148,143 @@ async function save() {
 </script>
 
 <template>
-  <section class="card">
-    <div v-if="state === 'loading'" class="body" aria-busy="true" :aria-label="t('common.loading')">
-      <Skeleton v-for="n in 6" :key="n" height="40px" />
+  <SettingsCard v-if="state === 'loading'" aria-busy="true" :aria-label="t('common.loading')">
+    <div v-for="n in 6" :key="n" class="skeleton-row">
+      <Skeleton width="40%" /><Skeleton height="36px" />
     </div>
+  </SettingsCard>
 
-    <EmptyState
-      v-else-if="state === 'forbidden'"
-      icon="pi-lock"
-      :title="t('permissions.forbidden')"
-      :body="t('permissions.forbiddenHint')"
-    />
+  <SettingsCard v-else-if="state === 'forbidden'"><NoPermission /></SettingsCard>
 
-    <EmptyState
-      v-else-if="state === 'error' || !form"
-      icon="pi-exclamation-triangle"
-      :title="t('regional.loadError')"
-    >
-      <Button
-        severity="secondary"
-        variant="outlined"
-        icon="pi pi-replay pi-dir"
-        :label="t('common.retry')"
-        @click="load"
-      />
-    </EmptyState>
+  <SettingsCard v-else-if="state === 'error' || !form">
+    <ErrorState :title="t('regional.loadError')" @retry="load" />
+  </SettingsCard>
 
-    <form v-else class="body" @submit.prevent="save">
-      <p class="intro">{{ t('regional.intro') }}</p>
-      <Message v-if="!canEdit" severity="secondary" :closable="false">{{
-        t('regional.readOnly')
-      }}</Message>
+  <form v-else @submit.prevent="save">
+    <Message v-if="!canEdit" severity="secondary" :closable="false" class="note">{{
+      t('regional.readOnly')
+    }}</Message>
+    <Message v-if="error" severity="error" :closable="false" role="alert" class="note">{{
+      error
+    }}</Message>
+    <SettingsCard>
+      <SettingRow
+        :label="t('regional.currency')"
+        :help="t('regional.currencyHelp')"
+        label-for="regional-currency"
+      >
+        <Select
+          v-model="form.currency"
+          input-id="regional-currency"
+          :options="currencyOptions"
+          option-label="label"
+          option-value="value"
+          :disabled="!canEdit || currencyLocked"
+          fluid
+        />
+        <Message severity="info" icon="pi pi-lock" :closable="false">{{
+          currencyLocked ? t('regional.currencyLocked') : t('regional.currencyHint')
+        }}</Message>
+      </SettingRow>
 
-      <div class="grid">
-        <div class="field">
-          <label for="regional-currency">{{ t('regional.currency') }}</label>
-          <Select
-            v-model="form.currency"
-            input-id="regional-currency"
-            :options="currencyOptions"
-            option-label="label"
-            option-value="value"
-            :disabled="!canEdit || currencyLocked"
-            fluid
-          />
-          <small>{{
-            currencyLocked ? t('regional.currencyLocked') : t('regional.currencyHint')
-          }}</small>
-        </div>
-        <div class="field">
-          <label for="regional-timezone">{{ t('regional.timezone') }}</label>
-          <Select
-            v-model="form.timezone"
-            input-id="regional-timezone"
-            :options="timezones"
-            filter
-            :disabled="!canEdit"
-            fluid
-          />
-          <small>{{ t('regional.timezoneHint') }}</small>
-        </div>
-        <div class="field">
-          <label for="regional-locale">{{ t('regional.language') }}</label>
-          <Select
-            v-model="form.locale"
-            input-id="regional-locale"
-            :options="localeOptions"
-            option-label="label"
-            option-value="value"
-            :disabled="!canEdit"
-            fluid
-          />
-          <small>{{ t('regional.languageHint') }}</small>
-        </div>
-        <div class="field">
-          <label for="regional-week">{{ t('regional.weekStart') }}</label>
-          <Select
-            v-model="form.week_start"
-            input-id="regional-week"
-            :options="weekOptions"
-            option-label="label"
-            option-value="value"
-            :disabled="!canEdit"
-            fluid
-          />
-        </div>
-        <div class="field">
-          <label for="regional-date">{{ t('regional.dateFormat') }}</label>
-          <Select
-            v-model="form.date_format"
-            input-id="regional-date"
-            :options="dateOptions"
-            option-label="label"
-            option-value="value"
-            :disabled="!canEdit"
-            fluid
-          />
-        </div>
-        <div class="field">
-          <label for="regional-time">{{ t('regional.timeFormat') }}</label>
-          <Select
-            v-model="form.time_format"
-            input-id="regional-time"
-            :options="timeOptions"
-            option-label="label"
-            option-value="value"
-            :disabled="!canEdit"
-            fluid
-          />
-        </div>
-      </div>
-
-      <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
-      <div v-if="canEdit" class="footer">
-        <span class="audit"
-          ><i class="pi pi-shield" aria-hidden="true" />{{ t('override.auditNote') }}</span
+      <SettingRow
+        :label="t('regional.timezone')"
+        :help="t('regional.timezoneHint')"
+        label-for="regional-timezone"
+      >
+        <Select
+          v-model="form.timezone"
+          input-id="regional-timezone"
+          :options="timezoneOptions"
+          option-label="label"
+          option-value="value"
+          filter
+          :disabled="!canEdit"
+          fluid
         >
-        <Button type="submit" :label="t('permissions.save')" :disabled="!dirty" :loading="saving" />
-      </div>
-    </form>
-  </section>
-</template>
+          <template #option="{ option }">
+            <span class="option">
+              <span>{{ option.label }}</span>
+              <span class="option__meta" dir="ltr">{{ option.meta }}</span>
+            </span>
+          </template>
+        </Select>
+      </SettingRow>
 
+      <SettingRow :label="t('regional.language')" :help="t('regional.languageHint')">
+        <SelectButton
+          v-model="form.locale"
+          :options="localeOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          :disabled="!canEdit"
+          :aria-label="t('regional.language')"
+        />
+      </SettingRow>
+
+      <SettingRow
+        :label="t('regional.dateFormat')"
+        :example="dateExample"
+        label-for="regional-date"
+      >
+        <Select
+          v-model="form.date_format"
+          input-id="regional-date"
+          :options="dateOptions"
+          option-label="label"
+          option-value="value"
+          :disabled="!canEdit"
+          fluid
+        />
+      </SettingRow>
+
+      <SettingRow :label="t('regional.timeFormat')" :example="timeExample">
+        <SelectButton
+          v-model="form.time_format"
+          :options="clockOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          :disabled="!canEdit"
+          :aria-label="t('regional.timeFormat')"
+        />
+      </SettingRow>
+
+      <SettingRow :label="t('regional.weekStart')">
+        <SelectButton
+          v-model="form.week_start"
+          :options="weekOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          :disabled="!canEdit"
+          :aria-label="t('regional.weekStart')"
+        />
+      </SettingRow>
+    </SettingsCard>
+
+    <UnsavedBar v-if="canEdit && dirty" :saving="saving" @discard="discard" @save="save" />
+  </form>
+</template>
 <style scoped>
-.card {
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
+.note {
+  margin-bottom: 12px;
 }
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
-}
-.intro {
-  margin: 0;
-  font: var(--text-small);
-  color: var(--text-secondary);
-}
-.grid {
+.skeleton-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--space-4) var(--space-5);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 24px;
+  padding: 16px 0;
 }
-.field {
+.option {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-.field label {
-  font: var(--fw-medium) var(--fs-small) / var(--lh-small) var(--font-sans);
-}
-.field small {
-  font: var(--text-caption);
-  font-weight: var(--fw-regular);
-  color: var(--text-muted);
-}
-.footer {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
+  gap: var(--space-4);
+  width: 100%;
 }
-.audit {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.option__meta {
   font: var(--text-caption);
-  font-weight: var(--fw-regular);
   color: var(--text-muted);
 }
 </style>

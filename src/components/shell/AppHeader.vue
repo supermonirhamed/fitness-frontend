@@ -3,11 +3,11 @@
 // `context` slot; search and alerts arrive with their stories.
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import LanguageToggle from '@/components/LanguageToggle.vue'
+import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 
 const props = defineProps<{ userName: string; userRole?: string; menuItems?: MenuItem[] }>()
 const emit = defineEmits<{ menu: []; signOut: [] }>()
@@ -19,15 +19,6 @@ const items = computed<MenuItem[]>(() => [
   ...(props.menuItems?.length ? [{ separator: true }] : []),
   { label: t('common.signOut'), icon: 'pi pi-sign-out pi-dir', command: () => emit('signOut') },
 ])
-
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase()
 </script>
 
 <template>
@@ -42,7 +33,7 @@ const initials = (name: string) =>
     />
     <slot name="context" />
     <span class="app-header__spacer" />
-    <LanguageToggle />
+    <LanguageToggle :icon="null" />
     <button
       type="button"
       class="app-header__user"
@@ -50,7 +41,7 @@ const initials = (name: string) =>
       aria-controls="user-menu"
       @click="userMenu?.toggle($event)"
     >
-      <Avatar :label="initials(props.userName)" shape="circle" class="app-header__avatar" />
+      <PersonAvatar :name="props.userName" />
       <span class="app-header__user-text">
         <span class="app-header__user-name">{{ props.userName }}</span>
         <span v-if="props.userRole" class="app-header__user-role">{{ props.userRole }}</span>
@@ -90,11 +81,6 @@ const initials = (name: string) =>
 }
 .app-header__user:hover {
   background: var(--surface-hover);
-}
-.app-header__avatar {
-  background: var(--primary-subtle);
-  color: var(--primary-subtle-text);
-  font-weight: 600;
 }
 .app-header__user-text {
   display: flex;

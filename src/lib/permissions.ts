@@ -8,23 +8,54 @@ export function specialActions(actions: string[]): string[] {
 export interface SettingsPage {
   name: string
   key: string
+  icon: string
   permission: string
 }
 
 /** Settings sub-pages, in menu order, with the permission each needs. */
 export const SETTINGS_PAGES: SettingsPage[] = [
-  { name: 'tenant.settings.organization', key: 'organization', permission: 'settings.view' },
-  { name: 'tenant.settings.regional', key: 'regional', permission: 'settings.view' },
-  { name: 'tenant.settings.booking', key: 'booking', permission: 'settings.view' },
-  { name: 'tenant.settings.locations', key: 'locations', permission: 'locations.view' },
-  { name: 'tenant.settings.users', key: 'users', permission: 'staff.view' },
-  { name: 'tenant.settings.roles', key: 'roles', permission: 'roles.view' },
-  { name: 'tenant.settings.security', key: 'security', permission: 'settings.security' },
-  { name: 'tenant.settings.audit', key: 'audit', permission: 'audit.view' },
+  {
+    name: 'tenant.settings.organization',
+    key: 'organization',
+    icon: 'pi-id-card',
+    permission: 'settings.view',
+  },
+  {
+    name: 'tenant.settings.regional',
+    key: 'regional',
+    icon: 'pi-globe',
+    permission: 'settings.view',
+  },
+  {
+    name: 'tenant.settings.booking',
+    key: 'booking',
+    icon: 'pi-sliders-h',
+    permission: 'settings.view',
+  },
+  {
+    name: 'tenant.settings.security',
+    key: 'security',
+    icon: 'pi-shield',
+    permission: 'settings.security',
+  },
+  { name: 'tenant.settings.audit', key: 'audit', icon: 'pi-history', permission: 'audit.view' },
 ]
 
+/** Staff sub-pages (tabs), in order. */
+export const STAFF_PAGES: SettingsPage[] = [
+  { name: 'tenant.staff.users', key: 'users', icon: 'pi-users', permission: 'staff.view' },
+  { name: 'tenant.staff.roles', key: 'roles', icon: 'pi-key', permission: 'roles.view' },
+]
+
+export function allowedPages(
+  pages: SettingsPage[],
+  can: (permission: string) => boolean,
+): SettingsPage[] {
+  return pages.filter((page) => can(page.permission))
+}
+
 export function allowedSettingsPages(can: (permission: string) => boolean): SettingsPage[] {
-  return SETTINGS_PAGES.filter((page) => can(page.permission))
+  return allowedPages(SETTINGS_PAGES, can)
 }
 
 export interface PermissionDiff {

@@ -2,12 +2,18 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
-import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import Textarea from 'primevue/textarea'
-import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import FileUploadBox from '@/components/patterns/FileUploadBox.vue'
+import NoPermission from '@/components/patterns/NoPermission.vue'
+import SettingRow from '@/components/patterns/SettingRow.vue'
+import SettingsCard from '@/components/patterns/SettingsCard.vue'
+import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
 import { tenantApi, type OrganizationProfile } from '@/api/tenant'
 import { statusOf, validationErrors } from '@/lib/http'
 import { useOrganization } from '@/stores/organization'
@@ -29,11 +35,14 @@ const errors = ref<Record<string, string>>({})
 const saving = ref(false)
 const logoBusy = ref(false)
 const logoError = ref<string | null>(null)
-const fileInput = ref<HTMLInputElement>()
 const canEdit = computed(() => auth.can('settings.update'))
 const dirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(saved.value))
 
 const FIELDS = ['name', 'legal_name', 'email', 'phone', 'address', 'website'] as const
+const CONTACT = [
+  { key: 'phone', icon: 'pi-phone', type: 'tel' },
+  { key: 'email', icon: 'pi-envelope', type: 'email' },
+] as const
 
 function pick(p: OrganizationProfile): OrganizationProfile {
   return Object.fromEntries(
@@ -76,10 +85,12 @@ async function save() {
   }
 }
 
-async function onFile(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  ;(event.target as HTMLInputElement).value = ''
-  if (!file) return
+function discard() {
+  form.value = saved.value ? { ...saved.value } : null
+  errors.value = {}
+}
+
+async function onFile(file: File) {
   logoError.value = null
   if (file.size > MAX_BYTES) {
     logoError.value = t('orgProfile.logoTooBig')
@@ -114,251 +125,149 @@ async function removeLogo() {
 </script>
 
 <template>
-  <div v-if="state === 'loading'" class="stack" aria-busy="true" :aria-label="t('common.loading')">
-    <div class="card"><Skeleton height="96px" /></div>
-    <div class="card"><Skeleton v-for="n in 4" :key="n" height="40px" /></div>
-  </div>
+  <SettingsCard v-if="state === 'loading'" aria-busy="true" :aria-label="t('common.loading')">
+    <div v-for="n in 5" :key="n" class="skeleton-row">
+      <Skeleton width="40%" /><Skeleton height="36px" />
+    </div>
+  </SettingsCard>
 
-  <section v-else-if="state === 'forbidden'" class="card">
-    <EmptyState
-      icon="pi-lock"
-      :title="t('permissions.forbidden')"
-      :body="t('permissions.forbiddenHint')"
-    />
-  </section>
+  <SettingsCard v-else-if="state === 'forbidden'"><NoPermission /></SettingsCard>
 
-  <section v-else-if="state === 'error' || !form" class="card">
-    <EmptyState icon="pi-exclamation-triangle" :title="t('orgProfile.loadError')">
-      <Button
-        severity="secondary"
-        variant="outlined"
-        icon="pi pi-replay pi-dir"
-        :label="t('common.retry')"
-        @click="load"
-      />
-    </EmptyState>
-  </section>
+  <SettingsCard v-else-if="state === 'error' || !form">
+    <ErrorState :title="t('orgProfile.loadError')" @retry="load" />
+  </SettingsCard>
 
-  <div v-else class="stack">
-    <section class="card">
-      <h2>{{ t('orgProfile.logo') }}</h2>
-      <div class="logo">
-        <div class="logo__preview">
-          <img v-if="logoUrl" :src="logoUrl" :alt="t('orgProfile.logoAlt', { name: form.name })" />
-          <i v-else class="pi pi-image" aria-hidden="true" />
-        </div>
-        <div class="logo__text">
-          <p>{{ t('orgProfile.logoHint') }}</p>
-          <div v-if="canEdit" class="logo__actions">
-            <input ref="fileInput" type="file" :accept="ACCEPT" hidden @change="onFile" />
-            <Button
-              icon="pi pi-upload"
-              :label="logoUrl ? t('orgProfile.replaceLogo') : t('orgProfile.uploadLogo')"
-              severity="secondary"
-              variant="outlined"
-              size="small"
-              :loading="logoBusy"
-              @click="fileInput?.click()"
-            />
-            <Button
-              v-if="logoUrl"
-              icon="pi pi-trash"
-              :label="t('orgProfile.removeLogo')"
-              severity="danger"
-              variant="text"
-              size="small"
-              :disabled="logoBusy"
-              @click="removeLogo"
-            />
-          </div>
-          <small v-if="logoError" class="field__error" role="alert">{{ logoError }}</small>
-        </div>
-      </div>
-    </section>
-
-    <form class="card" @submit.prevent="save">
-      <h2>{{ t('orgProfile.details') }}</h2>
-      <Message v-if="!canEdit" severity="secondary" :closable="false">{{
-        t('regional.readOnly')
-      }}</Message>
-      <Message v-if="errors.form" severity="error" :closable="false" role="alert">{{
-        errors.form
-      }}</Message>
-      <div class="grid">
-        <div
-          v-for="field in FIELDS"
-          :key="field"
-          :class="['field', { 'field--wide': field === 'address' }]"
-        >
-          <label :for="`org-${field}`">
-            {{ t(`orgProfile.fields.${field}`)
-            }}<span v-if="field === 'name'" aria-hidden="true"> *</span>
-          </label>
-          <Textarea
-            v-if="field === 'address'"
-            :id="`org-${field}`"
-            v-model="form[field] as string"
-            rows="2"
-            auto-resize
-            :disabled="!canEdit"
-            :invalid="!!errors[field]"
-            fluid
-          />
-          <InputText
-            v-else
-            :id="`org-${field}`"
-            v-model="form[field] as string"
-            :dir="['email', 'phone', 'website'].includes(field) ? 'ltr' : undefined"
-            :type="field === 'email' ? 'email' : field === 'website' ? 'url' : 'text'"
-            :disabled="!canEdit"
-            :invalid="!!errors[field]"
-            fluid
-          />
-          <small v-if="errors[field]" class="field__error">{{ errors[field] }}</small>
-          <small v-else-if="field === 'name'">{{ t('orgProfile.nameHint') }}</small>
-        </div>
-      </div>
-      <div v-if="canEdit" class="footer">
-        <span class="audit"
-          ><i class="pi pi-shield" aria-hidden="true" />{{ t('override.auditNote') }}</span
-        >
-        <Button
-          type="submit"
-          :label="t('permissions.save')"
-          :disabled="!dirty || !form.name"
-          :loading="saving"
+  <form v-else @submit.prevent="save">
+    <Message v-if="!canEdit" severity="secondary" :closable="false" class="note">{{
+      t('regional.readOnly')
+    }}</Message>
+    <Message v-if="errors.form" severity="error" :closable="false" role="alert" class="note">{{
+      errors.form
+    }}</Message>
+    <SettingsCard>
+      <SettingRow :label="t('orgProfile.logo')" :help="t('orgProfile.logoHelp')">
+        <FileUploadBox
+          :preview-url="logoUrl"
+          :alt="t('orgProfile.logoAlt', { name: form.name })"
+          :label="t('orgProfile.uploadLogo')"
+          :hint="t('orgProfile.logoFileHint')"
+          :error="logoError"
+          :accept="ACCEPT"
+          :busy="logoBusy"
+          :disabled="!canEdit"
+          @select="onFile"
+          @remove="removeLogo"
         />
-      </div>
-    </form>
+      </SettingRow>
 
-    <RouterLink :to="{ name: 'tenant.settings.regional' }" class="card card--link">
-      <i class="pi pi-globe" aria-hidden="true" />
-      <span>
-        <strong>{{ t('orgProfile.regionalTitle') }}</strong>
-        <small>{{ t('orgProfile.regionalHint') }}</small>
-      </span>
-      <i class="pi pi-angle-right pi-dir" aria-hidden="true" />
-    </RouterLink>
-  </div>
+      <SettingRow
+        :label="t('orgProfile.fields.name')"
+        :help="t('orgProfile.nameHint')"
+        label-for="org-name"
+      >
+        <InputText
+          id="org-name"
+          v-model="form.name"
+          :disabled="!canEdit"
+          :invalid="!!errors.name"
+          aria-required="true"
+          fluid
+        />
+        <small v-if="errors.name" class="field__error">{{ errors.name }}</small>
+      </SettingRow>
+
+      <SettingRow
+        :label="t('orgProfile.fields.legal_name')"
+        :help="t('orgProfile.legalHelp')"
+        label-for="org-legal_name"
+      >
+        <InputText
+          id="org-legal_name"
+          v-model="form.legal_name as string"
+          :disabled="!canEdit"
+          :invalid="!!errors.legal_name"
+          fluid
+        />
+        <small v-if="errors.legal_name" class="field__error">{{ errors.legal_name }}</small>
+      </SettingRow>
+
+      <SettingRow :label="t('orgProfile.contact')">
+        <template v-for="field in CONTACT" :key="field.key">
+          <IconField>
+            <InputIcon :class="['pi', field.icon]" />
+            <InputText
+              :id="`org-${field.key}`"
+              v-model="form[field.key] as string"
+              dir="ltr"
+              :type="field.type"
+              :placeholder="t(`orgProfile.fields.${field.key}`)"
+              :aria-label="t(`orgProfile.fields.${field.key}`)"
+              :disabled="!canEdit"
+              :invalid="!!errors[field.key]"
+              fluid
+            />
+          </IconField>
+          <small v-if="errors[field.key]" class="field__error">{{ errors[field.key] }}</small>
+        </template>
+      </SettingRow>
+
+      <SettingRow :label="t('orgProfile.fields.website')" label-for="org-website">
+        <IconField>
+          <InputIcon class="pi pi-link" />
+          <InputText
+            id="org-website"
+            v-model="form!.website as string"
+            dir="ltr"
+            type="url"
+            placeholder="https://"
+            :disabled="!canEdit"
+            :invalid="!!errors.website"
+            fluid
+          />
+        </IconField>
+        <small v-if="errors.website" class="field__error">{{ errors.website }}</small>
+      </SettingRow>
+
+      <SettingRow
+        :label="t('orgProfile.fields.address')"
+        :help="t('orgProfile.addressHelp')"
+        label-for="org-address"
+      >
+        <Textarea
+          id="org-address"
+          v-model="form!.address as string"
+          rows="2"
+          auto-resize
+          :disabled="!canEdit"
+          :invalid="!!errors.address"
+          fluid
+        />
+        <small v-if="errors.address" class="field__error">{{ errors.address }}</small>
+      </SettingRow>
+    </SettingsCard>
+
+    <UnsavedBar
+      v-if="canEdit && dirty"
+      :saving="saving"
+      :save-disabled="!form!.name"
+      @discard="discard"
+      @save="save"
+    />
+  </form>
 </template>
 
 <style scoped>
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+.note {
+  margin-bottom: 12px;
 }
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-}
-.card h2 {
-  margin: 0;
-  font: var(--text-h3);
-}
-.logo {
-  display: flex;
-  gap: var(--space-4);
-  align-items: center;
-  flex-wrap: wrap;
-}
-.logo__preview {
-  width: 120px;
-  height: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-card);
-  background: var(--surface-sunken);
-  color: var(--text-muted);
-}
-.logo__preview img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-.logo__text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  flex: 1;
-  min-width: 220px;
-}
-.logo__text p {
-  margin: 0;
-  font: var(--text-small);
-  color: var(--text-secondary);
-}
-.logo__actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.grid {
+.skeleton-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--space-4) var(--space-5);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 24px;
+  padding: 16px 0;
 }
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field--wide {
-  grid-column: 1 / -1;
-}
-.field label {
-  font: var(--fw-medium) var(--fs-small) / var(--lh-small) var(--font-sans);
-}
-.field small {
-  font: var(--text-caption);
-  font-weight: var(--fw-regular);
-  color: var(--text-muted);
-}
-.field small.field__error,
 .field__error {
+  font: var(--text-caption);
   color: var(--sev-danger-fg);
-  font: var(--text-caption);
-}
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-}
-.audit {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font: var(--text-caption);
-  color: var(--text-muted);
-}
-.card--link {
-  flex-direction: row;
-  align-items: center;
-  text-decoration: none;
-  color: inherit;
-}
-.card--link:hover {
-  border-color: var(--border-strong);
-}
-.card--link span {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.card--link small {
-  font: var(--text-small);
-  color: var(--text-secondary);
 }
 </style>

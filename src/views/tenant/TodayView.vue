@@ -49,7 +49,7 @@ onMounted(async () => {
         <Button
           icon="pi pi-plus"
           :label="t('locationForm.firstBranch')"
-          @click="$router.push({ name: 'tenant.settings.locations', query: { new: '1' } })"
+          @click="$router.push({ name: 'tenant.branches', query: { new: '1' } })"
         />
       </EmptyState>
     </section>

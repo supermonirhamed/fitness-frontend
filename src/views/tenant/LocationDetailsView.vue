@@ -214,7 +214,7 @@ async function refreshStats() {
 
 <template>
   <div class="page">
-    <RouterLink :to="{ name: 'tenant.settings.locations' }" class="back">
+    <RouterLink :to="{ name: 'tenant.branches' }" class="back">
       <i class="pi pi-arrow-left pi-dir" aria-hidden="true" />{{ t('locationDetails.back') }}
     </RouterLink>
 
@@ -417,11 +417,9 @@ async function refreshStats() {
               </DataTable>
               <p class="note">
                 {{ t('locationDetails.allLocations', staff.all_locations_count) }}
-                <RouterLink
-                  v-if="auth.can('staff.update')"
-                  :to="{ name: 'tenant.settings.users' }"
-                  >{{ t('locationDetails.manageAccess') }}</RouterLink
-                >
+                <RouterLink v-if="auth.can('staff.update')" :to="{ name: 'tenant.staff.users' }">{{
+                  t('locationDetails.manageAccess')
+                }}</RouterLink>
               </p>
             </template>
           </TabPanel>

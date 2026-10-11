@@ -6,6 +6,8 @@ import { useI18n } from 'vue-i18n'
 import InputNumber from 'primevue/inputnumber'
 import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
+import SettingRow from '@/components/patterns/SettingRow.vue'
+import SettingsCard from '@/components/patterns/SettingsCard.vue'
 import type {
   BookingPolicy,
   BookingPolicyOptions,
@@ -99,27 +101,31 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
 </script>
 
 <template>
-  <div class="groups">
-    <fieldset v-for="(fields, group) in POLICY_GROUPS" :key="group" class="group">
-      <legend>{{ t(`bookingPolicy.groups.${group}`) }}</legend>
+  <SettingsCard>
+    <template v-for="(fields, group) in POLICY_GROUPS" :key="group">
+      <div class="settings-group" role="heading" aria-level="3">
+        {{ t(`bookingPolicy.groups.${group}`) }}
+      </div>
 
-      <div v-for="field in fields" :key="field" class="row">
-        <div class="head">
-          <label :id="`policy-${field}-label`" :for="`policy-${field}`">{{
-            t(`bookingPolicy.fields.${field}`)
-          }}</label>
-          <label v-if="inherited" class="override">
-            <ToggleSwitch
-              :model-value="overriding(field)"
-              :disabled="disabled"
-              :aria-label="
-                t('bookingPolicy.overrideField', { field: t(`bookingPolicy.fields.${field}`) })
-              "
-              @update:model-value="toggle(field, $event)"
-            />
-            <span>{{ t('bookingPolicy.override') }}</span>
-          </label>
-        </div>
+      <SettingRow
+        v-for="field in fields"
+        :key="field"
+        :label="t(`bookingPolicy.fields.${field}`)"
+        :help="field === 'waitlist_mode' ? example(field) : t(`bookingPolicy.help.${field}`)"
+        :example="field === 'waitlist_mode' ? undefined : example(field)"
+        :label-for="NUMBER_LIMITS[field] && overriding(field) ? `policy-${field}` : undefined"
+      >
+        <label v-if="inherited" class="override">
+          <ToggleSwitch
+            :model-value="overriding(field)"
+            :disabled="disabled"
+            :aria-label="
+              t('bookingPolicy.overrideField', { field: t(`bookingPolicy.fields.${field}`) })
+            "
+            @update:model-value="toggle(field, $event)"
+          />
+          <span>{{ t('bookingPolicy.override') }}</span>
+        </label>
 
         <div v-if="!overriding(field)" class="inherited">
           <span class="value">{{ describe(field, inherited!) }}</span>
@@ -135,11 +141,12 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
             :input-id="`policy-${field}`"
             :min="0"
             :max="NUMBER_LIMITS[field]!.max"
+            :step="NUMBER_LIMITS[field]!.unit === 'minutes' ? 15 : 1"
             :suffix="` ${t(`bookingPolicy.unitNames.${NUMBER_LIMITS[field]!.unit}`)}`"
             :disabled="disabled"
             :invalid="!!errorOf(field)"
             show-buttons
-            fluid
+            class="number"
             @update:model-value="setValue(field, $event)"
           />
           <SelectButton
@@ -151,13 +158,11 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
             :allow-empty="false"
             :disabled="disabled"
             :invalid="!!errorOf(field)"
-            :aria-labelledby="`policy-${field}-label`"
-            class="choice"
+            :aria-label="t(`bookingPolicy.fields.${field}`)"
             @update:model-value="setValue(field, $event)"
           />
 
           <div v-if="isPenalty(field) && model[field] === 'fixed_fee'" class="fee">
-            <label :for="`policy-${FEE_OF[field]}`">{{ t('bookingPolicy.feeAmount') }}</label>
             <InputNumber
               :model-value="model[FEE_OF[field]]"
               :input-id="`policy-${FEE_OF[field]}`"
@@ -168,7 +173,8 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
               :max-fraction-digits="3"
               :disabled="disabled"
               :invalid="!!errorOf(FEE_OF[field])"
-              fluid
+              :aria-label="t('bookingPolicy.feeAmount')"
+              class="number"
               @update:model-value="setValue(FEE_OF[field], $event)"
             />
             <small v-if="errorOf(FEE_OF[field])" class="error">{{
@@ -177,86 +183,41 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
           </div>
 
           <small v-if="errorOf(field)" class="error">{{ t('bookingPolicy.invalid') }}</small>
-          <small v-else class="hint">{{ example(field) }}</small>
         </template>
-      </div>
-    </fieldset>
-  </div>
+      </SettingRow>
+    </template>
+  </SettingsCard>
 </template>
 
 <style scoped>
-.groups {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: var(--space-4) var(--space-5);
+.number {
+  max-width: 220px;
 }
-.group {
+.fee {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  margin: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  min-width: 0;
-}
-legend {
-  padding-inline: var(--space-2);
-  font: var(--fw-semibold) var(--fs-small) / var(--lh-small) var(--font-sans);
-}
-.row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-.head > label:first-child {
-  font: var(--fw-medium) var(--fs-small) / var(--lh-small) var(--font-sans);
+  gap: 4px;
 }
 .override {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  font: var(--text-caption);
+  gap: 8px;
+  font: var(--text-small);
   color: var(--text-secondary);
   cursor: pointer;
 }
 .inherited {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  padding: var(--space-2) var(--space-3);
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
   border-radius: var(--radius-input);
   background: var(--surface-sunken);
 }
 .inherited .value {
-  font-weight: var(--fw-medium);
+  font: 500 14px/1.4 var(--font-sans);
 }
 .inherited .source {
-  font: var(--text-caption);
-  color: var(--text-muted);
-}
-.choice {
-  flex-wrap: wrap;
-}
-.fee {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.fee label {
-  font: var(--text-caption);
-  color: var(--text-secondary);
-}
-.hint {
   font: var(--text-caption);
   color: var(--text-muted);
 }

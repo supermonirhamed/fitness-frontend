@@ -1,10 +1,10 @@
 import type { BookingPolicy, BookingPolicyOverrides, Penalty } from '@/api/tenant'
 
 /** The overridable settings (US-01.02), grouped as on screen. A penalty carries its fee. */
+// Groups as in the design (OrgSettings.jsx): booking window, cancellations & no-shows, waitlist.
 export const POLICY_GROUPS = {
   booking: ['booking_opens_days', 'booking_closes_minutes'],
-  cancellation: ['cancellation_window_hours', 'late_cancel_penalty'],
-  noShow: ['no_show_penalty'],
+  cancellation: ['cancellation_window_hours', 'late_cancel_penalty', 'no_show_penalty'],
   waitlist: ['waitlist_mode', 'waitlist_closes_minutes'],
 } as const
 

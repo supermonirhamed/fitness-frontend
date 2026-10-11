@@ -2,10 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
-import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
-import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import NoPermission from '@/components/patterns/NoPermission.vue'
+import SettingsCard from '@/components/patterns/SettingsCard.vue'
+import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
 import BookingPolicyFields from '@/components/policies/BookingPolicyFields.vue'
 import {
   tenantApi,
@@ -44,6 +46,12 @@ async function load() {
 }
 onMounted(load)
 
+function discard() {
+  form.value = saved.value ? { ...saved.value } : null
+  errors.value = {}
+  error.value = null
+}
+
 async function save() {
   if (!form.value) return
   saving.value = true
@@ -66,91 +74,41 @@ async function save() {
 </script>
 
 <template>
-  <section class="card">
-    <div v-if="state === 'loading'" class="body" aria-busy="true" :aria-label="t('common.loading')">
-      <Skeleton v-for="n in 4" :key="n" height="120px" />
+  <SettingsCard v-if="state === 'loading'" aria-busy="true" :aria-label="t('common.loading')">
+    <div v-for="n in 6" :key="n" class="skeleton-row">
+      <Skeleton width="40%" /><Skeleton height="36px" />
     </div>
+  </SettingsCard>
 
-    <EmptyState
-      v-else-if="state === 'forbidden'"
-      icon="pi-lock"
-      :title="t('permissions.forbidden')"
-      :body="t('permissions.forbiddenHint')"
-    />
+  <SettingsCard v-else-if="state === 'forbidden'"><NoPermission /></SettingsCard>
 
-    <EmptyState
-      v-else-if="state === 'error' || !form"
-      icon="pi-exclamation-triangle"
-      :title="t('bookingPolicy.loadError')"
-    >
-      <Button
-        severity="secondary"
-        variant="outlined"
-        icon="pi pi-replay pi-dir"
-        :label="t('common.retry')"
-        @click="load"
-      />
-    </EmptyState>
+  <SettingsCard v-else-if="state === 'error' || !form">
+    <ErrorState :title="t('bookingPolicy.loadError')" @retry="load" />
+  </SettingsCard>
 
-    <form v-else class="body" @submit.prevent="save">
-      <p class="intro">{{ t('bookingPolicy.intro') }}</p>
-      <Message severity="info" :closable="false" icon="pi pi-info-circle">{{
-        t('bookingPolicy.inheritance')
-      }}</Message>
-      <Message v-if="!canEdit" severity="secondary" :closable="false">{{
-        t('regional.readOnly')
-      }}</Message>
+  <form v-else class="stack" @submit.prevent="save">
+    <Message severity="info" :closable="false">{{ t('bookingPolicy.inheritance') }}</Message>
+    <Message v-if="!canEdit" severity="secondary" :closable="false">{{
+      t('regional.readOnly')
+    }}</Message>
+    <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
 
-      <BookingPolicyFields
-        v-model="form"
-        :options="options"
-        :disabled="!canEdit"
-        :errors="errors"
-      />
+    <BookingPolicyFields v-model="form" :options="options" :disabled="!canEdit" :errors="errors" />
 
-      <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
-      <div v-if="canEdit" class="footer">
-        <span class="audit"
-          ><i class="pi pi-shield" aria-hidden="true" />{{ t('override.auditNote') }}</span
-        >
-        <Button type="submit" :label="t('permissions.save')" :disabled="!dirty" :loading="saving" />
-      </div>
-    </form>
-  </section>
+    <UnsavedBar v-if="canEdit && dirty" :saving="saving" @discard="discard" @save="save" />
+  </form>
 </template>
 
 <style scoped>
-.card {
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-}
-.body {
+.stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
+  gap: 12px;
 }
-.intro {
-  margin: 0;
-  font: var(--text-small);
-  color: var(--text-secondary);
-}
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-}
-.audit {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font: var(--text-caption);
-  font-weight: var(--fw-regular);
-  color: var(--text-muted);
+.skeleton-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 24px;
+  padding: 16px 0;
 }
 </style>

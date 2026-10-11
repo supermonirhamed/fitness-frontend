@@ -4,7 +4,7 @@ import { usePlatformAuth } from '@/stores/platformAuth'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
 import { onUnauthenticated } from '@/lib/http'
-import { allowedSettingsPages } from '@/lib/permissions'
+import { allowedPages, SETTINGS_PAGES, STAFF_PAGES } from '@/lib/permissions'
 
 const context = resolveAppContext(window.location.hostname)
 
@@ -97,7 +97,14 @@ const tenantRoutes: RouteRecordRaw[] = [
         props: (route) => ({ id: Number(route.params.id) }),
       },
       {
-        path: 'locations/:id(\\d+)',
+        path: 'branches',
+        name: 'tenant.branches',
+        component: () => import('@/views/tenant/settings/LocationsView.vue'),
+        meta: { permission: 'locations.view' },
+      },
+      { path: 'locations/:id(\\d+)', redirect: (to) => `/branches/${to.params.id}` },
+      {
+        path: 'branches/:id(\\d+)',
         name: 'tenant.locations.show',
         component: () => import('@/views/tenant/LocationDetailsView.vue'),
         meta: { permission: 'locations.view' },
@@ -126,24 +133,10 @@ const tenantRoutes: RouteRecordRaw[] = [
             component: () => import('@/views/tenant/settings/BookingPolicyView.vue'),
             meta: { permission: 'settings.view' },
           },
-          {
-            path: 'locations',
-            name: 'tenant.settings.locations',
-            component: () => import('@/views/tenant/settings/LocationsView.vue'),
-            meta: { permission: 'locations.view' },
-          },
-          {
-            path: 'users',
-            name: 'tenant.settings.users',
-            component: () => import('@/views/tenant/settings/UsersAccessView.vue'),
-            meta: { permission: 'staff.view' },
-          },
-          {
-            path: 'roles',
-            name: 'tenant.settings.roles',
-            component: () => import('@/views/tenant/settings/RolesView.vue'),
-            meta: { permission: 'roles.view' },
-          },
+          // Moved out of Settings with the design's navigation.
+          { path: 'locations', redirect: { name: 'tenant.branches' } },
+          { path: 'users', redirect: { name: 'tenant.staff.users' } },
+          { path: 'roles', redirect: { name: 'tenant.staff.roles' } },
           {
             path: 'security',
             name: 'tenant.settings.security',
@@ -155,6 +148,25 @@ const tenantRoutes: RouteRecordRaw[] = [
             name: 'tenant.settings.audit',
             component: () => import('@/views/tenant/settings/AuditLogView.vue'),
             meta: { permission: 'audit.view' },
+          },
+        ],
+      },
+      {
+        path: 'staff',
+        name: 'tenant.staff',
+        component: () => import('@/views/tenant/staff/StaffLayout.vue'),
+        children: [
+          {
+            path: 'users',
+            name: 'tenant.staff.users',
+            component: () => import('@/views/tenant/settings/UsersAccessView.vue'),
+            meta: { permission: 'staff.view' },
+          },
+          {
+            path: 'roles',
+            name: 'tenant.staff.roles',
+            component: () => import('@/views/tenant/settings/RolesView.vue'),
+            meta: { permission: 'roles.view' },
           },
         ],
       },
@@ -202,8 +214,9 @@ if (context.kind === 'tenant') {
       return { name: 'tenant.security', query: { required: '1' } }
 
     // Pages the role can't open (US-00.07). Hiding links is not enough: the API refuses too.
-    if (to.name === 'tenant.settings') {
-      const first = allowedSettingsPages((p) => auth.can(p))[0]
+    if (to.name === 'tenant.settings' || to.name === 'tenant.staff') {
+      const pages = to.name === 'tenant.settings' ? SETTINGS_PAGES : STAFF_PAGES
+      const first = allowedPages(pages, (p) => auth.can(p))[0]
       return first ? { name: first.name } : { name: 'tenant.forbidden' }
     }
     const missing = to.matched.find(

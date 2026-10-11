@@ -5,6 +5,7 @@ import { setLocale } from '@/i18n'
 import { tenantApi } from '@/api/tenant'
 import { useStaffAuth } from '@/stores/staffAuth'
 
+withDefaults(defineProps<{ icon?: string | null }>(), { icon: 'pi pi-globe' })
 const { t, locale } = useI18n()
 const auth = useStaffAuth()
 
@@ -25,7 +26,7 @@ async function toggle() {
   <Button
     variant="text"
     severity="secondary"
-    icon="pi pi-globe"
+    :icon="icon ?? undefined"
     :label="t('common.language')"
     @click="toggle"
   />

@@ -8,6 +8,8 @@ import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import NoPermission from '@/components/patterns/NoPermission.vue'
 import {
   tenantApi,
   type AuditEntry,
@@ -152,7 +154,7 @@ function summary(entry: AuditEntry): string {
 </script>
 
 <template>
-  <section class="card">
+  <section class="list">
     <div class="filters" role="search">
       <Select
         v-model="actor"
@@ -209,35 +211,28 @@ function summary(entry: AuditEntry): string {
 
     <div
       v-if="state === 'loading'"
-      class="skeleton"
+      class="skeleton panel"
       aria-busy="true"
       :aria-label="t('common.loading')"
     >
       <Skeleton v-for="n in 6" :key="n" height="40px" />
     </div>
 
-    <EmptyState
-      v-else-if="state === 'forbidden'"
-      icon="pi-lock"
-      :title="t('permissions.forbidden')"
-      :body="t('permissions.forbiddenHint')"
+    <NoPermission v-else-if="state === 'forbidden'" class="panel" />
+
+    <ErrorState
+      v-else-if="state === 'error'"
+      class="panel"
+      :title="t('audit.loadError')"
+      @retry="load"
     />
 
     <EmptyState
-      v-else-if="state === 'error'"
-      icon="pi-exclamation-triangle"
-      :title="t('audit.loadError')"
+      v-else-if="total === 0 && filtered"
+      class="panel"
+      icon="pi-search"
+      :title="t('audit.noResults')"
     >
-      <Button
-        severity="secondary"
-        variant="outlined"
-        icon="pi pi-replay pi-dir"
-        :label="t('common.retry')"
-        @click="load"
-      />
-    </EmptyState>
-
-    <EmptyState v-else-if="total === 0 && filtered" icon="pi-search" :title="t('audit.noResults')">
       <Button
         severity="secondary"
         variant="outlined"
@@ -247,6 +242,7 @@ function summary(entry: AuditEntry): string {
     </EmptyState>
 
     <EmptyState
+      class="panel"
       v-else-if="total === 0"
       icon="pi-history"
       :title="t('audit.empty')"
@@ -353,19 +349,21 @@ function summary(entry: AuditEntry): string {
 </template>
 
 <style scoped>
-.card {
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.panel {
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
-  overflow: hidden;
 }
 .filters {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
   align-items: center;
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
 }
 .filters__item {
   width: 200px;

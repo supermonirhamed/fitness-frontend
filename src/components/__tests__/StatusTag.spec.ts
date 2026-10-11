@@ -13,7 +13,8 @@ describe('StatusTag', () => {
     expect(render('Active').find('.p-tag-success').text()).toBe('Active')
     expect(render('Provisioning').find('.p-tag-info').exists()).toBe(true)
     expect(render('Failed').find('.p-tag-danger').exists()).toBe(true)
-    expect(render('Suspended').find('.p-tag-warn').exists()).toBe(true)
+    expect(render('Suspended').find('.p-tag-danger').exists()).toBe(true)
+    expect(render('Draft').find('.p-tag-secondary').exists()).toBe(true)
   })
 
   it('translates labels and switches direction', () => {
