@@ -6,7 +6,7 @@
 // "Weekly" turns it into a series (US-03.03): a preview lists each date with its flags, and
 // flagged dates can be skipped one by one before the sessions are created.
 // Editing keeps the service and branch; a series occurrence asks what the change applies to.
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
@@ -50,6 +50,11 @@ export interface SessionPrefill {
   coachId?: number | null
   date?: string
   start?: string
+  /** Duplicate (US-03.08): the same service, assistants, length and capacity. */
+  serviceId?: number | null
+  assistantIds?: number[]
+  duration?: number
+  capacity?: number
 }
 
 const props = defineProps<{ prefill: SessionPrefill; session?: CalendarSession | null }>()
@@ -190,6 +195,11 @@ watch(visible, async (open) => {
   const date = props.prefill.date ?? todayIn(branch.value?.timezone ?? 'Asia/Riyadh')
   form.date = new Date(`${date}T12:00:00`)
   form.start = props.prefill.start ?? '18:00'
+  if (props.prefill.serviceId) {
+    // After the reset above has been seen, so the service's options load even if it is the same.
+    await nextTick()
+    form.serviceId = props.prefill.serviceId
+  }
   if (!services.value.length) {
     services.value = (await tenantApi.services.list({}).catch(() => [])).filter(
       (s) => s.status !== 'Archived' && s.activity_type !== 'Open Access',
@@ -223,6 +233,14 @@ watch(
       loaded.coaches.find((c) => c.id === props.prefill.coachId)?.id ??
       loaded.coaches[0]?.id ??
       null
+    if (serviceId === props.prefill.serviceId) {
+      if (props.prefill.duration) form.duration = props.prefill.duration
+      if (props.prefill.capacity)
+        form.capacity = Math.min(props.prefill.capacity, pick?.capacity ?? Infinity)
+      form.assistantIds = (props.prefill.assistantIds ?? []).filter((id) =>
+        loaded.coaches.some((c) => c.id === id && c.id !== form.coachId),
+      )
+    }
   },
 )
 watch(

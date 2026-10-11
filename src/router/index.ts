@@ -79,6 +79,12 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'schedule.update' },
       },
       {
+        path: 'calendar/sessions/:id(\\d+)',
+        name: 'tenant.session',
+        component: () => import('@/views/tenant/schedule/SessionDetailsView.vue'),
+        meta: { permission: 'schedule.view' },
+      },
+      {
         path: 'account/profile',
         name: 'tenant.profile',
         component: () => import('@/views/tenant/account/ProfileView.vue'),

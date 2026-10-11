@@ -474,6 +474,31 @@ export interface SeriesPreviewItem {
   conflicts: SessionConflictItem[]
 }
 
+/** The session details page (US-03.08). Roster and waitlist fill with EP-04. */
+export interface SessionDetails extends CalendarSession {
+  series: {
+    id: number
+    weekdays: number[]
+    every_weeks: number
+    start_time: string
+    ends_on: string | null
+    rolling: boolean
+  } | null
+  policy: BookingPolicy
+  issues: SessionConflictItem[]
+  created_by: string | null
+  created_at: string | null
+  roster: unknown[]
+  waitlist_entries: unknown[]
+  activity: {
+    action: string
+    user: string | null
+    at: string | null
+    changed: string[]
+    reason: string | null
+  }[]
+}
+
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
 
 /** A session with the conflicts it has now (Conflict Center, US-03.07). */
@@ -922,6 +947,9 @@ export const tenantApi = {
     },
     async update(id: number, input: SessionInput & { scope?: 'one' }): Promise<CalendarSession> {
       return (await http.put(`/api/sessions/${id}`, input)).data.data
+    },
+    async get(id: number): Promise<SessionDetails> {
+      return (await http.get(`/api/sessions/${id}`)).data.data
     },
     async cancel(
       id: number,

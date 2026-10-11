@@ -931,8 +931,18 @@ const zoneOf = (s: CalendarSession) =>
         <div v-if="selected.status === 'Completed'" class="pop__note">
           <i class="pi pi-lock" aria-hidden="true" />{{ t('calendar.pastReadOnly') }}
         </div>
-        <div v-if="canEdit(selected)" class="pop__actions">
+        <div class="pop__actions">
           <Button
+            :label="t('calendar.open')"
+            icon="pi pi-arrow-right pi-dir"
+            icon-pos="right"
+            severity="secondary"
+            variant="text"
+            size="small"
+            @click="router.push({ name: 'tenant.session', params: { id: selected.id } })"
+          />
+          <Button
+            v-if="canEdit(selected)"
             :label="t('calendar.edit')"
             icon="pi pi-pencil"
             severity="secondary"

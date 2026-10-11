@@ -224,7 +224,11 @@ function onCancelled(session: CalendarSession) {
               :style="{ background: item.session.service.color ?? 'var(--svc-1)' }"
               aria-hidden="true"
             />
-            <span class="item__title">{{ item.session.service.name }}</span>
+            <RouterLink
+              class="item__title"
+              :to="{ name: 'tenant.session', params: { id: item.session.id } }"
+              >{{ item.session.service.name }}</RouterLink
+            >
             <StatusTag :status="item.session.status" size="sm" />
           </div>
           <div class="item__meta">
@@ -369,6 +373,12 @@ function onCancelled(session: CalendarSession) {
 }
 .item__title {
   font: 600 15px/1.4 var(--font-sans);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.item__title:hover {
+  color: var(--text-link);
+  text-decoration: underline;
 }
 .swatch {
   width: 10px;
