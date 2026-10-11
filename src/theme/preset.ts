@@ -77,5 +77,24 @@ export const StudioPreset = definePreset(Aura, {
     card: { root: { borderRadius: '10px', shadow: 'none' } },
     dialog: { root: { borderRadius: '12px' } },
     tag: { root: { borderRadius: '4px', fontWeight: '600' } },
+    // Design forms/ToggleSwitch.jsx: 40×22 track, 18px white knob 2px from the edge, no border.
+    toggleswitch: {
+      root: {
+        width: '40px',
+        height: '22px',
+        gap: '2px',
+        borderWidth: '0',
+        borderRadius: '999px',
+        background: 'light-dark({surface.300}, {surface.600})',
+        hoverBackground: 'light-dark({surface.400}, {surface.500})',
+      },
+      handle: {
+        size: '18px',
+        background: '#ffffff',
+        hoverBackground: '#ffffff',
+        checkedBackground: '#ffffff',
+        checkedHoverBackground: '#ffffff',
+      },
+    },
   },
 })

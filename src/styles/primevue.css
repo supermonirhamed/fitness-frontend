@@ -289,22 +289,8 @@
   justify-content: center;
 }
 
-/* ToggleSwitch — components/forms/ToggleSwitch.jsx: 40×22 track, 18px knob */
-.p-toggleswitch {
-  width: 40px;
-  height: 22px;
-}
-.p-toggleswitch .p-toggleswitch-slider {
-  background: var(--border-strong);
-  border: 0;
-}
-.p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
-  background: var(--primary);
-}
-.p-toggleswitch .p-toggleswitch-handle {
-  width: 18px;
-  height: 18px;
-  background: #fff;
+/* ToggleSwitch: sizes live in the theme preset (toggleswitch tokens) so the knob position stays right. */
+.p-toggleswitch-handle {
   box-shadow: var(--shadow-1);
 }
 
