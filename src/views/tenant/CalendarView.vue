@@ -6,6 +6,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import Message from 'primevue/message'
@@ -15,6 +16,7 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
+import NewSessionDrawer, { type SessionPrefill } from '@/components/schedule/NewSessionDrawer.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
@@ -57,6 +59,8 @@ const route = useRoute()
 const router = useRouter()
 const auth = useStaffAuth()
 const org = useOrganization()
+const toast = useToast()
+const canCreate = computed(() => auth.can('schedule.create'))
 
 // The branch the calendar is about: the switcher's pick, or the only branch.
 const branch = computed(
@@ -372,6 +376,41 @@ function select(s: CalendarSession, event: Event) {
   popover.value?.hide()
   requestAnimationFrame(() => popover.value?.show(event))
 }
+// New session (US-03.02): from the button, an empty slot of the day view, or another page's link.
+const drawerOpen = ref(false)
+const prefill = ref<SessionPrefill>({})
+function newSession(p: SessionPrefill = {}) {
+  prefill.value = { locationId: branch.value?.id ?? null, date: anchor.value, ...p }
+  drawerOpen.value = true
+}
+function onSlot(event: MouseEvent, column: Column) {
+  if (!canCreate.value || event.target !== event.currentTarget) return
+  const minutes = hours.value.from + Math.floor(event.offsetY / HOUR) * 60
+  newSession({
+    locationId: column.locationId ?? branch.value?.id ?? null,
+    ...(resource.value === 'facility' ? { facilityId: column.id } : { coachId: column.id }),
+    start: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:00`,
+  })
+}
+function onCreated(session: CalendarSession) {
+  toast.add({
+    severity: 'success',
+    summary: t('session.created', { name: session.service.name }),
+    detail: session.status === 'Draft' ? t('session.draftHint') : undefined,
+    life: 5000,
+  })
+  anchor.value = session.local.date
+  load()
+}
+onMounted(() => {
+  if (route.query.new === '1' && canCreate.value) {
+    newSession({
+      locationId: Number(route.query.location) || branch.value?.id || null,
+      facilityId: Number(route.query.facility) || null,
+      start: typeof route.query.start === 'string' ? route.query.start : undefined,
+    })
+  }
+})
 const zoneOf = (s: CalendarSession) =>
   allBranches.value ? zoneAbbreviation(s.location.timezone, locale.value) : null
 </script>
@@ -424,6 +463,7 @@ const zoneOf = (s: CalendarSession) =>
         :allow-empty="false"
         :aria-label="t('calendar.view')"
       />
+      <Button v-if="canCreate" icon="pi pi-plus" :label="t('session.new')" @click="newSession()" />
     </div>
 
     <div class="filters">
@@ -519,6 +559,12 @@ const zoneOf = (s: CalendarSession) =>
         :title="t('calendar.empty')"
         :body="t('calendar.emptyHint')"
       >
+        <Button
+          v-if="canCreate"
+          icon="pi pi-plus"
+          :label="t('session.new')"
+          @click="newSession()"
+        />
       </EmptyState>
 
       <!-- Day: resource columns -->
@@ -529,6 +575,12 @@ const zoneOf = (s: CalendarSession) =>
           :title="resource === 'coach' ? t('calendar.noCoachSessions') : t('calendar.noFacilities')"
           :body="resource === 'coach' ? t('calendar.emptyHint') : t('calendar.noFacilitiesHint')"
         >
+          <Button
+            v-if="canCreate && resource === 'coach'"
+            icon="pi pi-plus"
+            :label="t('session.new')"
+            @click="newSession()"
+          />
         </EmptyState>
         <div
           v-else
@@ -555,8 +607,9 @@ const zoneOf = (s: CalendarSession) =>
           <div
             v-for="c in dayColumns"
             :key="c.id"
-            class="column"
+            :class="['column', { 'column--clickable': canCreate }]"
             :style="{ height: `${gridHeight}px`, backgroundSize: `100% ${HOUR}px` }"
+            @click="onSlot($event, c)"
           >
             <div
               v-for="(sh, i) in shadesFor(branchById(c.locationId) ?? calendarBranch, anchor)"
@@ -753,6 +806,8 @@ const zoneOf = (s: CalendarSession) =>
       </div>
     </div>
 
+    <NewSessionDrawer v-model:visible="drawerOpen" :prefill="prefill" @saved="onCreated" />
+
     <Popover ref="popover" @hide="selected = null">
       <div v-if="selected" class="pop">
         <div class="pop__head">
@@ -890,6 +945,9 @@ const zoneOf = (s: CalendarSession) =>
   position: relative;
   border-inline-start: 1px solid var(--border-subtle);
   background-image: linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
+}
+.column--clickable {
+  cursor: copy;
 }
 .column--past {
   background-color: color-mix(in srgb, var(--surface-sunken) 35%, transparent);

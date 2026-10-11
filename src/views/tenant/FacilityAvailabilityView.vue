@@ -169,10 +169,23 @@ const slotItems = computed(() => [
     command: () => (blockOpen.value = true),
   },
   {
-    // US-03.02 (Create session) arrives with the schedule (EP-03).
+    // Create session (US-03.02) on the calendar, starting at the picked slot.
     label: t('availability.createSession'),
     icon: 'pi pi-calendar-plus',
-    disabled: true,
+    disabled: !auth.can('schedule.create'),
+    command: () =>
+      picked.value &&
+      router.push({
+        name: 'tenant.calendar',
+        query: {
+          view: 'day',
+          date: picked.value.date,
+          new: '1',
+          facility: String(props.id),
+          location: facility.value ? String(facility.value.location_id) : undefined,
+          start: picked.value.start,
+        },
+      }),
   },
 ])
 function pickSlot(event: Event, date: string, minutes: number) {
@@ -428,9 +441,6 @@ const timeRange = (r: FacilityReservation) =>
             <i :class="item.icon" aria-hidden="true" />
             <span>
               {{ item.label }}
-              <small v-if="item.label === t('availability.createSession')">{{
-                t('availability.createSessionSoon')
-              }}</small>
             </span>
           </a>
         </template>

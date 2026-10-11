@@ -424,6 +424,47 @@ export interface CalendarFilters {
   mine?: boolean
 }
 
+/** What stands in the way of a session (US-03.02/06): hard ones block, soft ones need confirming. */
+export interface SessionConflictItem {
+  level: 'hard' | 'soft'
+  code: 'facility_busy' | 'facility_blocked' | 'coach_busy' | 'outside_hours' | 'holiday' | string
+  title: string
+  who: string | null
+  when: string | null
+  session_id: number | null
+}
+
+export interface SessionInput {
+  service_id: number
+  location_id: number
+  facility_id: number
+  coach_ids: number[]
+  date: string
+  start_time: string
+  duration: number
+  capacity: number
+  status: 'Draft' | 'Published'
+  confirm_warnings?: boolean
+}
+
+export interface SessionFormOptions {
+  defaults: {
+    duration: number
+    capacity: number | null
+    buffer_before: number
+    buffer_after: number
+  }
+  timezone: string
+  facilities: {
+    id: number
+    name: string
+    capacity: number
+    parent_id: number | null
+    linked: boolean
+  }[]
+  coaches: { id: number; name: string }[]
+}
+
 export interface VatSettings {
   enabled: boolean
   prices_include_vat: boolean
@@ -798,6 +839,19 @@ export const tenantApi = {
     },
   },
   sessions: {
+    async options(serviceId: number, locationId: number): Promise<SessionFormOptions> {
+      return (
+        await http.get('/api/sessions/options', {
+          params: { service_id: serviceId, location_id: locationId },
+        })
+      ).data.data
+    },
+    async check(input: SessionInput): Promise<SessionConflictItem[]> {
+      return (await http.post('/api/sessions/check', input)).data.data.conflicts
+    },
+    async create(input: SessionInput): Promise<CalendarSession> {
+      return (await http.post('/api/sessions', input)).data.data
+    },
     async list(
       filters: CalendarFilters,
     ): Promise<{ data: CalendarSession[]; branches: CalendarBranch[] }> {

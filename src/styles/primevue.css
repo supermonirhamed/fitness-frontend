@@ -527,10 +527,10 @@
   border: 0;
   box-shadow: var(--shadow-3);
 }
-.p-drawer-left,
-.p-drawer-right {
+/* The position class sits on the mask; :where keeps it weak so a drawer's own width wins. */
+:where(.p-drawer-left, .p-drawer-right) .p-drawer {
   width: var(--drawer-w);
-  max-width: 100%;
+  max-width: 100vw;
 }
 .p-drawer .p-drawer-header {
   align-items: flex-start;
