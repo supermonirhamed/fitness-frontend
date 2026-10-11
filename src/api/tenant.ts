@@ -391,6 +391,8 @@ export interface CalendarSession {
   facility: { id: number; name: string; capacity: number }
   coaches: { id: number; name: string }[]
   series_id: number | null
+  /** A day of an event (US-03.10). */
+  event_id: number | null
   /** Edited apart from its series (US-03.04). */
   exception: boolean
   /** Started or cancelled: not edited. */
@@ -488,6 +490,14 @@ export interface SessionDetails extends CalendarSession {
     rolling: boolean
   } | null
   policy: BookingPolicy
+  event: {
+    id: number
+    capacity: number
+    registered: number
+    registration_opens_on: string | null
+    registration_closes_on: string | null
+    days: number
+  } | null
   issues: SessionConflictItem[]
   created_by: string | null
   created_at: string | null
@@ -511,6 +521,34 @@ export interface AppointmentDay {
     starts_at: string
     coaches: { id: number; name: string; facility_id: number }[]
   }[]
+}
+
+/** A new event (US-03.10): its dates become linked sessions. */
+export interface EventInput {
+  service_id: number
+  location_id: number
+  facility_id: number
+  coach_ids: number[]
+  status: 'Draft' | 'Published'
+  capacity: number
+  session_capacity?: number | null
+  dates: { date: string; start_time: string; end_time: string }[]
+  registration_opens_on: string | null
+  registration_closes_on: string | null
+  confirm_warnings?: boolean
+}
+
+export interface ScheduledEventDetails {
+  id: number
+  service: { id: number; name: string | null }
+  location: { id: number; name: string }
+  capacity: number
+  registered: number
+  registration_opens_on: string | null
+  registration_closes_on: string | null
+  registration_open: boolean
+  status: SessionStatus
+  sessions: CalendarSession[]
 }
 
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
@@ -1025,6 +1063,14 @@ export const tenantApi = {
       confirm_warnings?: boolean
     }): Promise<CalendarSession> {
       return (await http.post('/api/appointments', input)).data.data
+    },
+  },
+  events: {
+    async create(input: EventInput): Promise<ScheduledEventDetails> {
+      return (await http.post('/api/events', input)).data.data
+    },
+    async get(id: number): Promise<ScheduledEventDetails> {
+      return (await http.get(`/api/events/${id}`)).data.data
     },
   },
   programs: {

@@ -532,6 +532,10 @@
   width: var(--drawer-w);
   max-width: 100vw;
 }
+/* Wide drawers (design: width="var(--drawer-w-lg)"), e.g. a new event with its dates. */
+.p-drawer.drawer-lg {
+  width: var(--drawer-w-lg);
+}
 .p-drawer .p-drawer-header {
   align-items: flex-start;
   gap: 12px;

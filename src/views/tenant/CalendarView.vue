@@ -18,6 +18,7 @@ import SplitButton from 'primevue/splitbutton'
 import Skeleton from 'primevue/skeleton'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
 import AppointmentDrawer from '@/components/schedule/AppointmentDrawer.vue'
+import EventDrawer from '@/components/schedule/EventDrawer.vue'
 import SessionDrawer, { type SessionPrefill } from '@/components/schedule/SessionDrawer.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
@@ -31,6 +32,7 @@ import {
   type CalendarBranch,
   type CalendarSession,
   type Facility,
+  type ScheduledEventDetails,
   type SeriesUpdateResult,
   type StaffOption,
   type TimeRange,
@@ -408,12 +410,26 @@ function newSession(p: SessionPrefill = {}) {
 }
 // New ▾: session or series, appointment from availability (US-03.09).
 const appointmentOpen = ref(false)
+const eventOpen = ref(false)
+function onEventCreated(event: ScheduledEventDetails) {
+  toast.add({
+    severity: 'success',
+    summary: t('event.created', { name: event.service.name, n: event.sessions.length }),
+    detail: event.status === 'Draft' ? t('session.draftHint') : undefined,
+    life: 5000,
+  })
+  const first = event.sessions[0]?.local.date
+  if (first) anchor.value = first
+  if (view.value === 'day') view.value = 'week'
+  load()
+}
 const createItems = computed(() => [
   {
     label: t('calendar.newSessionOrSeries'),
     icon: 'pi pi-calendar-plus',
     command: () => newSession(),
   },
+  { label: t('calendar.newEvent'), icon: 'pi pi-star', command: () => (eventOpen.value = true) },
   {
     label: t('appointment.title'),
     icon: 'pi pi-user',
@@ -915,6 +931,12 @@ const zoneOf = (s: CalendarSession) =>
       </div>
     </div>
 
+    <EventDrawer
+      v-model:visible="eventOpen"
+      :location-id="branch?.id ?? null"
+      :date="anchor"
+      @saved="onEventCreated"
+    />
     <AppointmentDrawer
       v-model:visible="appointmentOpen"
       :location-id="branch?.id ?? null"

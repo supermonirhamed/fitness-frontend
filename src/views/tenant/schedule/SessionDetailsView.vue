@@ -95,7 +95,10 @@ const dayLabel = (ymd: string) =>
 
 const seriesLine = computed(() => {
   const s = session.value?.series
-  if (!s) return t('sessionPage.oneTime')
+  if (!s)
+    return session.value?.event
+      ? t('event.partOf', { n: session.value.event.days })
+      : t('sessionPage.oneTime')
   const start = org.organization?.week_start ?? 6
   const days = Array.from({ length: 7 }, (_, i) => (start + i) % 7)
     .filter((d) => s.weekdays.includes(d))
@@ -279,6 +282,11 @@ const moreItems = computed<MenuItem[]>(() => {
           <span v-if="session.coaches[0]"
             ><i class="pi pi-user" aria-hidden="true" />{{ session.coaches[0].name }}</span
           >
+          <span v-if="session.event"
+            ><i class="pi pi-star" aria-hidden="true" />{{
+              t('event.partOf', { n: session.event.days })
+            }}</span
+          >
           <span v-if="session.series"
             ><i class="pi pi-replay" aria-hidden="true" />{{
               session.exception ? t('session.exception') : t('calendar.inSeries')
@@ -379,6 +387,28 @@ const moreItems = computed<MenuItem[]>(() => {
             <dl class="panel facts">
               <dt>{{ t('sessionPage.series') }}</dt>
               <dd>{{ seriesLine }}</dd>
+              <template v-if="session.event">
+                <dt>{{ t('event.registration') }}</dt>
+                <dd>
+                  {{
+                    t('event.registrationWindow', {
+                      from: session.event.registration_opens_on
+                        ? dayLabel(session.event.registration_opens_on)
+                        : t('event.rightAway'),
+                      to: session.event.registration_closes_on
+                        ? dayLabel(session.event.registration_closes_on)
+                        : t('event.untilStart'),
+                    })
+                  }}
+                  ·
+                  {{
+                    t('event.registered', {
+                      n: session.event.registered,
+                      capacity: session.event.capacity,
+                    })
+                  }}
+                </dd>
+              </template>
               <dt>{{ t('session.branch') }}</dt>
               <dd>{{ session.location.name }}</dd>
               <dt>{{ t('sessionPage.coaches') }}</dt>
@@ -514,7 +544,8 @@ const moreItems = computed<MenuItem[]>(() => {
 }
 :deep(.page-header) i.pi-building,
 :deep(.page-header) i.pi-user,
-:deep(.page-header) i.pi-replay {
+:deep(.page-header) i.pi-replay,
+:deep(.page-header) i.pi-star {
   font-size: 12px;
   margin-inline-end: 6px;
 }
