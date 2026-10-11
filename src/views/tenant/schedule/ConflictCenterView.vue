@@ -126,10 +126,13 @@ function askCancel(s: CalendarSession) {
   cancelling.value = s
   cancelOpen.value = true
 }
-function onCancelled(session: CalendarSession) {
+function onCancelled(result: { cancelled: number; name: string | null }) {
   toast.add({
     severity: 'info',
-    summary: t('session.cancel.done', { name: session.service.name }),
+    summary:
+      result.cancelled === 1 && result.name
+        ? t('session.cancel.done', { name: result.name })
+        : t('session.cancel.doneMany', result.cancelled),
     life: 4000,
   })
   load()

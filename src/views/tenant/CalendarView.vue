@@ -19,6 +19,7 @@ import Skeleton from 'primevue/skeleton'
 import BulkActionBar from '@/components/patterns/BulkActionBar.vue'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
 import AppointmentDrawer from '@/components/schedule/AppointmentDrawer.vue'
+import CancelSessionDialog from '@/components/schedule/CancelSessionDialog.vue'
 import EventDrawer from '@/components/schedule/EventDrawer.vue'
 import SessionDrawer, { type SessionPrefill } from '@/components/schedule/SessionDrawer.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -68,6 +69,18 @@ const org = useOrganization()
 const toast = useToast()
 const canCreate = computed(() => auth.can('schedule.create'))
 const canResolve = computed(() => auth.can('schedule.update'))
+const canCancel = computed(() => auth.can('schedule.delete'))
+const cancelOpen = ref(false)
+function onCancelled(result: { cancelled: number }) {
+  toast.add({
+    severity: 'info',
+    summary: t('session.cancel.doneMany', result.cancelled),
+    life: 4000,
+  })
+  picked.value = []
+  load()
+  loadConflicts()
+}
 const canEdit = (s: CalendarSession) =>
   auth.can('schedule.update') &&
   !s.locked &&
@@ -749,6 +762,15 @@ const zoneOf = (s: CalendarSession) =>
         :loading="bulkBusy"
         @click="bulkStatus('Draft')"
       />
+      <Button
+        v-if="canCancel"
+        size="small"
+        severity="contrast"
+        icon="pi pi-times-circle"
+        :label="t('session.cancel.title')"
+        :disabled="!picked.length"
+        @click="cancelOpen = true"
+      />
     </BulkActionBar>
     <Message v-if="ownOnly" severity="secondary" icon="pi pi-user" :closable="false">{{
       t('calendar.ownOnly')
@@ -1025,6 +1047,7 @@ const zoneOf = (s: CalendarSession) =>
       </div>
     </div>
 
+    <CancelSessionDialog v-model:visible="cancelOpen" :ids="picked" @cancelled="onCancelled" />
     <EventDrawer
       v-model:visible="eventOpen"
       :location-id="branch?.id ?? null"

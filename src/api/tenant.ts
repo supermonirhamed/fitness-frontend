@@ -551,6 +551,12 @@ export interface ScheduledEventDetails {
   sessions: CalendarSession[]
 }
 
+/** Which sessions a cancel covers (US-03.12). */
+export type CancelTarget =
+  | { mode: 'ids'; ids: number[] }
+  | { mode: 'following'; session_id: number }
+  | { mode: 'range'; location_id: number; from: string; to: string }
+
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
 
 /** A session with the conflicts it has now (Conflict Center, US-03.07). */
@@ -1015,6 +1021,18 @@ export const tenantApi = {
       input: { reason: CancelReason; note: string | null },
     ): Promise<CalendarSession> {
       return (await http.post(`/api/sessions/${id}/cancel`, input)).data.data
+    },
+    async cancelPreview(input: CancelTarget): Promise<{
+      sessions: number
+      bookings: number
+      waitlist: number
+    }> {
+      return (await http.post('/api/sessions/cancel/preview', input)).data.data
+    },
+    async cancelMany(
+      input: CancelTarget & { reason: CancelReason; note: string | null },
+    ): Promise<{ cancelled: number; bookings: number }> {
+      return (await http.post('/api/sessions/cancel', input)).data.data
     },
     async conflicts(params: { location_id?: number } = {}): Promise<{
       data: ConflictCenterItem[]
