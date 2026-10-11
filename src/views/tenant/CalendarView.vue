@@ -29,6 +29,7 @@ import {
   type CalendarBranch,
   type CalendarSession,
   type Facility,
+  type SeriesUpdateResult,
   type StaffOption,
   type TimeRange,
 } from '@/api/tenant'
@@ -422,6 +423,25 @@ function onCreated(session: CalendarSession) {
     life: 5000,
   })
   anchor.value = session.local.date
+  load()
+}
+function onSeriesUpdated(result: SeriesUpdateResult) {
+  toast.add({
+    severity: 'success',
+    summary: t('session.seriesUpdated'),
+    detail: t('session.seriesUpdatedDetail', { ...result }),
+    life: 5000,
+  })
+  if (result.unresolved.length)
+    toast.add({
+      severity: 'warn',
+      summary: t('session.unresolved', {
+        dates: result.unresolved
+          .map((u) => `${dayLabel(u.date, { day: 'numeric', month: 'short' })} ${u.start}`)
+          .join('، '),
+      }),
+      life: 12000,
+    })
   load()
 }
 function onSeriesCreated(result: { sessions: number; skipped: number; firstDate: string | null }) {
@@ -845,6 +865,7 @@ const zoneOf = (s: CalendarSession) =>
       :session="editing"
       @saved="onCreated"
       @updated="onUpdated"
+      @series-updated="onSeriesUpdated"
       @series-saved="onSeriesCreated"
     />
 

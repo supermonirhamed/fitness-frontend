@@ -470,6 +470,36 @@ export interface SeriesPreviewItem {
   conflicts: SessionConflictItem[]
 }
 
+/** A series' weekly pattern (US-03.05), for the edit form. */
+export interface SeriesPattern {
+  id: number
+  weekdays: number[]
+  every_weeks: number
+  start_time: string
+  duration: number
+  starts_on: string
+  ends_on: string | null
+  rolling: boolean
+}
+
+export type SeriesUpdateInput = Omit<SessionInput, 'date'> & {
+  from: string
+  weekdays: number[]
+  every_weeks: number
+  ends: 'date' | 'never'
+  ends_on: string | null
+  skip_dates: string[]
+}
+
+export interface SeriesUpdateResult {
+  updated: number
+  created: number
+  removed: number
+  cancelled: number
+  /** Booked occurrences a new schedule couldn't move. */
+  unresolved: { id: number; date: string; start: string; bookings: number }[]
+}
+
 export interface SessionFormOptions {
   defaults: {
     duration: number
@@ -878,11 +908,14 @@ export const tenantApi = {
     async checkUpdate(id: number, input: SessionInput): Promise<SessionConflictItem[]> {
       return (await http.post(`/api/sessions/${id}/check`, input)).data.data.conflicts
     },
-    async update(
-      id: number,
-      input: SessionInput & { scope?: 'one' | 'following' | 'all' },
-    ): Promise<CalendarSession> {
+    async update(id: number, input: SessionInput & { scope?: 'one' }): Promise<CalendarSession> {
       return (await http.put(`/api/sessions/${id}`, input)).data.data
+    },
+    async series(id: number): Promise<SeriesPattern> {
+      return (await http.get(`/api/session-series/${id}`)).data.data
+    },
+    async updateSeries(id: number, input: SeriesUpdateInput): Promise<SeriesUpdateResult> {
+      return (await http.put(`/api/session-series/${id}`, input)).data.data
     },
     async previewSeries(input: SeriesInput): Promise<SeriesPreviewItem[]> {
       return (await http.post('/api/session-series/preview', input)).data.data

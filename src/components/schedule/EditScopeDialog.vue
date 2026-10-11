@@ -2,12 +2,14 @@
 // What an edit of a series occurrence applies to (US-03.04/05), as the design's EditScopeDialog
 // (ui_kits/admin/ScheduleDialogs.jsx): this session only (an exception, BR-06), this and following,
 // or all in the series (past sessions never change).
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import RadioButton from 'primevue/radiobutton'
+import ConflictList from '@/components/patterns/ConflictList.vue'
+import type { SessionConflictItem } from '@/api/tenant'
 
 export type EditScope = 'one' | 'following' | 'all'
 
@@ -20,16 +22,39 @@ const props = defineProps<{
   unavailable?: Partial<Record<EditScope, string>>
   loading?: boolean
   error?: string | null
+  /** Dates a series change was refused on (US-03.05): they can be left as they are. */
+  conflicts?: (SessionConflictItem & { date?: string })[]
 }>()
 const visible = defineModel<boolean>('visible', { required: true })
-const emit = defineEmits<{ confirm: [scope: EditScope] }>()
+const emit = defineEmits<{
+  confirm: [scope: EditScope]
+  skip: [scope: EditScope, dates: string[]]
+}>()
 const { t } = useI18n()
 
+const SCOPES: EditScope[] = ['one', 'following', 'all']
 const scope = ref<EditScope>('one')
 watch(visible, (open) => {
-  if (open) scope.value = 'one'
+  if (open) scope.value = SCOPES.find((s) => !props.unavailable?.[s]) ?? 'one'
 })
-const SCOPES: EditScope[] = ['one', 'following', 'all']
+const conflictDates = computed(() => [
+  ...new Set((props.conflicts ?? []).map((c) => c.date).filter((d): d is string => !!d)),
+])
+const hasHard = computed(() => (props.conflicts ?? []).some((c) => c.level === 'hard'))
+const conflictItems = computed(() =>
+  (props.conflicts ?? []).map((c) => ({
+    ...c,
+    // Busy times already carry their date; holidays and hours don't.
+    when: c.date && !c.when?.startsWith(c.date) ? `${c.date} · ${c.when ?? ''}` : c.when,
+  })),
+)
+// A scope that became unavailable falls back to one that isn't.
+watch(
+  () => props.unavailable,
+  (u) => {
+    if (u?.[scope.value]) scope.value = SCOPES.find((s) => !u[s]) ?? 'one'
+  },
+)
 </script>
 
 <template>
@@ -62,6 +87,10 @@ const SCOPES: EditScope[] = ['one', 'following', 'all']
           </label>
         </div>
       </fieldset>
+      <div v-if="conflictItems.length" class="scope__conflicts">
+        <span class="scope__label">{{ t('session.editScope.conflictsOn') }}</span>
+        <ConflictList :items="conflictItems" />
+      </div>
       <Message v-if="moved" severity="info" icon="pi pi-bell" :closable="false">{{
         t('session.editScope.notify')
       }}</Message>
@@ -74,8 +103,17 @@ const SCOPES: EditScope[] = ['one', 'following', 'all']
         @click="visible = false"
       />
       <Button
-        :label="t('session.saveChanges')"
+        v-if="conflictDates.length && scope !== 'one'"
+        :label="t('session.editScope.skipAndSave', conflictDates.length)"
+        severity="secondary"
+        variant="outlined"
         :loading="loading"
+        @click="emit('skip', scope, conflictDates)"
+      />
+      <Button
+        :label="conflictItems.length ? t('session.saveAnyway') : t('session.saveChanges')"
+        :loading="loading"
+        :disabled="!!props.unavailable?.[scope] || hasHard"
         @click="emit('confirm', scope)"
       />
     </template>
@@ -126,6 +164,11 @@ const SCOPES: EditScope[] = ['one', 'following', 'all']
 }
 .scope__label {
   font: 500 14px/1.4 var(--font-sans);
+}
+.scope__conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .scope__hint {
   font: var(--text-small);

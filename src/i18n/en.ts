@@ -222,9 +222,14 @@ export default {
     saveChanges: 'Save changes',
     updated: '{name} updated',
     exception: 'Edited apart from its series',
+    series: 'Series',
+    seriesUpdated: 'Series updated',
+    seriesUpdatedDetail:
+      '{updated} changed, {created} added, {removed} removed, {cancelled} cancelled.',
+    unresolved: 'Booked sessions kept on the old schedule: {dates}. Move or cancel them.',
+    capacityBelow: 'The capacity is below the bookings of: {list}',
     editScope: {
       title: 'Edit recurring session',
-      later: 'Comes with series editing.',
       partOf: 'This session is part of a weekly series.',
       applyTo: 'Apply to',
       one: 'This session only',
@@ -234,6 +239,13 @@ export default {
       all: 'All in series',
       allHint: 'Past sessions are not changed.',
       notify: 'Clients with bookings will be notified of the time or place change.',
+      seriesOnly: 'New weekdays or an end date apply to the series.',
+      dateOnly: 'A new date applies to this session only.',
+      conflictsOn: "These dates can't take the change:",
+      skipAndSave:
+        'Leave these dates unchanged and save | Leave this date unchanged and save | Leave these {n} dates unchanged and save',
+      until: 'until {date}',
+      noEnd: 'no end date',
     },
   },
   calendar: {

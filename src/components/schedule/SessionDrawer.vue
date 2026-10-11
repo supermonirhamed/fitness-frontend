@@ -32,6 +32,8 @@ import {
   type SessionInput,
   type SeriesInput,
   type SeriesPreviewItem,
+  type SeriesPattern,
+  type SeriesUpdateResult,
 } from '@/api/tenant'
 import { ACTIVITY_ICONS, activityKey } from '@/lib/catalog'
 import { errorCode, apiMessage } from '@/lib/apiErrors'
@@ -55,6 +57,7 @@ const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{
   saved: [session: CalendarSession]
   updated: [session: CalendarSession]
+  seriesUpdated: [result: SeriesUpdateResult]
   seriesSaved: [result: { sessions: number; skipped: number; firstDate: string | null }]
 }>()
 const { t, locale } = useI18n()
@@ -161,8 +164,22 @@ watch(visible, async (open) => {
     form.duration = Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60000)
     form.capacity = s.capacity ?? 1
     form.status = s.status === 'Draft' ? 'Draft' : 'Published'
-    const loaded = await tenantApi.sessions.options(s.service.id, s.location.id).catch(() => null)
-    if (visible.value && editing.value?.id === s.id) options.value = loaded
+    pattern.value = null
+    scopeConflicts.value = []
+    scopeSkips.value = []
+    const [loaded, series] = await Promise.all([
+      tenantApi.sessions.options(s.service.id, s.location.id).catch(() => null),
+      s.series_id ? tenantApi.sessions.series(s.series_id).catch(() => null) : null,
+    ])
+    if (!visible.value || editing.value?.id !== s.id) return
+    options.value = loaded
+    if (series) {
+      weekdays.value = [...series.weekdays]
+      everyWeeks.value = series.every_weeks
+      ends.value = series.rolling ? 'never' : 'date'
+      endsOn.value = series.ends_on ? new Date(`${series.ends_on}T12:00:00`) : null
+      pattern.value = series
+    }
     return
   }
   form.locationId =
@@ -373,8 +390,11 @@ async function createSeries() {
 
 async function submit() {
   if (editing.value) {
-    if (editing.value.series_id) scopeOpen.value = true
-    else await update('one')
+    if (editing.value.series_id) {
+      scopeConflicts.value = []
+      scopeSkips.value = []
+      scopeOpen.value = true
+    } else await update()
     return
   }
   if (repeat.value === 'weekly') {
@@ -402,8 +422,49 @@ async function save() {
   }
 }
 
-// Edit (US-03.04): a series occurrence first asks what the change applies to.
+// Edit (US-03.04): a series occurrence first asks what the change applies to. Its pattern
+// (weekdays, interval, end) can change too, for this and following or the whole series (US-03.05).
 const scopeOpen = ref(false)
+const pattern = ref<SeriesPattern | null>(null)
+const scopeConflicts = ref<(SessionConflictItem & { date?: string })[]>([])
+const scopeSkips = ref<string[]>([])
+const sameDays = (a: number[], b: number[]) =>
+  a.length === b.length && [...a].sort().join() === [...b].sort().join()
+const patternChanged = computed(() => {
+  const p = pattern.value
+  if (!p) return false
+  return (
+    !sameDays(p.weekdays, weekdays.value) ||
+    p.every_weeks !== everyWeeks.value ||
+    p.rolling !== (ends.value === 'never') ||
+    (ends.value === 'date' && p.ends_on !== ymd(endsOn.value))
+  )
+})
+const unavailableScopes = computed(() => ({
+  ...(patternChanged.value ? { one: t('session.editScope.seriesOnly') } : {}),
+  ...(editing.value && editing.value.local.date !== ymd(form.date)
+    ? {
+        following: t('session.editScope.dateOnly'),
+        all: t('session.editScope.dateOnly'),
+      }
+    : {}),
+}))
+const seriesSummary = computed(() => {
+  const p = pattern.value
+  if (!p) return null
+  const days = weekdayOrder.value
+    .filter((d) => p.weekdays.includes(d))
+    .map(dayShort)
+    .join('، ')
+  const end = p.rolling
+    ? t('session.editScope.noEnd')
+    : p.ends_on
+      ? t('session.editScope.until', { date: dateLabel(p.ends_on) })
+      : ''
+  return [locale.value === 'ar' ? days : days.replace(/،/g, ','), p.start_time, end]
+    .filter(Boolean)
+    .join(' · ')
+})
 const moved = computed(() => {
   const s = editing.value
   return (
@@ -414,14 +475,67 @@ const moved = computed(() => {
       Date.parse(s.ends_at) - Date.parse(s.starts_at) !== form.duration * 60000)
   )
 })
-async function update(scope: EditScope) {
+async function updateSeries(scope: EditScope, skipDates: string[] = [], confirm = false) {
+  const payload = input(confirm || soft.value > 0)
+  const s = editing.value
+  if (!payload || !s?.series_id || !pattern.value) return
+  saving.value = true
+  errors.value = {}
+  formError.value = null
+  try {
+    const result = await tenantApi.sessions.updateSeries(s.series_id, {
+      ...payload, // its date is this occurrence's: the series keeps its own dates
+      from: scope === 'following' ? s.local.date : pattern.value.starts_on,
+      weekdays: weekdays.value,
+      every_weeks: everyWeeks.value,
+      ends: ends.value === 'never' ? 'never' : 'date',
+      ends_on: ends.value === 'never' ? null : ymd(endsOn.value),
+      skip_dates: skipDates,
+    })
+    scopeOpen.value = false
+    emit('seriesUpdated', result)
+    visible.value = false
+  } catch (e) {
+    const code = errorCode(e)
+    const data = (e as { response?: { data?: Record<string, unknown> } }).response?.data ?? {}
+    if (code === 'session_conflicts' || code === 'needs_confirmation') {
+      // Shown in the dialog: those dates can be left as they are, warnings accepted.
+      scopeConflicts.value = (data.conflicts as typeof scopeConflicts.value) ?? []
+      scopeSkips.value = skipDates
+      return
+    }
+    scopeOpen.value = false
+    if (code === 'capacity_below_bookings') {
+      const list = (data.sessions as { date: string; start: string; bookings: number }[]) ?? []
+      formError.value = t('session.capacityBelow', {
+        list: list.map((x) => `${dateLabel(x.date)} ${x.start} (${x.bookings})`).join('، '),
+      })
+    } else {
+      failed(e)
+    }
+  } finally {
+    saving.value = false
+  }
+}
+function onScope(scope: EditScope) {
+  // Only warnings left: saving again accepts them.
+  const confirm = scopeConflicts.value.length > 0
+  scopeConflicts.value = []
+  if (scope === 'one') update()
+  else updateSeries(scope, scopeSkips.value, confirm)
+}
+function onSkip(scope: EditScope, dates: string[]) {
+  scopeConflicts.value = []
+  updateSeries(scope, [...scopeSkips.value, ...dates])
+}
+async function update() {
   const payload = input(soft.value > 0)
   if (!payload || !editing.value) return
   saving.value = true
   errors.value = {}
   formError.value = null
   try {
-    const session = await tenantApi.sessions.update(editing.value.id, { ...payload, scope })
+    const session = await tenantApi.sessions.update(editing.value.id, { ...payload, scope: 'one' })
     scopeOpen.value = false
     emit('updated', session)
     visible.value = false
@@ -669,8 +783,9 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
         </FormField>
       </div>
 
-      <section v-if="!editing" class="repeat">
-        <FormField :label="t('session.repeat')">
+      <section v-if="!editing || pattern" class="repeat">
+        <span v-if="pattern" class="repeat__title">{{ t('session.series') }}</span>
+        <FormField v-if="!editing" :label="t('session.repeat')">
           <SelectButton
             v-model="repeat"
             :options="repeatOptions"
@@ -680,7 +795,7 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
             :aria-label="t('session.repeat')"
           />
         </FormField>
-        <template v-if="repeat === 'weekly'">
+        <template v-if="repeat === 'weekly' || pattern">
           <div class="days" role="group" :aria-label="t('session.onDays')">
             <Button
               v-for="d in weekdayOrder"
@@ -722,7 +837,7 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
                 :invalid="!!err('ends_on')"
               />
             </div>
-            <div class="ends__row">
+            <div v-if="!pattern" class="ends__row">
               <RadioButton v-model="ends" input-id="ends-count" value="count" />
               <label for="ends-count">{{ t('session.after') }}</label>
               <InputNumber
@@ -839,9 +954,12 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
   <EditScopeDialog
     v-model:visible="scopeOpen"
     :moved="moved"
-    :unavailable="{ following: t('session.editScope.later'), all: t('session.editScope.later') }"
+    :summary="seriesSummary"
+    :unavailable="unavailableScopes"
+    :conflicts="scopeConflicts"
     :loading="saving"
-    @confirm="update"
+    @confirm="onScope"
+    @skip="onSkip"
   />
 </template>
 
@@ -927,6 +1045,9 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
   height: 10px;
   border-radius: 3px;
   flex: none;
+}
+.repeat__title {
+  font: var(--text-h4);
 }
 .repeat {
   border-top: 1px solid var(--border-default);
