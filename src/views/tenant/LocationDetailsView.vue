@@ -1,25 +1,33 @@
 <script setup lang="ts">
-// Branch details (US-01.04): header with status and timezone, then tabs. Business hours:
-// US-01.06 and holidays US-01.07; facilities: US-01.08; services: US-02.03.
+// Branch details (US-01.04) as in the design (ui_kits/admin/BranchDetails.jsx): breadcrumb header
+// with zone badge and a "⋯" menu, Draft / Inactive banners with their action, and tabs Overview,
+// Business hours (US-01.06), Holidays (US-01.07), Facilities (US-01.08), Services (US-02.03),
+// Staff, Tax/VAT, Booking policies (US-01.02) and Activity.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
-import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
 import Message from 'primevue/message'
+import type { MenuItem } from 'primevue/menuitem'
 import Skeleton from 'primevue/skeleton'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
+import ActivityTimeline from '@/components/patterns/ActivityTimeline.vue'
+import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import NoPermission from '@/components/patterns/NoPermission.vue'
+import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
+import StatusBanner from '@/components/patterns/StatusBanner.vue'
+import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
+import ZoneBadge from '@/components/patterns/ZoneBadge.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import BusinessHoursEditor from '@/components/locations/BusinessHoursEditor.vue'
-import ServicesPanel from '@/components/services/ServicesPanel.vue'
 import VatPanel from '@/components/locations/VatPanel.vue'
 import FacilitiesPanel from '@/components/locations/FacilitiesPanel.vue'
 import HourOverridesSection from '@/components/locations/HourOverridesSection.vue'
@@ -33,11 +41,14 @@ import {
   type BookingPolicyOptions,
   type LocationDetails,
   type LocationStaffMember,
-  type ServiceCategory,
+  type Service,
+  type VatSettings,
+  type WeeklyHours,
 } from '@/api/tenant'
 import { statusOf, validationErrors } from '@/lib/http'
 import { toOverrides } from '@/lib/bookingPolicy'
-import { zoneAbbreviation } from '@/lib/datetime'
+import { useRouter } from 'vue-router'
+import { errorCode } from '@/lib/apiErrors'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ id: number }>()
@@ -48,7 +59,8 @@ const auth = useStaffAuth()
 const state = ref<'loading' | 'ready' | 'error' | 'missing'>('loading')
 const location = ref<LocationDetails>()
 const route = useRoute()
-const tab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'info')
+const tab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'overview')
+const router = useRouter()
 const canEdit = computed(() => auth.can('locations.update'))
 
 async function load() {
@@ -68,12 +80,100 @@ const figures = computed(() => {
   const s = location.value?.stats
   if (!s) return []
   return [
-    { key: 'today_sessions', icon: 'pi-calendar', value: s.today_sessions },
-    { key: 'staff', icon: 'pi-users', value: s.staff },
-    { key: 'facilities', icon: 'pi-th-large', value: s.facilities },
-    { key: 'active_services', icon: 'pi-tags', value: s.active_services },
+    { key: 'today_sessions', value: s.today_sessions },
+    { key: 'staff', value: s.staff },
+    { key: 'facilities', value: s.facilities },
+    { key: 'active_services', value: s.active_services },
   ]
 })
+
+// Overview "Key facts": today's opening hours and VAT.
+const hours = ref<WeeklyHours | null | undefined>(undefined)
+const vat = ref<VatSettings | null>(null)
+watch(
+  [tab, () => location.value?.id],
+  async ([value, id]) => {
+    if (value !== 'overview' || !id || hours.value !== undefined) return
+    const [h, v] = await Promise.allSettled([
+      tenantApi.businessHours(id),
+      auth.can('locations.vat') || auth.can('locations.view')
+        ? tenantApi.vat.get(id)
+        : Promise.reject(),
+    ])
+    hours.value = h.status === 'fulfilled' ? h.value.hours : null
+    vat.value = v.status === 'fulfilled' ? v.value : null
+  },
+  { immediate: true },
+)
+const todayHours = computed(() => {
+  if (!hours.value || !location.value) return null
+  const day = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone: location.value.timezone,
+  }).format(new Date())
+  const index = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(day)
+  const ranges = hours.value[String(index)] ?? []
+  return ranges.length
+    ? ranges.map((r) => `${r.start}–${r.end}`).join('، ')
+    : t('branchPage.closedToday')
+})
+const vatLine = computed(() => {
+  const v = vat.value
+  if (!v) return null
+  if (!v.enabled) return t('branchPage.vatOff')
+  return `${v.rate ?? '—'}% · ${v.prices_include_vat ? t('branchPage.inclusive') : t('branchPage.exclusive')}`
+})
+
+// Header "⋯" menu: Deactivate / Activate, Archive (only once the branch isn't active).
+const archiveOpen = ref(false)
+const archiving = ref(false)
+const archiveError = ref<string | null>(null)
+const moreItems = computed<MenuItem[]>(() => {
+  const l = location.value
+  if (!l || !canChangeStatus.value) return []
+  return [
+    l.status === 'Active'
+      ? {
+          label: t('deactivateLocation.action'),
+          icon: 'pi pi-power-off',
+          class: 'menu-danger',
+          command: () => (deactivateOpen.value = true),
+        }
+      : { label: t('branchPage.activate'), icon: 'pi pi-check-circle', command: activate },
+    {
+      label:
+        l.status === 'Active'
+          ? `${t('archive.archive')} — ${t('branchPage.deactivateFirst')}`
+          : t('archive.archive'),
+      icon: 'pi pi-inbox',
+      disabled: l.status === 'Active',
+      command: () => {
+        archiveError.value = null
+        archiveOpen.value = true
+      },
+    },
+  ]
+})
+async function archive() {
+  if (!location.value) return
+  archiving.value = true
+  archiveError.value = null
+  try {
+    await tenantApi.archiveLocation(location.value.id)
+    toast.add({
+      severity: 'success',
+      summary: t('archive.archivedToast', { name: location.value.name }),
+      life: 4000,
+    })
+    if (auth.user?.location_ids !== null) await auth.check(true)
+    router.push({ name: 'tenant.branches' })
+  } catch (e) {
+    archiveError.value =
+      errorCode(e) === 'last_location' ? t('locationsPage.lastLocation') : t('common.genericError')
+  } finally {
+    archiving.value = false
+  }
+}
 
 const mapUrl = computed(() => {
   const l = location.value
@@ -180,26 +280,37 @@ async function savePolicy() {
   }
 }
 
-watch(tab, (value) => {
-  if (value === 'staff' && staffState.value === 'idle') loadStaff()
-  if (value === 'policies' && policyState.value === 'idle') loadPolicy()
-})
-
-// Services tab (US-02.03): the branch's catalog.
-const categories = ref<ServiceCategory[]>([])
 watch(
   tab,
-  async (value) => {
-    if (value === 'services' && !categories.value.length) {
-      try {
-        categories.value = await tenantApi.serviceCategories.list()
-      } catch {
-        categories.value = []
-      }
-    }
+  (value) => {
+    if (value === 'staff' && staffState.value === 'idle') loadStaff()
+    if (value === 'policies' && policyState.value === 'idle') loadPolicy()
   },
   { immediate: true },
 )
+function discardPolicy() {
+  overrides.value = JSON.parse(savedOverrides.value)
+  policyErrors.value = {}
+  policyError.value = null
+}
+
+// Services tab (US-02.03): what this branch offers; managed on the Services page (design).
+const services = ref<Service[] | null>(null)
+const servicesState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
+async function loadServices() {
+  servicesState.value = 'loading'
+  try {
+    services.value = (await tenantApi.services.list({ location_id: props.id })).filter(
+      (s) => s.status !== 'Archived',
+    )
+    servicesState.value = 'ready'
+  } catch {
+    servicesState.value = 'error'
+  }
+}
+watch(tab, (value) => value === 'services' && servicesState.value === 'idle' && loadServices(), {
+  immediate: true,
+})
 
 // The facilities figure changes when facilities are added or archived.
 async function refreshStats() {
@@ -214,144 +325,175 @@ async function refreshStats() {
 
 <template>
   <div class="page">
-    <RouterLink :to="{ name: 'tenant.branches' }" class="back">
-      <i class="pi pi-arrow-left pi-dir" aria-hidden="true" />{{ t('locationDetails.back') }}
-    </RouterLink>
-
     <div
       v-if="state === 'loading'"
       class="skeleton"
       aria-busy="true"
       :aria-label="t('common.loading')"
     >
-      <Skeleton height="48px" width="40%" />
+      <Skeleton height="20px" width="20%" />
+      <Skeleton height="32px" width="40%" />
       <Skeleton height="200px" />
     </div>
-
-    <section v-else-if="state === 'missing'" class="card">
-      <EmptyState
-        icon="pi-lock"
-        :title="t('locationDetails.missing')"
-        :body="t('locationDetails.missingHint')"
-      />
-    </section>
-
-    <section v-else-if="state === 'error' || !location" class="card">
-      <EmptyState icon="pi-exclamation-triangle" :title="t('locationDetails.loadError')">
-        <Button
-          severity="secondary"
-          variant="outlined"
-          icon="pi pi-replay pi-dir"
-          :label="t('common.retry')"
-          @click="load"
-        />
-      </EmptyState>
-    </section>
+    <EmptyState
+      v-else-if="state === 'missing'"
+      class="card"
+      icon="pi-search"
+      :title="t('locationDetails.missing')"
+      :body="t('locationDetails.missingHint')"
+    >
+      <RouterLink :to="{ name: 'tenant.branches' }">{{ t('branches.title') }}</RouterLink>
+    </EmptyState>
+    <ErrorState
+      v-else-if="state === 'error' || !location"
+      class="card"
+      :title="t('locationDetails.loadError')"
+      @retry="load"
+    />
 
     <template v-else>
-      <PageHeader :title="location.name">
+      <PageHeader
+        :title="location.name"
+        :breadcrumb="[
+          { label: t('branches.title'), to: { name: 'tenant.branches' } },
+          { label: location.name },
+        ]"
+        :more-items="moreItems"
+      >
         <template #status>
           <StatusTag :status="location.status" />
-          <span class="zone" dir="ltr"
-            ><i class="pi pi-clock" aria-hidden="true" />{{ location.timezone }} ·
-            {{ zoneAbbreviation(location.timezone, locale) }}</span
+          <ZoneBadge :timezone="location.timezone" with-name icon />
+        </template>
+        <template v-if="location.address" #meta>
+          <span class="meta-address"
+            ><i class="pi pi-map-marker" aria-hidden="true" />{{ location.address }}</span
           >
         </template>
-        <template #actions>
-          <Button
-            v-if="canChangeStatus && location.status === 'Inactive'"
-            severity="secondary"
-            variant="outlined"
-            icon="pi pi-play"
-            :label="t('deactivateLocation.activate')"
-            :loading="activating"
-            @click="activate"
-          />
-          <Button
-            v-else-if="canChangeStatus"
-            severity="danger"
-            variant="outlined"
-            icon="pi pi-power-off"
-            :label="t('deactivateLocation.action')"
-            @click="deactivateOpen = true"
-          />
-          <Button
-            v-if="canEdit"
-            icon="pi pi-pencil"
-            :label="t('locationForm.edit')"
-            @click="formOpen = true"
-          />
+        <template v-if="canEdit" #primary>
+          <Button icon="pi pi-pencil" :label="t('common.edit')" @click="formOpen = true" />
         </template>
       </PageHeader>
 
-      <Message v-if="location.status === 'Draft'" severity="info" :closable="false">{{
-        t('locationDetails.draftBanner')
-      }}</Message>
-      <Message v-else-if="location.status === 'Inactive'" severity="warn" :closable="false">{{
-        t('locationDetails.inactiveBanner')
-      }}</Message>
+      <StatusBanner
+        v-if="location.status === 'Draft'"
+        severity="info"
+        icon="pi-eye-slash"
+        :title="t('branchPage.draftTitle')"
+      >
+        {{ t('branchPage.draftHint') }}
+        <template v-if="canChangeStatus" #action>
+          <Button
+            size="small"
+            :label="t('branchPage.activate')"
+            :loading="activating"
+            @click="activate"
+          />
+        </template>
+      </StatusBanner>
+      <StatusBanner
+        v-else-if="location.status === 'Inactive'"
+        severity="warn"
+        icon="pi-power-off"
+        :title="t('branchPage.inactiveTitle')"
+      >
+        {{ t('branchPage.inactiveHint') }}
+        <template v-if="canChangeStatus" #action>
+          <Button
+            size="small"
+            variant="outlined"
+            severity="warn"
+            :label="t('branchPage.reactivate')"
+            :loading="activating"
+            @click="activate"
+          />
+        </template>
+      </StatusBanner>
 
       <Tabs v-model:value="tab" scrollable>
         <TabList>
-          <Tab value="info">{{ t('locationDetails.tabs.info') }}</Tab>
+          <Tab value="overview">{{ t('branchPage.tabs.overview') }}</Tab>
           <Tab value="hours">{{ t('locationDetails.tabs.hours') }}</Tab>
-          <Tab value="facilities">{{ t('locationDetails.tabs.facilities') }}</Tab>
-          <Tab value="services">{{ t('locationDetails.tabs.services') }}</Tab>
-          <Tab v-if="auth.can('staff.view')" value="staff">{{
-            t('locationDetails.tabs.staff')
-          }}</Tab>
-          <Tab value="policies">{{ t('locationDetails.tabs.policies') }}</Tab>
+          <Tab value="holidays">{{ t('branchPage.tabs.holidays') }}</Tab>
+          <Tab value="facilities"
+            >{{ t('locationDetails.tabs.facilities')
+            }}<span v-if="location.stats?.facilities != null" class="tab-count">{{
+              location.stats.facilities
+            }}</span></Tab
+          >
+          <Tab value="services"
+            >{{ t('locationDetails.tabs.services')
+            }}<span v-if="location.stats?.active_services != null" class="tab-count">{{
+              location.stats.active_services
+            }}</span></Tab
+          >
+          <Tab v-if="auth.can('staff.view')" value="staff"
+            >{{ t('locationDetails.tabs.staff')
+            }}<span v-if="location.stats" class="tab-count">{{ location.stats.staff }}</span></Tab
+          >
           <Tab value="vat">{{ t('locationDetails.tabs.vat') }}</Tab>
+          <Tab value="policies">{{ t('locationDetails.tabs.policies') }}</Tab>
+          <Tab v-if="auth.can('audit.view')" value="activity">{{ t('details.tabs.activity') }}</Tab>
         </TabList>
         <TabPanels>
-          <TabPanel value="info">
-            <div class="info">
-              <ul class="figures">
-                <li v-for="f in figures" :key="f.key" class="figure">
-                  <i :class="['pi', f.icon]" aria-hidden="true" />
-                  <span class="value num">{{ f.value ?? '—' }}</span>
-                  <span class="label">{{ t(`locationDetails.figures.${f.key}`) }}</span>
-                </li>
-              </ul>
-
-              <div class="details">
+          <TabPanel value="overview">
+            <div class="overview">
+              <div class="card figures">
+                <div v-for="f in figures" :key="f.key">
+                  <div class="caption">{{ t(`locationDetails.figures.${f.key}`) }}</div>
+                  <div class="figure num">{{ f.value ?? '—' }}</div>
+                </div>
+              </div>
+              <div class="card facts">
+                <div class="facts__title">{{ t('branchPage.keyFacts') }}</div>
+                <div class="facts__row">
+                  <span>{{ t('branchPage.today') }}</span
+                  ><span dir="ltr">{{ todayHours ?? '—' }}</span>
+                </div>
+                <div v-if="vatLine" class="facts__row">
+                  <span>{{ t('branchPage.vat') }}</span
+                  ><span>{{ vatLine }}</span>
+                </div>
+                <div class="facts__row">
+                  <span>{{ t('locationForm.fields.phone') }}</span
+                  ><span dir="ltr">{{ location.phone || '—' }}</span>
+                </div>
+                <div v-if="location.email" class="facts__row">
+                  <span>{{ t('locationForm.fields.email') }}</span
+                  ><span dir="ltr">{{ location.email }}</span>
+                </div>
+                <a v-if="mapUrl" :href="mapUrl" target="_blank" rel="noopener" class="map"
+                  ><i class="pi pi-map-marker" aria-hidden="true" />{{
+                    t('locationDetails.openMap')
+                  }}</a
+                >
+              </div>
+              <div v-if="location.photo_url || location.description" class="card about">
                 <img
                   v-if="location.photo_url"
                   :src="location.photo_url"
                   :alt="t('locationForm.photoAlt')"
                   class="photo"
                 />
-                <dl>
-                  <dt>{{ t('locationForm.fields.address') }}</dt>
-                  <dd>
-                    {{ location.address || '—' }}
-                    <a v-if="mapUrl" :href="mapUrl" target="_blank" rel="noopener" class="map"
-                      ><i class="pi pi-map-marker" aria-hidden="true" />{{
-                        t('locationDetails.openMap')
-                      }}</a
-                    >
-                  </dd>
-                  <dt>{{ t('locationForm.fields.phone') }}</dt>
-                  <dd dir="ltr" class="ltr-isolate">{{ location.phone || '—' }}</dd>
-                  <dt>{{ t('locationForm.fields.email') }}</dt>
-                  <dd dir="ltr" class="ltr-isolate">{{ location.email || '—' }}</dd>
-                  <dt>{{ t('locationForm.fields.description') }}</dt>
-                  <dd class="pre">{{ location.description || '—' }}</dd>
-                </dl>
+                <p v-if="location.description" class="pre">{{ location.description }}</p>
               </div>
-              <p class="note">{{ t('locationDetails.figuresNote') }}</p>
             </div>
           </TabPanel>
 
           <TabPanel value="hours">
-            <div v-if="tab === 'hours'" class="hours">
-              <BusinessHoursEditor :location-id="location.id" :can-edit="canEdit" />
-              <HourOverridesSection
-                :location-id="location.id"
-                :timezone="location.timezone"
-                :can-edit="canEdit"
-              />
-            </div>
+            <BusinessHoursEditor
+              v-if="tab === 'hours'"
+              :location-id="location.id"
+              :can-edit="canEdit"
+            />
+          </TabPanel>
+
+          <TabPanel value="holidays">
+            <HourOverridesSection
+              v-if="tab === 'holidays'"
+              :location-id="location.id"
+              :timezone="location.timezone"
+              :can-edit="canEdit"
+            />
           </TabPanel>
 
           <TabPanel value="facilities">
@@ -364,64 +506,78 @@ async function refreshStats() {
           </TabPanel>
 
           <TabPanel value="services">
-            <ServicesPanel
-              v-if="tab === 'services'"
-              :categories="categories"
-              :location-id="location.id"
-            />
+            <div class="card">
+              <div class="managed">
+                <i class="pi pi-info-circle" aria-hidden="true" />{{
+                  t('branchPage.servicesManaged')
+                }}
+                <RouterLink :to="{ name: 'tenant.services' }">{{ t('catalog.title') }}</RouterLink>
+              </div>
+              <div v-if="servicesState === 'loading'" class="pad">
+                <Skeleton v-for="n in 3" :key="n" height="28px" />
+              </div>
+              <ErrorState v-else-if="servicesState === 'error'" compact @retry="loadServices" />
+              <EmptyState
+                v-else-if="!services?.length"
+                compact
+                icon="pi-th-large"
+                :title="t('branchPage.noServices')"
+              />
+              <RouterLink
+                v-for="s in services ?? []"
+                v-else
+                :key="s.id"
+                :to="{ name: 'tenant.services.show', params: { id: s.id } }"
+                class="link-row"
+              >
+                <span
+                  class="swatch"
+                  :style="{ background: s.color ?? 'var(--border-strong)' }"
+                  aria-hidden="true"
+                />
+                <span class="link-row__name">{{ s.display_name }}</span>
+                <StatusTag v-if="s.status !== 'Published'" :status="s.status" size="sm" />
+                <i class="pi pi-arrow-up-right link-row__icon" aria-hidden="true" />
+              </RouterLink>
+            </div>
           </TabPanel>
 
           <TabPanel value="staff">
-            <div v-if="staffState === 'loading'" class="skeleton">
-              <Skeleton v-for="n in 3" :key="n" height="40px" />
-            </div>
-            <EmptyState
-              v-else-if="staffState === 'forbidden'"
-              icon="pi-lock"
-              :title="t('permissions.forbidden')"
-            />
-            <EmptyState
-              v-else-if="staffState === 'error'"
-              icon="pi-exclamation-triangle"
-              :title="t('common.genericError')"
-            >
-              <Button
-                severity="secondary"
-                variant="outlined"
-                :label="t('common.retry')"
-                @click="loadStaff"
-              />
-            </EmptyState>
-            <template v-else-if="staff">
-              <EmptyState
-                v-if="!staff.data.length"
-                icon="pi-users"
-                :title="t('locationDetails.noStaff')"
-                :body="t('locationDetails.noStaffHint')"
-              />
-              <DataTable v-else :value="staff.data" data-key="id" size="small">
-                <Column :header="t('locationForm.fields.name')">
-                  <template #body="{ data }">
-                    <div class="name">{{ data.name }}</div>
-                    <div class="sub ltr-isolate" dir="ltr">{{ data.email }}</div>
-                  </template>
-                </Column>
-                <Column :header="t('locationDetails.role')">
-                  <template #body="{ data }">{{
-                    data.roles.map(roleName).join(locale === 'ar' ? '، ' : ', ')
-                  }}</template>
-                </Column>
-                <Column :header="t('locationForm.fields.status')">
-                  <template #body="{ data }"><StatusTag :status="data.status" /></template>
-                </Column>
-              </DataTable>
-              <p class="note">
-                {{ t('locationDetails.allLocations', staff.all_locations_count) }}
-                <RouterLink v-if="auth.can('staff.update')" :to="{ name: 'tenant.staff.users' }">{{
-                  t('locationDetails.manageAccess')
+            <div class="card">
+              <div class="managed">
+                <i class="pi pi-info-circle" aria-hidden="true" />{{ t('branchPage.staffManaged') }}
+                <RouterLink v-if="auth.can('staff.view')" :to="{ name: 'tenant.staff.users' }">{{
+                  t('staff.title')
                 }}</RouterLink>
-              </p>
-            </template>
+              </div>
+              <div v-if="staffState === 'loading'" class="pad">
+                <Skeleton v-for="n in 3" :key="n" height="32px" />
+              </div>
+              <NoPermission v-else-if="staffState === 'forbidden'" compact />
+              <ErrorState v-else-if="staffState === 'error'" compact @retry="loadStaff" />
+              <template v-else-if="staff">
+                <EmptyState
+                  v-if="!staff.data.length"
+                  compact
+                  icon="pi-users"
+                  :title="t('locationDetails.noStaff')"
+                  :body="t('locationDetails.noStaffHint')"
+                />
+                <div v-for="member in staff.data" :key="member.id" class="person-row">
+                  <PersonAvatar :name="member.name" />
+                  <div class="person-row__text">
+                    <div class="person-row__name">{{ member.name }}</div>
+                    <div class="person-row__sub">
+                      {{ member.roles.map(roleName).join(locale === 'ar' ? '، ' : ', ') }}
+                    </div>
+                  </div>
+                  <StatusTag v-if="member.status !== 'Active'" :status="member.status" size="sm" />
+                </div>
+                <p class="note">
+                  {{ t('locationDetails.allLocations', staff.all_locations_count) }}
+                </p>
+              </template>
+            </div>
           </TabPanel>
 
           <TabPanel value="vat">
@@ -433,23 +589,22 @@ async function refreshStats() {
           </TabPanel>
 
           <TabPanel value="policies">
-            <div v-if="policyState === 'loading'" class="skeleton">
-              <Skeleton v-for="n in 2" :key="n" height="120px" />
+            <div v-if="policyState === 'loading'" class="card pad">
+              <Skeleton v-for="n in 4" :key="n" height="36px" />
             </div>
-            <EmptyState
+            <ErrorState
               v-else-if="policyState === 'error'"
-              icon="pi-exclamation-triangle"
+              class="card"
               :title="t('bookingPolicy.loadError')"
-            >
-              <Button
-                severity="secondary"
-                variant="outlined"
-                :label="t('common.retry')"
-                @click="loadPolicy"
-              />
-            </EmptyState>
-            <form v-else-if="policy" class="policies" @submit.prevent="savePolicy">
-              <p class="note">{{ t('locationDetails.policiesIntro') }}</p>
+              @retry="loadPolicy"
+            />
+            <form v-else-if="policy" class="stack" @submit.prevent="savePolicy">
+              <Message severity="info" :closable="false">{{
+                t('locationDetails.policiesIntro')
+              }}</Message>
+              <Message v-if="policyError" severity="error" :closable="false" role="alert">{{
+                policyError
+              }}</Message>
               <BookingPolicyFields
                 v-model="overrides"
                 :options="policyOptions"
@@ -458,21 +613,21 @@ async function refreshStats() {
                 :disabled="!canEdit"
                 :errors="policyErrors"
               />
-              <Message v-if="policyError" severity="error" :closable="false" role="alert">{{
-                policyError
-              }}</Message>
-              <div v-if="canEdit" class="footer">
-                <span class="audit"
-                  ><i class="pi pi-shield" aria-hidden="true" />{{ t('override.auditNote') }}</span
-                >
-                <Button
-                  type="submit"
-                  :label="t('permissions.save')"
-                  :disabled="!policyDirty"
-                  :loading="policySaving"
-                />
-              </div>
+              <UnsavedBar
+                v-if="canEdit && policyDirty"
+                :saving="policySaving"
+                @discard="discardPolicy"
+                @save="savePolicy"
+              />
             </form>
+          </TabPanel>
+
+          <TabPanel value="activity">
+            <ActivityTimeline
+              v-if="tab === 'activity'"
+              entity-type="Location"
+              :entity-id="location.id"
+            />
           </TabPanel>
         </TabPanels>
       </Tabs>
@@ -483,6 +638,16 @@ async function refreshStats() {
         :location="location"
         @deactivated="onDeactivated"
       />
+      <ConfirmActionDialog
+        v-model:visible="archiveOpen"
+        :title="t('archive.archiveTitle', { name: location.name })"
+        :description="t('locationsPage.archiveDescription')"
+        :confirm-label="t('archive.archive')"
+        :loading="archiving"
+        :error="archiveError"
+        destructive
+        @confirm="archive"
+      />
     </template>
   </div>
 </template>
@@ -491,157 +656,166 @@ async function refreshStats() {
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 16px;
+  padding-bottom: 72px;
 }
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font: var(--text-small);
-  color: var(--text-secondary);
-  text-decoration: none;
-  width: fit-content;
-}
-.back:hover {
-  color: var(--text-primary);
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .card {
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
 }
-.skeleton {
+.pad {
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 10px;
 }
-.zone {
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.meta-address {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  font: var(--text-caption);
-  color: var(--text-muted);
+  gap: 4px;
 }
-.info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+.meta-address i {
+  font-size: 12px;
+}
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
 }
 .figures {
+  padding: 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.caption {
+  font: var(--text-caption);
+  font-weight: 400;
+  color: var(--text-muted);
 }
 .figure {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  background: var(--surface-card);
+  font: 600 20px/1.4 var(--font-sans);
 }
-.figure .pi {
-  grid-row: span 2;
-  font-size: 1.25rem;
-  color: var(--primary);
-}
-.figure .value {
-  font: var(--text-h3);
-}
-.figure .label {
-  font: var(--text-caption);
-  color: var(--text-muted);
-}
-.details {
+.facts {
+  padding: 16px;
   display: flex;
-  gap: var(--space-5);
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-.photo {
-  width: 240px;
-  max-width: 100%;
-  aspect-ratio: 3 / 2;
-  object-fit: cover;
-  border-radius: var(--radius-card);
-  border: 1px solid var(--border-subtle);
-}
-dl {
-  flex: 1;
-  min-width: 240px;
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-2) var(--space-5);
-  margin: 0;
-}
-dt {
+  flex-direction: column;
+  gap: 10px;
   font: var(--text-small);
-  color: var(--text-muted);
 }
-dd {
-  margin: 0;
-  font: var(--text-body);
-  min-width: 0;
-  overflow-wrap: anywhere;
+.facts__title {
+  font: var(--text-h4);
 }
-.pre {
-  white-space: pre-line;
+.facts__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.facts__row > span:first-child {
+  color: var(--text-secondary);
 }
 .map {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  margin-inline-start: var(--space-2);
+  gap: 4px;
+}
+.about {
+  grid-column: 1 / -1;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.photo {
+  width: 200px;
+  max-width: 40%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.pre {
+  margin: 0;
+  white-space: pre-line;
+}
+.managed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-default);
   font: var(--text-small);
-  color: var(--text-link);
+  color: var(--text-secondary);
+}
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.link-row:last-child {
+  border-bottom: 0;
+}
+.link-row:hover {
+  background: var(--surface-hover);
+  text-decoration: none;
+}
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.link-row__name {
+  flex: 1;
+}
+.link-row__icon {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.person-row__text {
+  flex: 1;
+  min-width: 0;
+}
+.person-row__name {
+  font: 500 14px/1.3 var(--font-sans);
+}
+.person-row__sub {
+  font: var(--text-caption);
+  color: var(--text-muted);
 }
 .note {
   margin: 0;
+  padding: 10px 16px;
   font: var(--text-small);
   color: var(--text-muted);
 }
-.name {
-  font-weight: var(--fw-medium);
-}
-.sub {
-  font: var(--text-caption);
-  color: var(--text-muted);
-}
-.hours {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-.policies {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-}
-.audit {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font: var(--text-caption);
-  color: var(--text-muted);
-}
-@media (max-width: 560px) {
-  dl {
+@media (max-width: 900px) {
+  .overview {
     grid-template-columns: 1fr;
+  }
+  .figures {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

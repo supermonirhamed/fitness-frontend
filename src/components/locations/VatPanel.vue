@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Tax / VAT of a branch (US-01.14, D8): on/off, rate from a date, VAT-inclusive or exclusive
 // prices, registration number and the legal name on receipts, with a receipt preview.
+// Laid out as the design (BranchDetails.jsx VatTab): setting rows beside a receipt preview card.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -12,7 +13,9 @@ import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import ToggleSwitch from 'primevue/toggleswitch'
-import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import SettingRow from '@/components/patterns/SettingRow.vue'
+import SettingsCard from '@/components/patterns/SettingsCard.vue'
 import { tenantApi, type VatSettings } from '@/api/tenant'
 import { validationErrors, type ValidationErrors } from '@/lib/http'
 import { isoDay } from '@/lib/audit'
@@ -109,241 +112,205 @@ async function save() {
 </script>
 
 <template>
-  <div v-if="state === 'loading'" class="stack">
-    <Skeleton v-for="n in 3" :key="n" height="56px" />
+  <div v-if="state === 'loading'" class="vat">
+    <SettingsCard>
+      <div v-for="n in 4" :key="n" class="skeleton-row">
+        <Skeleton width="40%" /><Skeleton height="36px" />
+      </div>
+    </SettingsCard>
   </div>
-  <EmptyState
+  <ErrorState
     v-else-if="state === 'error'"
-    icon="pi-exclamation-triangle"
+    class="card"
     :title="t('vat.loadError')"
-  >
-    <Button severity="secondary" variant="outlined" :label="t('common.retry')" @click="load" />
-  </EmptyState>
+    @retry="load"
+  />
 
   <form v-else-if="settings" class="vat" @submit.prevent="save">
-    <div class="toggle">
-      <ToggleSwitch v-model="form.enabled" input-id="vat-enabled" :disabled="!canEdit" />
-      <label for="vat-enabled">
-        <strong>{{ t('vat.enabled') }}</strong>
-        <small>{{ t('vat.enabledHint') }}</small>
-      </label>
+    <div class="vat__rows">
+      <Message v-if="formError" severity="error" :closable="false" role="alert">{{
+        formError
+      }}</Message>
+      <SettingsCard>
+        <SettingRow :label="t('vat.enabled')" :help="t('vat.enabledHint')">
+          <label class="switch">
+            <ToggleSwitch
+              v-model="form.enabled"
+              :disabled="!canEdit"
+              :aria-label="t('vat.enabled')"
+            />
+            <span>{{ form.enabled ? t('vat.on') : t('vat.off') }}</span>
+          </label>
+        </SettingRow>
+
+        <template v-if="form.enabled">
+          <SettingRow :label="t('vat.rate')" :help="t('vat.rateHint')" label-for="vat-rate">
+            <InputNumber
+              v-model="form.rate"
+              input-id="vat-rate"
+              :min="0"
+              :max="100"
+              :max-fraction-digits="2"
+              suffix=" %"
+              :disabled="!canEdit"
+              :invalid="!!err('rate')"
+              class="narrow"
+            />
+            <small v-if="err('rate')" class="error">{{ err('rate') }}</small>
+          </SettingRow>
+          <SettingRow
+            :label="t('vat.pricing')"
+            :help="form.prices_include_vat ? t('vat.previewInclusive') : t('vat.previewExclusive')"
+          >
+            <SelectButton
+              v-model="form.prices_include_vat"
+              :options="pricingOptions"
+              option-label="label"
+              option-value="value"
+              :allow-empty="false"
+              :disabled="!canEdit"
+              :aria-label="t('vat.pricing')"
+            />
+          </SettingRow>
+          <SettingRow :label="t('vat.registrationNumber')" label-for="vat-number">
+            <InputText
+              id="vat-number"
+              v-model="form.registration_number"
+              maxlength="30"
+              dir="ltr"
+              class="mono"
+              :disabled="!canEdit"
+              :invalid="!!err('registration_number')"
+              fluid
+            />
+            <small v-if="err('registration_number')" class="error">{{
+              err('registration_number')
+            }}</small>
+          </SettingRow>
+          <SettingRow
+            :label="t('vat.legalName')"
+            :help="t('vat.legalNameHint')"
+            label-for="vat-legal"
+          >
+            <InputText
+              id="vat-legal"
+              v-model="form.legal_name"
+              maxlength="190"
+              :disabled="!canEdit"
+              fluid
+            />
+          </SettingRow>
+          <SettingRow
+            v-if="rateChanged"
+            :label="t('vat.effectiveFrom')"
+            :help="t('vat.effectiveHint')"
+            label-for="vat-from"
+          >
+            <DatePicker
+              v-model="form.effective"
+              input-id="vat-from"
+              :min-date="today"
+              :manual-input="false"
+              date-format="yy-mm-dd"
+              :invalid="!!err('effective_from')"
+              fluid
+            />
+            <small v-if="err('effective_from')" class="error">{{ err('effective_from') }}</small>
+          </SettingRow>
+        </template>
+        <div v-else class="off-note">
+          <Message severity="secondary" :closable="false">{{ t('vat.disabledNote') }}</Message>
+        </div>
+      </SettingsCard>
     </div>
 
-    <Message v-if="!form.enabled" severity="info" :closable="false">{{
-      t('vat.disabledNote')
-    }}</Message>
-
-    <template v-else>
-      <div class="grid">
-        <div class="field">
-          <label for="vat-rate">{{ t('vat.rate') }} *</label>
-          <InputNumber
-            v-model="form.rate"
-            input-id="vat-rate"
-            :min="0"
-            :max="100"
-            :max-fraction-digits="2"
-            suffix=" %"
-            :disabled="!canEdit"
-            :invalid="!!err('rate')"
-            fluid
-          />
-          <small :class="err('rate') ? 'error' : 'hint'">{{
-            err('rate') ?? t('vat.rateHint')
-          }}</small>
+    <section class="card preview" :aria-label="t('vat.preview')">
+      <div class="preview__title">{{ t('vat.preview') }}</div>
+      <template v-if="form.enabled">
+        <div class="preview__line">
+          <span>{{ t('vat.subtotal') }}</span
+          ><span class="num">{{ money(preview.net) }}</span>
         </div>
-        <div v-if="rateChanged" class="field">
-          <label for="vat-from">{{ t('vat.effectiveFrom') }} *</label>
-          <DatePicker
-            v-model="form.effective"
-            input-id="vat-from"
-            :min-date="today"
-            :manual-input="false"
-            date-format="yy-mm-dd"
-            :invalid="!!err('effective_from')"
-            fluid
-          />
-          <small :class="err('effective_from') ? 'error' : 'hint'">{{
-            err('effective_from') ?? t('vat.effectiveHint')
-          }}</small>
+        <div class="preview__line">
+          <span>{{ t('vat.vatLine', { rate: form.rate ?? 0 }) }}</span
+          ><span class="num">{{ money(preview.vat) }}</span>
         </div>
+      </template>
+      <div class="preview__line preview__total">
+        <span>{{ t('vat.total') }}</span
+        ><span class="num">{{ money(preview.gross) }}</span>
       </div>
-
-      <div class="field">
-        <span id="vat-pricing" class="label">{{ t('vat.pricing') }}</span>
-        <SelectButton
-          v-model="form.prices_include_vat"
-          :options="pricingOptions"
-          option-label="label"
-          option-value="value"
-          :allow-empty="false"
-          :disabled="!canEdit"
-          aria-labelledby="vat-pricing"
-        />
-      </div>
-
-      <div class="grid">
-        <div class="field">
-          <label for="vat-number">{{ t('vat.registrationNumber') }} *</label>
-          <InputText
-            id="vat-number"
-            v-model="form.registration_number"
-            maxlength="30"
-            dir="ltr"
-            :disabled="!canEdit"
-            :invalid="!!err('registration_number')"
-            fluid
-          />
-          <small v-if="err('registration_number')" class="error">{{
-            err('registration_number')
-          }}</small>
-        </div>
-        <div class="field">
-          <label for="vat-legal">{{ t('vat.legalName') }}</label>
-          <InputText
-            id="vat-legal"
-            v-model="form.legal_name"
-            maxlength="190"
-            :disabled="!canEdit"
-            fluid
-          />
-          <small class="hint">{{ t('vat.legalNameHint') }}</small>
-        </div>
-      </div>
-
-      <section class="preview" :aria-label="t('vat.preview')">
-        <span class="label">{{ t('vat.preview') }}</span>
-        <p class="receipt">
-          <span
-            >{{ t('vat.subtotal') }} <b class="num">{{ money(preview.net) }}</b></span
-          >
-          <span
-            >{{ t('vat.vatLine', { rate: form.rate ?? 0 }) }}
-            <b class="num">{{ money(preview.vat) }}</b></span
-          >
-          <span
-            >{{ t('vat.total') }} <b class="num">{{ money(preview.gross) }}</b></span
-          >
-        </p>
-        <small class="hint">{{
-          form.prices_include_vat ? t('vat.previewInclusive') : t('vat.previewExclusive')
-        }}</small>
-      </section>
-    </template>
-
-    <section v-if="settings.rates.length" class="history">
-      <span class="label">{{ t('vat.history') }}</span>
-      <ul>
-        <li v-for="r in settings.rates" :key="r.effective_from">
-          <span class="num">{{ r.rate }} %</span>
-          <span>{{
-            t('vat.from', { date: format.date(`${r.effective_from}T00:00:00Z`, 'UTC') })
-          }}</span>
-          <span v-if="r.scheduled" class="tag">{{ t('vat.scheduled') }}</span>
-        </li>
-      </ul>
+      <Button v-if="canEdit" type="submit" :label="t('vat.save')" :loading="saving" fluid />
     </section>
-
-    <Message v-if="formError" severity="error" :closable="false" role="alert">{{
-      formError
-    }}</Message>
-    <div v-if="canEdit" class="footer">
-      <span class="audit"
-        ><i class="pi pi-shield" aria-hidden="true" />{{ t('override.auditNote') }}</span
-      >
-      <Button type="submit" :label="t('permissions.save')" :loading="saving" />
-    </div>
   </form>
 </template>
 
 <style scoped>
-.stack,
 .vat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-.toggle label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
 }
-.field {
+.vat__rows {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
+  gap: 12px;
 }
-.field label,
-.label {
-  font: var(--text-small);
-  font-weight: var(--fw-medium);
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
 }
-.hint,
-.toggle small {
-  font: var(--text-caption);
-  color: var(--text-muted);
+.skeleton-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 24px;
+  padding: 16px 0;
+}
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.narrow {
+  max-width: 160px;
+}
+.mono :deep(input),
+.mono {
+  font-family: var(--font-mono);
+}
+.off-note {
+  padding: 0 0 16px;
 }
 .error {
   font: var(--text-caption);
   color: var(--sev-danger-fg);
 }
-.preview,
-.history {
+.preview {
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px dashed var(--border-default);
-  border-radius: var(--radius-card);
+  gap: 12px;
 }
-.receipt {
+.preview__title {
+  font: var(--text-h4);
+}
+.preview__line {
   display: flex;
-  gap: var(--space-3) var(--space-5);
-  flex-wrap: wrap;
-  margin: 0;
-}
-.history ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.history li {
-  display: flex;
-  gap: var(--space-3);
-  font: var(--text-small);
-}
-.tag {
-  font: var(--text-caption);
-  color: var(--sev-info-fg, var(--text-muted));
-}
-.footer {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
+  font: var(--text-body);
+  color: var(--text-secondary);
 }
-.audit {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font: var(--text-caption);
-  color: var(--text-muted);
+.preview__total {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  font: 600 16px var(--font-sans);
+  color: var(--text-primary);
+}
+@media (max-width: 900px) {
+  .vat {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

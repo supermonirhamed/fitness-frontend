@@ -17,6 +17,7 @@ import DataTable from 'primevue/datatable'
 import Tag from 'primevue/tag'
 import ArchiveServiceDialog from '@/components/services/ArchiveServiceDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ActivityTimeline from '@/components/patterns/ActivityTimeline.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusBanner from '@/components/patterns/StatusBanner.vue'
@@ -26,7 +27,6 @@ import ServiceBookingRules from '@/components/services/ServiceBookingRules.vue'
 import ServiceFormDrawer from '@/components/services/ServiceFormDrawer.vue'
 import {
   tenantApi,
-  type AuditEntry,
   type Location,
   type Service,
   type ServiceCategory,
@@ -35,17 +35,14 @@ import {
   type ServiceStatus,
 } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
-import { actionKey, fieldChanges } from '@/lib/audit'
 import { ACTIVITY_ICONS, activityKey, durationParts } from '@/lib/catalog'
-import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
 import type { MenuItem } from 'primevue/menuitem'
 
 const props = defineProps<{ id: number }>()
 const route = useRoute()
-const { t, te, locale } = useI18n()
+const { t, locale } = useI18n()
 const toast = useToast()
-const format = useFormat()
 const auth = useStaffAuth()
 const canEdit = computed(() => auth.can('services.update'))
 
@@ -230,34 +227,6 @@ const largestFacility = (locationId: number) => {
     .map((f) => f.capacity)
   return caps.length ? Math.max(...caps) : null
 }
-
-// Activity (needs audit.view)
-const activity = ref<AuditEntry[] | null>(null)
-const activityState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
-async function loadActivity() {
-  activityState.value = 'loading'
-  try {
-    activity.value = (
-      await tenantApi.auditLogs({ entity_type: 'Service', entity_id: props.id }, 1)
-    ).data
-    activityState.value = 'ready'
-  } catch {
-    activityState.value = 'error'
-  }
-}
-watch(tab, (value) => value === 'activity' && activityState.value === 'idle' && loadActivity(), {
-  immediate: true,
-})
-const actionLabel = (action: string) =>
-  te(`audit.actions.${actionKey(action)}`) ? t(`audit.actions.${actionKey(action)}`) : action
-// Edits list what changed; a creation just says so.
-const changedFields = (entry: AuditEntry) =>
-  entry.old_values === null
-    ? ''
-    : fieldChanges(entry.old_values, entry.new_values)
-        .map((c) => c.field)
-        .filter((f) => f !== 'bulk')
-        .join(', ')
 </script>
 
 <template>
@@ -576,39 +545,11 @@ const changedFields = (entry: AuditEntry) =>
           </TabPanel>
 
           <TabPanel value="activity">
-            <div v-if="activityState === 'loading'" class="skeleton">
-              <Skeleton v-for="n in 3" :key="n" height="40px" />
-            </div>
-            <ErrorState
-              v-else-if="activityState === 'error'"
-              class="panel"
-              compact
-              @retry="loadActivity"
+            <ActivityTimeline
+              v-if="tab === 'activity'"
+              entity-type="Service"
+              :entity-id="service.id"
             />
-            <EmptyState
-              v-else-if="!activity?.length"
-              class="panel"
-              compact
-              icon="pi-history"
-              :title="t('details.noActivity')"
-            />
-            <ol v-else class="panel timeline">
-              <li v-for="entry in activity" :key="entry.id">
-                <span class="timeline__dot" aria-hidden="true" />
-                <div>
-                  <div class="timeline__title">
-                    {{ actionLabel(entry.action) }}
-                    <small v-if="changedFields(entry)" class="muted"
-                      >· {{ changedFields(entry) }}</small
-                    >
-                  </div>
-                  <div class="timeline__meta">
-                    {{ format.dateTime(entry.created_at) }} ·
-                    {{ entry.actor?.name ?? t('details.system') }}
-                  </div>
-                </div>
-              </li>
-            </ol>
           </TabPanel>
         </TabPanels>
       </Tabs>
@@ -757,34 +698,6 @@ const changedFields = (entry: AuditEntry) =>
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.timeline {
-  margin: 0;
-  padding: 20px;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.timeline li {
-  display: flex;
-  gap: 12px;
-  position: relative;
-}
-.timeline__dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 5px;
-  border-radius: 50%;
-  background: var(--primary);
-  flex: none;
-}
-.timeline__title {
-  font: 500 14px/1.4 var(--font-sans);
-}
-.timeline__meta {
-  font: var(--text-small);
-  color: var(--text-secondary);
 }
 @media (max-width: 900px) {
   .overview {

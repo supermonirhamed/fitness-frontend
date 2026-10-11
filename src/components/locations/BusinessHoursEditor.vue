@@ -1,24 +1,25 @@
 <script setup lang="ts">
 // Weekly business hours of a branch (US-01.06): each day closed or one or more time ranges, in
 // the branch's timezone. Sessions outside them get a warning; appointment slots stay inside.
+// Laid out as the design's hours grid (BranchDetails.jsx HoursTab): one row per day.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
-import InputText from 'primevue/inputtext'
+import TimeField from '@/components/patterns/TimeField.vue'
 import Message from 'primevue/message'
-import Popover from 'primevue/popover'
 import Skeleton from 'primevue/skeleton'
 import ToggleSwitch from 'primevue/toggleswitch'
-import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
+import StatusBanner from '@/components/patterns/StatusBanner.vue'
+import { zoneAbbreviation } from '@/lib/datetime'
 import { tenantApi, type TimeRange, type WeeklyHours } from '@/api/tenant'
 import { validationErrors } from '@/lib/http'
 import { DAY_KEYS, dayError, defaultWeek, fromInput, toInput, weekOrder } from '@/lib/businessHours'
 import { useOrganization } from '@/stores/organization'
 
 const props = defineProps<{ locationId: number; canEdit: boolean }>()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const toast = useToast()
 const org = useOrganization()
 
@@ -32,6 +33,7 @@ const saving = ref(false)
 const errors = ref<Record<string, string[]>>({})
 const formError = ref<string | null>(null)
 
+const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12' : '24'))
 const days = computed(() => weekOrder(org.organization?.week_start ?? 0))
 const dayName = (d: number) => t(`regional.days.${DAY_KEYS[d]}`)
 const dirty = computed(() => JSON.stringify(toApi(week.value)) !== saved.value)
@@ -46,8 +48,11 @@ function toApi(hours: WeeklyHours | null): WeeklyHours | null {
     ? Object.fromEntries(Object.entries(hours).map(([d, ranges]) => [d, ranges.map(fromInput)]))
     : null
 }
+/** Not set yet: the grid shows a default week to start from (saving sets it). */
+const notSet = ref(false)
 function apply(hours: WeeklyHours | null) {
-  week.value = fromApi(hours)
+  notSet.value = hours === null
+  week.value = hours === null ? defaultWeek() : fromApi(hours)
   saved.value = JSON.stringify(hours)
 }
 
@@ -82,20 +87,17 @@ function removeRange(d: number, i: number) {
   ranges(d).splice(i, 1)
 }
 
-// Copy one day's hours to others
-const copyPopover = ref<InstanceType<typeof Popover>>()
-const copyFrom = ref<number | null>(null)
-const copyTo = ref<number[]>([])
-function openCopy(event: Event, d: number) {
-  copyFrom.value = d
-  copyTo.value = []
-  copyPopover.value?.toggle(event)
+// Copy one day's hours to every day (design: copy icon per row).
+function copyToAll(d: number) {
+  if (!week.value) return
+  const source = ranges(d)
+  for (const day of days.value) week.value[String(day)] = source.map((r) => ({ ...r }))
+  toast.add({ severity: 'info', summary: t('businessHours.copiedAll'), life: 2500 })
 }
-function applyCopy() {
-  if (!week.value || copyFrom.value === null) return
-  const source = ranges(copyFrom.value)
-  for (const d of copyTo.value) week.value[String(d)] = source.map((r) => ({ ...r }))
-  copyPopover.value?.hide()
+function discard() {
+  apply(JSON.parse(saved.value))
+  errors.value = {}
+  formError.value = null
 }
 
 async function save(hours: WeeklyHours | null = toApi(week.value)) {
@@ -117,140 +119,123 @@ async function save(hours: WeeklyHours | null = toApi(week.value)) {
 </script>
 
 <template>
-  <div v-if="state === 'loading'" class="stack">
-    <Skeleton v-for="n in 4" :key="n" height="44px" />
+  <div v-if="state === 'loading'" class="panel pad">
+    <Skeleton v-for="n in 5" :key="n" height="36px" />
   </div>
-  <EmptyState
+  <ErrorState
     v-else-if="state === 'error'"
-    icon="pi-exclamation-triangle"
+    class="panel"
     :title="t('businessHours.loadError')"
-  >
-    <Button severity="secondary" variant="outlined" :label="t('common.retry')" @click="load" />
-  </EmptyState>
+    @retry="load"
+  />
 
-  <EmptyState
-    v-else-if="!week"
-    icon="pi-clock"
-    :title="t('businessHours.notSet')"
-    :body="t('businessHours.notSetHint')"
-  >
-    <Button
-      v-if="canEdit"
-      icon="pi pi-plus"
-      :label="t('businessHours.set')"
-      @click="week = defaultWeek()"
-    />
-  </EmptyState>
+  <form v-else-if="week" class="stack" @submit.prevent="save()">
+    <StatusBanner v-if="notSet" severity="info" icon="pi-clock" :title="t('businessHours.notSet')">
+      {{ t('businessHours.notSetHint') }}
+    </StatusBanner>
+    <Message v-if="formError" severity="error" :closable="false" role="alert">{{
+      formError
+    }}</Message>
 
-  <form v-else class="stack" @submit.prevent="save()">
-    <p class="note">
-      <i class="pi pi-clock" aria-hidden="true" />
-      {{ t('businessHours.intro') }}
-      <span dir="ltr" class="ltr-isolate">{{ timezone }}</span>
-    </p>
+    <div class="panel">
+      <div class="head">
+        <div class="head__text">
+          <div class="head__title">{{ t('locationDetails.tabs.hours') }}</div>
+          <div class="head__help">
+            {{ t('businessHours.outsideWarning') }}
+            <strong dir="ltr">{{ zoneAbbreviation(timezone, locale) }} · {{ timezone }}</strong>
+          </div>
+        </div>
+        <template v-if="canEdit">
+          <Button
+            v-if="!notSet && !dirty"
+            :label="t('businessHours.clear')"
+            severity="secondary"
+            variant="text"
+            size="small"
+            :disabled="saving"
+            @click="save(null)"
+          />
+          <Button
+            v-if="dirty && !notSet"
+            :label="t('common.discard')"
+            severity="secondary"
+            variant="text"
+            size="small"
+            :disabled="saving"
+            @click="discard"
+          />
+          <Button
+            v-if="dirty || notSet"
+            type="submit"
+            :label="t('businessHours.save')"
+            :loading="saving"
+          />
+        </template>
+      </div>
 
-    <ul class="days">
-      <li v-for="d in days" :key="d" class="day" :class="{ invalid: dayError(errors, d) }">
-        <div class="day-head">
+      <div v-for="d in days" :key="d" :class="['day', { 'day--invalid': dayError(errors, d) }]">
+        <label :for="`open-${d}`" class="day__name">{{ dayName(d) }}</label>
+        <div class="day__toggle">
           <ToggleSwitch
             :model-value="ranges(d).length > 0"
             :input-id="`open-${d}`"
             :disabled="!canEdit"
             @update:model-value="(open: boolean) => setOpen(d, open)"
           />
-          <label :for="`open-${d}`" class="day-name">{{ dayName(d) }}</label>
         </div>
-
-        <div class="ranges">
-          <span v-if="!ranges(d).length" class="closed">{{ t('businessHours.closed') }}</span>
+        <div class="day__ranges">
+          <span v-if="!ranges(d).length" class="closed">{{ t('businessHours.closedAllDay') }}</span>
           <div v-for="(range, i) in ranges(d)" :key="i" class="range">
-            <InputText
-              v-model="range.start"
-              type="time"
-              :aria-label="t('businessHours.opens', { day: dayName(d) })"
-              :disabled="!canEdit"
-              :invalid="!!errors[`hours.${d}.${i}.start`]"
-              class="time"
-            />
-            <span aria-hidden="true">–</span>
-            <InputText
-              v-model="range.end"
-              type="time"
-              :aria-label="t('businessHours.closes', { day: dayName(d) })"
-              :disabled="!canEdit"
-              :invalid="!!errors[`hours.${d}.${i}.end`]"
-              class="time"
-            />
+            <div class="range__times" dir="ltr">
+              <TimeField
+                :hour-format="hourFormat"
+                v-model="range.start"
+                :aria-label="t('businessHours.opens', { day: dayName(d) })"
+                :disabled="!canEdit"
+                :invalid="!!errors[`hours.${d}.${i}.start`]"
+              />
+              <span aria-hidden="true">–</span>
+              <TimeField
+                :hour-format="hourFormat"
+                v-model="range.end"
+                :aria-label="t('businessHours.closes', { day: dayName(d) })"
+                :disabled="!canEdit"
+                :invalid="!!errors[`hours.${d}.${i}.end`]"
+              />
+            </div>
             <Button
-              v-if="canEdit"
-              icon="pi pi-times"
+              v-if="canEdit && ranges(d).length > 1"
+              icon="pi pi-trash"
               severity="secondary"
               variant="text"
-              rounded
               size="small"
               :aria-label="t('businessHours.removeRange')"
               @click="removeRange(d, i)"
             />
+            <Button
+              v-if="canEdit && i === ranges(d).length - 1 && ranges(d).length < MAX_RANGES"
+              icon="pi pi-plus"
+              :label="t('businessHours.addRange')"
+              variant="text"
+              size="small"
+              @click="addRange(d)"
+            />
           </div>
           <small v-if="dayError(errors, d)" class="error">{{ dayError(errors, d) }}</small>
         </div>
-
-        <div v-if="canEdit" class="day-actions">
-          <Button
-            v-if="ranges(d).length && ranges(d).length < MAX_RANGES"
-            icon="pi pi-plus"
-            :label="t('businessHours.addRange')"
-            severity="secondary"
-            variant="text"
-            size="small"
-            @click="addRange(d)"
-          />
-          <Button
-            icon="pi pi-copy"
-            :label="t('businessHours.copy')"
-            severity="secondary"
-            variant="text"
-            size="small"
-            aria-haspopup="true"
-            @click="openCopy($event, d)"
-          />
-        </div>
-      </li>
-    </ul>
-    <p class="note">{{ t('businessHours.midnightHint') }}</p>
-
-    <Popover ref="copyPopover">
-      <div class="copy">
-        <span class="copy-title">{{
-          t('businessHours.copyTo', { day: copyFrom === null ? '' : dayName(copyFrom) })
-        }}</span>
-        <label v-for="d in days.filter((x) => x !== copyFrom)" :key="d" class="copy-day">
-          <Checkbox v-model="copyTo" :value="d" :input-id="`copy-${d}`" />
-          {{ dayName(d) }}
-        </label>
         <Button
+          v-if="canEdit"
+          v-tooltip.top="t('businessHours.copyAll')"
+          icon="pi pi-copy"
+          severity="secondary"
+          variant="text"
           size="small"
-          :label="t('businessHours.applyCopy')"
-          :disabled="!copyTo.length"
-          @click="applyCopy"
+          :aria-label="t('businessHours.copyAll')"
+          @click="copyToAll(d)"
         />
       </div>
-    </Popover>
-
-    <Message v-if="formError" severity="error" :closable="false" role="alert">{{
-      formError
-    }}</Message>
-    <div v-if="canEdit" class="footer">
-      <Button
-        v-if="saved !== 'null'"
-        :label="t('businessHours.clear')"
-        severity="secondary"
-        variant="text"
-        :disabled="saving"
-        @click="save(null)"
-      />
-      <span v-else />
-      <Button type="submit" :label="t('permissions.save')" :disabled="!dirty" :loading="saving" />
+      <p class="hint">{{ t('businessHours.midnightHint') }}</p>
     </div>
   </form>
 </template>
@@ -259,104 +244,99 @@ async function save(hours: WeeklyHours | null = toApi(week.value)) {
 .stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 12px;
 }
-.note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin: 0;
-  font: var(--text-small);
-  color: var(--text-muted);
-}
-.days {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.panel {
+  background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
 }
-.day {
-  display: grid;
-  grid-template-columns: 180px 1fr auto;
-  gap: var(--space-3);
-  align-items: start;
-  padding: var(--space-3) var(--space-4);
-}
-.day + .day {
-  border-top: 1px solid var(--border-subtle);
-}
-.day.invalid {
-  background: var(--sev-danger-bg, transparent);
-}
-.day-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 40px;
-}
-.day-name {
-  font-weight: var(--fw-medium);
-}
-.ranges {
+.pad {
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  min-height: 40px;
-  justify-content: center;
+  gap: 10px;
 }
-.range {
+.head {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-default);
 }
-.time {
-  width: 8.5rem;
+.head__text {
+  flex: 1;
+}
+.head__title {
+  font: var(--text-h3);
+}
+.head__help {
+  font: var(--text-small);
+  color: var(--text-secondary);
+}
+.head__help strong {
+  font-weight: 600;
+}
+.day {
+  display: grid;
+  grid-template-columns: 84px 44px minmax(0, 1fr) 36px;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.day--invalid {
+  background: var(--sev-danger-bg);
+}
+.day__name {
+  font: 500 14px/36px var(--font-sans);
+}
+.day__toggle {
+  padding-top: 7px;
+}
+.day__ranges {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 .closed {
   font: var(--text-small);
+  line-height: 36px;
   color: var(--text-muted);
 }
-.day-actions {
+.range {
   display: flex;
-  gap: var(--space-1);
   flex-wrap: wrap;
-  justify-content: flex-end;
+  gap: 4px;
+  align-items: center;
+}
+.range__times {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--text-muted);
+}
+.time {
+  width: 112px;
 }
 .error {
   font: var(--text-caption);
   color: var(--sev-danger-fg);
 }
-.copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 200px;
+.hint {
+  margin: 0;
+  padding: 10px 16px;
+  font: var(--text-caption);
+  color: var(--text-muted);
 }
-.copy-title {
-  font: var(--text-small);
-  font-weight: var(--fw-medium);
-}
-.copy-day {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-}
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .day {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr auto auto;
   }
-  .day-actions {
-    justify-content: flex-start;
+  .day__ranges {
+    grid-column: 1 / -1;
+    order: 3;
   }
 }
 </style>

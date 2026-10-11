@@ -8,6 +8,7 @@ import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
 import HourOverrideDrawer from '@/components/locations/HourOverrideDrawer.vue'
 import { tenantApi, type HourOverride } from '@/api/tenant'
 import { splitByDate, todayIn } from '@/lib/businessHours'
@@ -81,9 +82,9 @@ async function remove() {
 </script>
 
 <template>
-  <section class="section" aria-labelledby="overrides-title">
+  <section class="panel" aria-labelledby="overrides-title">
     <header class="head">
-      <div>
+      <div class="head__text">
         <h3 id="overrides-title">{{ t('hourOverrides.title') }}</h3>
         <p class="note">{{ t('hourOverrides.intro') }}</p>
       </div>
@@ -92,51 +93,53 @@ async function remove() {
         icon="pi pi-plus"
         :label="t('hourOverrides.add')"
         severity="secondary"
-        variant="outlined"
         @click="openDrawer()"
       />
     </header>
 
-    <div v-if="state === 'loading'" class="stack">
-      <Skeleton v-for="n in 2" :key="n" height="52px" />
+    <div v-if="state === 'loading'" class="pad">
+      <Skeleton v-for="n in 2" :key="n" height="44px" />
     </div>
-    <EmptyState
+    <ErrorState
       v-else-if="state === 'error'"
-      icon="pi-exclamation-triangle"
+      compact
       :title="t('hourOverrides.loadError')"
-    >
-      <Button severity="secondary" variant="outlined" :label="t('common.retry')" @click="load" />
-    </EmptyState>
+      @retry="load"
+    />
     <template v-else>
       <EmptyState
         v-if="!lists.upcoming.length"
+        compact
         icon="pi-calendar-times"
         :title="t('hourOverrides.none')"
         :body="t('hourOverrides.noneHint')"
       />
       <ul v-else class="list">
         <li v-for="o in lists.upcoming" :key="o.id" class="item">
+          <span :class="['tile', o.closed ? 'tile--closed' : 'tile--hours']" aria-hidden="true"
+            ><i :class="['pi', o.closed ? 'pi-ban' : 'pi-clock']"
+          /></span>
           <div class="main">
             <span class="name">{{ o.label }}</span>
             <span class="dates">{{ dates(o) }}</span>
           </div>
           <Tag v-if="o.closed" severity="danger" :value="t('hourOverrides.closed')" />
-          <span v-else class="hours" dir="ltr">{{ hoursText(o) }}</span>
+          <Tag v-else severity="warn"
+            ><span dir="ltr">{{ hoursText(o) }}</span></Tag
+          >
           <div v-if="canEdit" class="actions">
             <Button
               icon="pi pi-pencil"
               severity="secondary"
               variant="text"
-              rounded
               size="small"
               :aria-label="t('hourOverrides.edit', { label: o.label })"
               @click="openDrawer(o)"
             />
             <Button
               icon="pi pi-trash"
-              severity="danger"
+              severity="secondary"
               variant="text"
-              rounded
               size="small"
               :aria-label="t('hourOverrides.delete', { label: o.label })"
               @click="askRemove(o)"
@@ -159,12 +162,17 @@ async function remove() {
         />
         <ul v-if="showPast" class="list past">
           <li v-for="o in lists.past" :key="o.id" class="item">
+            <span class="tile" aria-hidden="true"
+              ><i :class="['pi', o.closed ? 'pi-ban' : 'pi-clock']"
+            /></span>
             <div class="main">
               <span class="name">{{ o.label }}</span>
               <span class="dates">{{ dates(o) }}</span>
             </div>
-            <Tag v-if="o.closed" severity="secondary" :value="t('hourOverrides.closed')" />
-            <span v-else class="hours" dir="ltr">{{ hoursText(o) }}</span>
+            <Tag v-if="o.closed" :value="t('hourOverrides.closed')" />
+            <Tag v-else
+              ><span dir="ltr">{{ hoursText(o) }}</span></Tag
+            >
           </li>
         </ul>
       </template>
@@ -191,71 +199,91 @@ async function remove() {
 </template>
 
 <style scoped>
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--border-subtle);
+.panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
 }
 .head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+.head__text {
+  flex: 1;
 }
 h3 {
   margin: 0;
-  font: var(--text-h4);
+  font: var(--text-h3);
 }
 .note {
-  margin: var(--space-1) 0 0;
+  margin: 2px 0 0;
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
-.stack {
+.pad {
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 10px;
 }
 .list {
   margin: 0;
   padding: 0;
   list-style: none;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
 }
 .item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
-.item + .item {
-  border-top: 1px solid var(--border-subtle);
+.list:last-child .item:last-child {
+  border-bottom: 0;
+}
+.tile {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+.tile--closed {
+  background: var(--sev-danger-bg);
+  color: var(--sev-danger-fg);
+}
+.tile--hours {
+  background: var(--sev-warn-bg);
+  color: var(--sev-warn-fg);
 }
 .main {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  min-width: 0;
 }
 .name {
-  font-weight: var(--fw-medium);
+  font: 500 14px var(--font-sans);
 }
-.dates,
-.hours {
+.dates {
   font: var(--text-small);
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .actions {
   display: flex;
-}
-.past {
-  opacity: 0.8;
+  gap: 2px;
 }
 .toggle {
-  align-self: flex-start;
+  margin: 8px 12px;
+}
+.past .item {
+  opacity: 0.7;
 }
 </style>

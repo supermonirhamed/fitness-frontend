@@ -118,7 +118,7 @@ const tenantRoutes: RouteRecordRaw[] = [
       {
         path: 'branches',
         name: 'tenant.branches',
-        component: () => import('@/views/tenant/settings/LocationsView.vue'),
+        component: () => import('@/views/tenant/branches/BranchesView.vue'),
         meta: { permission: 'locations.view' },
       },
       { path: 'locations/:id(\\d+)', redirect: (to) => `/branches/${to.params.id}` },

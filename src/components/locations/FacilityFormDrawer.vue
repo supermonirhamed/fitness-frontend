@@ -27,9 +27,12 @@ import { apiMessage } from '@/lib/apiErrors'
 import { FACILITY_ICONS, splitInto, typeKey } from '@/lib/facilities'
 import { useStaffAuth } from '@/stores/staffAuth'
 
-const props = defineProps<{ locationId: number; facility: Facility | null }>()
+const props = defineProps<{ locationId: number; facility: Facility | null; canArchive?: boolean }>()
 const visible = defineModel<boolean>('visible', { required: true })
-const emit = defineEmits<{ saved: [facility: Facility, created: boolean] }>()
+const emit = defineEmits<{
+  saved: [facility: Facility, created: boolean]
+  archive: [facility: Facility]
+}>()
 const { t, locale } = useI18n()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
 const auth = useStaffAuth()
@@ -358,6 +361,15 @@ async function submit() {
     <template #footer>
       <div class="footer">
         <Button
+          v-if="facility && canArchive"
+          :label="t('archive.archive')"
+          icon="pi pi-inbox"
+          severity="danger"
+          variant="text"
+          class="footer__start"
+          @click="emit('archive', facility)"
+        />
+        <Button
           :label="t('common.cancel')"
           severity="secondary"
           variant="text"
@@ -376,6 +388,9 @@ async function submit() {
 </template>
 
 <style scoped>
+.footer__start {
+  margin-inline-end: auto;
+}
 .form {
   display: flex;
   flex-direction: column;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The Facilities tab of a branch (US-01.08): its rooms, studios, fields, pools… with sub-areas.
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -10,6 +11,7 @@ import Skeleton from 'primevue/skeleton'
 import ArchiveFilter from '@/components/patterns/ArchiveFilter.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import ErrorState from '@/components/patterns/ErrorState.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import FacilityFormDrawer from '@/components/locations/FacilityFormDrawer.vue'
 import { tenantApi, type Facility } from '@/api/tenant'
@@ -17,8 +19,9 @@ import { FACILITY_ICONS, typeKey } from '@/lib/facilities'
 
 const props = defineProps<{ locationId: number; canEdit: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const toast = useToast()
+const router = useRouter()
 
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const facilities = ref<Facility[]>([])
@@ -38,9 +41,6 @@ async function load() {
 }
 onMounted(load)
 watch(archived, load)
-
-const subAreaNames = (f: Facility) =>
-  (f.sub_areas ?? []).map((s) => s.name).join(locale.value === 'ar' ? '، ' : ', ')
 
 // Create / edit
 const drawerOpen = ref(false)
@@ -71,6 +71,15 @@ const confirmTitle = computed(() =>
     name: target.value?.name ?? '',
   }),
 )
+function onRow(f: Facility, event: Event) {
+  if (archived.value || (event.target as HTMLElement).closest('.no-click')) return
+  if (props.canEdit) openDrawer(f)
+  else router.push({ name: 'tenant.facilities.availability', params: { id: f.id } })
+}
+function onArchiveFromDrawer(f: Facility) {
+  drawerOpen.value = false
+  ask(f)
+}
 function ask(f: Facility) {
   target.value = f
   confirmError.value = null
@@ -104,9 +113,8 @@ async function toggleArchive() {
 <template>
   <div class="panel">
     <div class="toolbar">
-      <p class="note">{{ t('facilities.intro') }}</p>
-      <span class="spacer" />
       <ArchiveFilter v-if="canEdit" v-model="archived" />
+      <span class="spacer" />
       <Button
         v-if="canEdit && !archived"
         icon="pi pi-plus"
@@ -115,18 +123,18 @@ async function toggleArchive() {
       />
     </div>
 
-    <div v-if="state === 'loading'" class="stack">
-      <Skeleton v-for="n in 3" :key="n" height="48px" />
+    <div v-if="state === 'loading'" class="card pad">
+      <Skeleton v-for="n in 3" :key="n" height="40px" />
     </div>
-    <EmptyState
+    <ErrorState
       v-else-if="state === 'error'"
-      icon="pi-exclamation-triangle"
+      class="card"
       :title="t('facilities.loadError')"
-    >
-      <Button severity="secondary" variant="outlined" :label="t('common.retry')" @click="load" />
-    </EmptyState>
+      @retry="load"
+    />
     <EmptyState
       v-else-if="!facilities.length"
+      class="card"
       :icon="archived ? 'pi-inbox' : 'pi-th-large'"
       :title="archived ? t('archive.noneArchived') : t('facilities.empty')"
       :body="archived ? t('archive.noneArchivedHint') : t('facilities.emptyHint')"
@@ -138,71 +146,71 @@ async function toggleArchive() {
         @click="openDrawer()"
       />
     </EmptyState>
-    <DataTable v-else :value="facilities" data-key="id" size="small">
+    <DataTable
+      v-else
+      :value="facilities"
+      data-key="id"
+      :row-class="() => (archived ? '' : 'row-click')"
+      @row-click="onRow($event.data, $event.originalEvent)"
+    >
       <Column :header="t('facilities.columns.name')">
         <template #body="{ data }">
           <div class="name-cell">
-            <i
-              :class="['pi', FACILITY_ICONS[data.type as Facility['type']], 'type-icon']"
-              aria-hidden="true"
-            />
+            <span class="tile" aria-hidden="true"
+              ><i :class="['pi', FACILITY_ICONS[data.type as Facility['type']]]"
+            /></span>
             <div>
               <div class="name">{{ data.name }}</div>
-              <div v-if="data.sub_areas?.length" class="sub">
-                {{ t('facilities.subAreas', data.sub_areas.length) }}: {{ subAreaNames(data) }}
+              <div class="sub">
+                {{ t(`facilityTypes.${typeKey(data.type)}`)
+                }}<template v-if="data.sub_areas?.length">
+                  · {{ t('facilities.subAreas', data.sub_areas.length) }}</template
+                >
               </div>
             </div>
           </div>
         </template>
       </Column>
-      <Column :header="t('facilities.columns.type')">
-        <template #body="{ data }">{{ t(`facilityTypes.${typeKey(data.type)}`) }}</template>
-      </Column>
-      <Column :header="t('facilities.columns.capacity')" class="num-col">
+      <Column :header="t('facilities.columns.capacity')" header-class="end" body-class="end">
         <template #body="{ data }"
-          ><span class="num">{{ data.capacity }}</span></template
+          ><span class="num strong">{{ data.capacity }}</span></template
         >
+      </Column>
+      <Column :header="t('facilities.columns.allowed')">
+        <template #body="{ data }">
+          <span v-if="data.allowed_services?.length" class="num">{{
+            data.allowed_services.length
+          }}</span>
+          <span v-else class="muted">{{ t('facilities.allServices') }}</span>
+        </template>
       </Column>
       <Column :header="t('facilities.columns.status')">
         <template #body="{ data }"><StatusTag :status="data.status" /></template>
       </Column>
-      <Column class="actions-col">
+      <Column header-class="row-end" body-class="row-end">
         <template #body="{ data }">
-          <div class="actions">
+          <div v-if="!archived" class="actions">
             <Button
-              v-if="!archived"
+              v-tooltip.top="t('facilities.availabilityShort')"
               as="router-link"
               :to="{ name: 'tenant.facilities.availability', params: { id: data.id } }"
               icon="pi pi-calendar"
               severity="secondary"
               variant="text"
-              rounded
               size="small"
               :aria-label="t('facilities.availability', { name: data.name })"
-              v-tooltip.top="t('facilities.availabilityShort')"
+              class="no-click"
             />
-            <Button
-              v-if="canEdit && !archived"
-              icon="pi pi-pencil"
-              severity="secondary"
-              variant="text"
-              rounded
-              size="small"
-              :aria-label="t('facilities.edit', { name: data.name })"
-              @click="openDrawer(data)"
-            />
-            <Button
-              v-if="canEdit"
-              :icon="archived ? 'pi pi-replay pi-dir' : 'pi pi-box'"
-              :label="archived ? t('archive.restore') : undefined"
-              :severity="archived ? undefined : 'secondary'"
-              variant="text"
-              :rounded="!archived"
-              size="small"
-              :aria-label="archived ? t('archive.restore') : t('archive.archive')"
-              @click="ask(data)"
-            />
+            <i class="pi pi-chevron-right pi-dir row-chevron" aria-hidden="true" />
           </div>
+          <Button
+            v-else-if="canEdit"
+            icon="pi pi-replay pi-dir"
+            :label="t('archive.restore')"
+            variant="outlined"
+            size="small"
+            @click="ask(data)"
+          />
         </template>
       </Column>
     </DataTable>
@@ -211,7 +219,9 @@ async function toggleArchive() {
       v-model:visible="drawerOpen"
       :location-id="locationId"
       :facility="editing"
+      :can-archive="canEdit"
       @saved="onSaved"
+      @archive="onArchiveFromDrawer"
     />
     <ConfirmActionDialog
       v-model:visible="confirmOpen"
@@ -232,46 +242,61 @@ async function toggleArchive() {
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 12px;
 }
 .toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 8px;
   flex-wrap: wrap;
 }
 .spacer {
   flex: 1;
 }
-.note {
-  margin: 0;
-  font: var(--text-small);
-  color: var(--text-muted);
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
 }
-.stack {
+.pad {
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 10px;
 }
 .name-cell {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
+  align-items: center;
+  gap: 10px;
 }
-.type-icon {
-  margin-top: 3px;
+.tile {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--primary-subtle);
   color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .name {
-  font-weight: var(--fw-medium);
+  font: 500 14px var(--font-sans);
 }
 .sub {
   font: var(--text-caption);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.strong {
+  font-weight: 600;
+}
+.muted {
   color: var(--text-muted);
 }
 .actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

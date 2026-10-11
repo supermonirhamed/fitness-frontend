@@ -3,12 +3,12 @@ import type { FacilityType } from '@/api/tenant'
 /** PrimeIcons for each facility type (US-01.08). */
 export const FACILITY_ICONS: Record<FacilityType, string> = {
   Room: 'pi-box',
-  Studio: 'pi-star',
+  Studio: 'pi-objects-column',
   Field: 'pi-flag',
-  Pool: 'pi-sun',
+  Pool: 'pi-wave-pulse',
   'Gym Area': 'pi-bolt',
   Court: 'pi-stop',
-  Other: 'pi-objects-column',
+  Other: 'pi-map-marker',
 }
 
 /** i18n key segment of a type ('Gym Area' → 'GymArea'). */
