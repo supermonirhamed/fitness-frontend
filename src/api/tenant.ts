@@ -1000,6 +1000,13 @@ export const tenantApi = {
     async update(id: number, input: SessionInput & { scope?: 'one' }): Promise<CalendarSession> {
       return (await http.put(`/api/sessions/${id}`, input)).data.data
     },
+    async setStatus(input: {
+      ids?: number[]
+      series_id?: number
+      status: 'Published' | 'Draft'
+    }): Promise<{ changed: number; skipped: { id: number; reason: string }[]; found: number }> {
+      return (await http.post('/api/sessions/status', input)).data.data
+    },
     async get(id: number): Promise<SessionDetails> {
       return (await http.get(`/api/sessions/${id}`)).data.data
     },

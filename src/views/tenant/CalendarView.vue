@@ -16,6 +16,7 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import SplitButton from 'primevue/splitbutton'
 import Skeleton from 'primevue/skeleton'
+import BulkActionBar from '@/components/patterns/BulkActionBar.vue'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
 import AppointmentDrawer from '@/components/schedule/AppointmentDrawer.vue'
 import EventDrawer from '@/components/schedule/EventDrawer.vue'
@@ -171,6 +172,52 @@ async function load() {
     state.value = 'ready'
   } catch {
     if (mine === request) state.value = 'error'
+  }
+}
+// Select → Publish / Unpublish together (US-03.11). Past and cancelled sessions can't be picked.
+const selectMode = ref(false)
+const picked = ref<number[]>([])
+const bulkBusy = ref(false)
+function togglePick(s: CalendarSession) {
+  if (s.locked) return
+  picked.value = picked.value.includes(s.id)
+    ? picked.value.filter((id) => id !== s.id)
+    : [...picked.value, s.id]
+}
+function toggleSelectMode() {
+  selectMode.value = !selectMode.value
+  picked.value = []
+  popover.value?.hide()
+}
+const draftsInView = computed(() =>
+  sessions.value.filter((s) => s.status === 'Draft' && !s.locked).map((s) => s.id),
+)
+async function bulkStatus(status: 'Published' | 'Draft') {
+  bulkBusy.value = true
+  try {
+    const result = await tenantApi.sessions.setStatus({ ids: picked.value, status })
+    toast.add({
+      severity: result.skipped.length ? 'warn' : 'success',
+      summary: t(
+        status === 'Published' ? 'calendar.bulk.published' : 'calendar.bulk.unpublished',
+        result.changed,
+      ),
+      detail: result.skipped.length
+        ? t('calendar.bulk.skipped', {
+            n: result.skipped.length,
+            reasons: [
+              ...new Set(result.skipped.map((x) => t(`calendar.bulk.reasons.${x.reason}`))),
+            ].join('، '),
+          })
+        : undefined,
+      life: 6000,
+    })
+    picked.value = []
+    load()
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  } finally {
+    bulkBusy.value = false
   }
 }
 // Conflict Center badge (US-03.07)
@@ -393,6 +440,10 @@ function openDay(ymd: string) {
 const popover = ref<InstanceType<typeof Popover>>()
 const selected = ref<CalendarSession | null>(null)
 function select(s: CalendarSession, event: Event) {
+  if (selectMode.value) {
+    togglePick(s)
+    return
+  }
   selected.value = s
   popover.value?.hide()
   // The event loses its currentTarget once handled: keep the card to align to.
@@ -647,6 +698,16 @@ const zoneOf = (s: CalendarSession) =>
       <Button
         v-if="canResolve"
         size="small"
+        :icon="selectMode ? 'pi pi-check' : 'pi pi-check-square'"
+        :label="selectMode ? t('calendar.bulk.done') : t('calendar.bulk.select')"
+        severity="secondary"
+        :variant="selectMode ? undefined : 'outlined'"
+        :aria-pressed="selectMode"
+        @click="toggleSelectMode"
+      />
+      <Button
+        v-if="canResolve"
+        size="small"
         icon="pi pi-exclamation-triangle"
         :label="t('calendar.conflicts')"
         :badge="conflictCount ? String(conflictCount) : undefined"
@@ -657,6 +718,38 @@ const zoneOf = (s: CalendarSession) =>
       />
     </div>
 
+    <BulkActionBar
+      v-if="selectMode"
+      :label="picked.length ? t('calendar.bulk.selected', picked.length) : t('calendar.bulk.hint')"
+      @clear="picked = []"
+    >
+      <Button
+        v-if="draftsInView.length"
+        size="small"
+        severity="contrast"
+        icon="pi pi-filter"
+        :label="t('calendar.bulk.allDrafts', draftsInView.length)"
+        @click="picked = [...new Set([...picked, ...draftsInView])]"
+      />
+      <Button
+        size="small"
+        severity="contrast"
+        icon="pi pi-send"
+        :label="t('calendar.bulk.publish')"
+        :disabled="!picked.length"
+        :loading="bulkBusy"
+        @click="bulkStatus('Published')"
+      />
+      <Button
+        size="small"
+        severity="contrast"
+        icon="pi pi-eye-slash"
+        :label="t('calendar.bulk.unpublish')"
+        :disabled="!picked.length"
+        :loading="bulkBusy"
+        @click="bulkStatus('Draft')"
+      />
+    </BulkActionBar>
     <Message v-if="ownOnly" severity="secondary" icon="pi pi-user" :closable="false">{{
       t('calendar.ownOnly')
     }}</Message>
@@ -764,7 +857,7 @@ const zoneOf = (s: CalendarSession) =>
                 "
                 :show-coach="resource === 'facility'"
                 :show-zone="zoneOf(l.item)"
-                :selected="selected?.id === l.item.id"
+                :selected="selected?.id === l.item.id || picked.includes(l.item.id)"
                 role="button"
                 tabindex="0"
                 @click="select(l.item, $event)"
@@ -833,7 +926,7 @@ const zoneOf = (s: CalendarSession) =>
               :session="l.item"
               variant="compact"
               :show-zone="zoneOf(l.item)"
-              :selected="selected?.id === l.item.id"
+              :selected="selected?.id === l.item.id || picked.includes(l.item.id)"
               role="button"
               tabindex="0"
               @click="select(l.item, $event)"
@@ -868,6 +961,7 @@ const zoneOf = (s: CalendarSession) =>
             :key="s.id"
             :session="s"
             variant="mini"
+            :selected="picked.includes(s.id)"
             role="button"
             tabindex="0"
             @click="select(s, $event)"
@@ -899,7 +993,7 @@ const zoneOf = (s: CalendarSession) =>
           <div
             v-for="s in sessionsOn(d)"
             :key="s.id"
-            class="list__row"
+            :class="['list__row', { 'list__row--picked': picked.includes(s.id) }]"
             role="button"
             tabindex="0"
             @click="select(s, $event)"
@@ -1221,6 +1315,10 @@ const zoneOf = (s: CalendarSession) =>
   padding: 10px 16px;
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
+}
+.list__row--picked {
+  background: var(--primary-subtle);
+  border-inline-start: 3px solid var(--primary);
 }
 .list__row:hover {
   background: var(--surface-hover);

@@ -194,12 +194,38 @@ function onCancelled(done: CalendarSession) {
   load()
 }
 
+async function publishSeries() {
+  const s = session.value
+  if (!s?.series) return
+  try {
+    const result = await tenantApi.sessions.setStatus({
+      series_id: s.series.id,
+      status: 'Published',
+    })
+    toast.add({
+      severity: 'success',
+      summary: t('calendar.bulk.published', result.changed),
+      life: 4000,
+    })
+    load()
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  }
+}
+
 const moreItems = computed<MenuItem[]>(() => {
   const items: MenuItem[] = []
   if (canEdit.value)
     items.push({ label: t('sessionPage.substitute'), icon: 'pi pi-user-edit', command: edit })
   if (canCreate.value)
     items.push({ label: t('sessionPage.duplicate'), icon: 'pi pi-copy', command: duplicate })
+  // A draft series is released at once (US-03.11).
+  if (canEdit.value && session.value?.series && session.value.status === 'Draft')
+    items.push({
+      label: t('sessionPage.publishSeries'),
+      icon: 'pi pi-send',
+      command: publishSeries,
+    })
   items.push({
     label: `${t('sessionPage.message')} · ${t('sessionPage.later')}`,
     icon: 'pi pi-send',
