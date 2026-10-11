@@ -327,7 +327,8 @@ function failed(e: unknown) {
   if (
     code === 'session_conflicts' ||
     code === 'needs_confirmation' ||
-    code === 'outside_hours_forbidden'
+    code === 'outside_hours_forbidden' ||
+    code === 'staff_warnings_forbidden'
   ) {
     const list =
       (e as { response?: { data?: { conflicts?: (SessionConflictItem & { date?: string })[] } } })
@@ -912,7 +913,11 @@ const hourFormat = computed(() => (org.organization?.time_format === '12h' ? '12
             :key="c.code"
             class="tag-sm"
             :severity="c.level === 'hard' ? 'danger' : 'warn'"
-            :icon="c.code === 'holiday' ? 'pi pi-calendar-times' : 'pi pi-exclamation-triangle'"
+            :icon="
+              c.code === 'holiday' || c.code.startsWith('coach_time_off')
+                ? 'pi pi-calendar-times'
+                : 'pi pi-exclamation-triangle'
+            "
             :value="c.who ? `${c.title} · ${c.who}` : c.title"
           />
           <Tag v-if="skips.includes(item.date)" class="tag-sm" :value="t('session.skipped')" />

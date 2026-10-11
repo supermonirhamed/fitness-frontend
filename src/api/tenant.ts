@@ -431,7 +431,11 @@ export interface CalendarFilters {
 /** What stands in the way of a session (US-03.02/06): hard ones block, soft ones need confirming. */
 export interface SessionConflictItem {
   level: 'hard' | 'soft'
-  code: 'facility_busy' | 'facility_blocked' | 'coach_busy' | 'outside_hours' | 'holiday' | string
+  /**
+   * Hard: facility_busy, facility_blocked, coach_busy, coach_time_off, over_capacity.
+   * Soft: outside_hours, holiday, outside_availability, coach_time_off_pending (US-03.06).
+   */
+  code: string
   title: string
   who: string | null
   when: string | null
