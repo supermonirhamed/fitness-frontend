@@ -11,6 +11,8 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Dialog from 'primevue/dialog'
+import MultiSelect from 'primevue/multiselect'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tab from 'primevue/tab'
@@ -36,6 +38,7 @@ import {
   type Client,
   type ClientOverview,
   type Payment,
+  type Tag as TagItem,
 } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
@@ -74,6 +77,28 @@ watch(id, () => {
 })
 const qrUrl = computed(() => (client.value ? `/api/clients/${client.value.id}/qr` : null))
 const blocked = computed(() => client.value?.status === 'Blocked')
+
+// Tags (US-05.12)
+const tagsOpen = ref(false)
+const allTags = ref<TagItem[]>([])
+const tagSelection = ref<number[]>([])
+async function openTags() {
+  allTags.value = await tenantApi.tags.list().catch(() => [])
+  tagSelection.value = (client.value?.tags ?? []).map((tag) => tag.id)
+  tagsOpen.value = true
+}
+async function saveTags() {
+  if (!client.value) return
+  try {
+    client.value = {
+      ...client.value,
+      tags: await tenantApi.tags.setForClient(client.value.id, tagSelection.value),
+    }
+    tagsOpen.value = false
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  }
+}
 
 // Edit
 const editOpen = ref(false)
@@ -194,6 +219,22 @@ const LATER = ['memberships'] as const
             <span v-if="client.age !== null">{{ t('clients.age', { n: client.age }) }}</span>
           </div>
           <div class="head__alerts">
+            <Tag
+              v-for="tag in client.tags ?? []"
+              :key="`tag-${tag.id}`"
+              class="tag-sm"
+              :value="tag.name"
+              :style="tag.color ? { background: tag.color, color: '#fff' } : undefined"
+            />
+            <Button
+              v-if="auth.can('clients.update')"
+              size="small"
+              variant="text"
+              icon="pi pi-tag"
+              :label="t('clientProfile.editTags')"
+              class="tags-btn"
+              @click="openTags"
+            />
             <Tag
               v-if="blocked"
               severity="danger"
@@ -500,6 +541,33 @@ const LATER = ['memberships'] as const
       </Tabs>
     </template>
 
+    <Dialog
+      v-model:visible="tagsOpen"
+      modal
+      :header="t('clientProfile.editTags')"
+      :style="{ width: '420px' }"
+    >
+      <MultiSelect
+        v-model="tagSelection"
+        :options="allTags"
+        option-label="name"
+        option-value="id"
+        display="chip"
+        filter
+        fluid
+        :aria-label="t('segments.tags')"
+      />
+      <small v-if="!allTags.length" class="muted">{{ t('clientProfile.noTagsYet') }}</small>
+      <template #footer>
+        <Button
+          :label="t('common.cancel')"
+          severity="secondary"
+          variant="text"
+          @click="tagsOpen = false"
+        />
+        <Button :label="t('common.save')" @click="saveTags" />
+      </template>
+    </Dialog>
     <NewClientDrawer v-model:visible="editOpen" :client="client" @saved="onEdited" />
     <BookingDetailsDrawer
       v-model:visible="detailsOpen"

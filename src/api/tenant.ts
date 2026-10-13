@@ -640,6 +640,8 @@ export interface Client {
   /** In the list (US-05.04). */
   last_visit_at?: string | null
   upcoming_bookings?: number
+  /** Manual labels (US-05.12). */
+  tags?: Tag[]
   /** A health note exists (US-05.03); reading it needs clients.health_view. */
   has_health_notes: boolean
   photo_url: string | null
@@ -695,6 +697,8 @@ export interface ClientFilters {
   last_visit?: 'never'
   visited_from?: string
   visited_to?: string
+  tag_ids?: number[]
+  segment_id?: number
 }
 
 export type GuardianPermission =
@@ -742,6 +746,35 @@ export interface FamilyPage {
   }[]
   currency: string
   owed: number
+}
+
+/** A manual label on clients (US-05.12). */
+export interface Tag {
+  id: number
+  name: string
+  color: string | null
+  clients_count?: number
+}
+
+/** The rules of a dynamic segment: the clients list filters (US-05.12). */
+export interface SegmentRules {
+  location_id?: number
+  status?: Client['status'][]
+  age_min?: number
+  age_max?: number
+  created_from?: string
+  created_to?: string
+  last_visit?: 'never'
+  no_visit_days?: number
+  tag_ids?: number[]
+}
+
+export interface Segment {
+  id: number
+  name: string
+  type: 'dynamic' | 'static'
+  rules: SegmentRules
+  count: number
 }
 
 /** An internal note on a client (US-05.11); never shown to the client. */
@@ -1701,6 +1734,58 @@ export const tenantApi = {
       const body = new FormData()
       body.append('photo', file)
       return (await http.post(`/api/clients/${id}/photo`, body)).data.data
+    },
+  },
+  /** Tags and segments (US-05.12). */
+  tags: {
+    async list(): Promise<Tag[]> {
+      return (await http.get('/api/tags')).data.data
+    },
+    async create(input: { name: string; color?: string | null }): Promise<Tag> {
+      return (await http.post('/api/tags', input)).data.data
+    },
+    async update(id: number, input: { name: string; color?: string | null }): Promise<Tag> {
+      return (await http.put(`/api/tags/${id}`, input)).data.data
+    },
+    async remove(id: number): Promise<void> {
+      await http.delete(`/api/tags/${id}`)
+    },
+    /** Replaces the client's tags. */
+    async setForClient(clientId: number, tagIds: number[]): Promise<Tag[]> {
+      return (await http.put(`/api/clients/${clientId}/tags`, { tag_ids: tagIds })).data.data
+    },
+    async bulk(tagId: number, clientIds: number[]): Promise<{ tagged: number }> {
+      return (await http.post('/api/clients/bulk-tag', { tag_id: tagId, client_ids: clientIds }))
+        .data.data
+    },
+  },
+  segments: {
+    async list(): Promise<Segment[]> {
+      return (await http.get('/api/segments')).data.data
+    },
+    async create(input: {
+      name: string
+      type: Segment['type']
+      rules?: SegmentRules
+    }): Promise<Segment> {
+      return (await http.post('/api/segments', input)).data.data
+    },
+    async update(
+      id: number,
+      input: { name: string; type: Segment['type']; rules?: SegmentRules },
+    ): Promise<Segment> {
+      return (await http.put(`/api/segments/${id}`, input)).data.data
+    },
+    async remove(id: number): Promise<void> {
+      await http.delete(`/api/segments/${id}`)
+    },
+    /** "312 clients match" while building the rules. */
+    async preview(rules: SegmentRules): Promise<number> {
+      return (await http.post('/api/segments/preview', { rules })).data.data.count
+    },
+    /** Adds clients to a static segment. */
+    async addMembers(id: number, clientIds: number[]): Promise<{ count: number }> {
+      return (await http.post(`/api/segments/${id}/members`, { client_ids: clientIds })).data.data
     },
   },
   /** Settings → Waivers and clients signing them (US-05.07). */

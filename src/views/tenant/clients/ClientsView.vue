@@ -13,6 +13,9 @@ import DataTable, { type DataTablePageEvent } from 'primevue/datatable'
 import DatePicker from 'primevue/datepicker'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
+import Tag from 'primevue/tag'
+import Dialog from 'primevue/dialog'
+import BulkActionBar from '@/components/patterns/BulkActionBar.vue'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -23,7 +26,13 @@ import PageHeader from '@/components/patterns/PageHeader.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import NewClientDrawer from '@/components/clients/NewClientDrawer.vue'
-import { tenantApi, type Client, type ClientFilters } from '@/api/tenant'
+import {
+  tenantApi,
+  type Client,
+  type ClientFilters,
+  type Segment,
+  type Tag as TagItem,
+} from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -47,6 +56,11 @@ const statuses = ref<Client['status'][]>([])
 const age = ref<'any' | 'minor' | 'adult'>('any')
 const lastVisit = ref<'any' | 'recent' | 'lapsed' | 'never'>('any')
 const created = ref<(Date | null)[] | null>(null)
+// Tags and segments (US-05.12); a segment link opens the list filtered by it.
+const tagIds = ref<number[]>([])
+const segmentId = ref<number | null>(route.query.segment ? Number(route.query.segment) : null)
+const tagOptions = ref<TagItem[]>([])
+const segmentOptions = ref<Segment[]>([])
 const ownOnly = computed(() => auth.user?.scope === 'own')
 const locations = computed(() => auth.user?.switchable_locations ?? [])
 
@@ -67,6 +81,8 @@ const filters = computed<ClientFilters>(() => ({
   visited_to: lastVisit.value === 'lapsed' ? daysAgo(30) : undefined,
   created_from: ymd(created.value?.[0]),
   created_to: ymd(created.value?.[1] ?? created.value?.[0]),
+  tag_ids: tagIds.value.length ? tagIds.value : undefined,
+  segment_id: segmentId.value ?? undefined,
 }))
 const filtered = computed(() => Object.values(filters.value).some((v) => v !== undefined))
 function clearFilters() {
@@ -76,6 +92,8 @@ function clearFilters() {
   age.value = 'any'
   lastVisit.value = 'any'
   created.value = null
+  tagIds.value = []
+  segmentId.value = null
 }
 const statusOptions = computed(() =>
   (['Active', 'Inactive', 'Lead', 'Blocked'] as const).map((s) => ({
@@ -131,7 +149,42 @@ watch(
   { deep: true },
 )
 const drawerOpen = ref(false)
+// Bulk (US-05.12): add a tag, or add to a static segment.
+const selected = ref<Client[]>([])
+const canTag = computed(() => auth.can('clients.update'))
+const canSegment = computed(() => auth.can('marketing.update'))
+const bulkDialog = ref<'tag' | 'segment' | null>(null)
+const bulkTarget = ref<number | null>(null)
+const staticSegments = computed(() => segmentOptions.value.filter((s) => s.type === 'static'))
+async function applyBulk() {
+  if (!bulkTarget.value) return
+  const ids = selected.value.map((c) => c.id)
+  try {
+    if (bulkDialog.value === 'tag') await tenantApi.tags.bulk(bulkTarget.value, ids)
+    else await tenantApi.segments.addMembers(bulkTarget.value, ids)
+    toast.add({
+      severity: 'success',
+      summary: t('clients.bulk.done', { n: ids.length }),
+      life: 3000,
+    })
+    bulkDialog.value = null
+    bulkTarget.value = null
+    selected.value = []
+    load()
+    loadTaxonomy()
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  }
+}
+async function loadTaxonomy() {
+  ;[tagOptions.value, segmentOptions.value] = await Promise.all([
+    tenantApi.tags.list().catch(() => []),
+    tenantApi.segments.list().catch(() => []),
+  ])
+}
+
 onMounted(async () => {
+  loadTaxonomy()
   await load()
   // "New client" from another page (booking, POS) opens the form straight away.
   if (route.query.new === '1' && canCreate.value) {
@@ -160,8 +213,16 @@ function onSaved(client: Client) {
       <template v-if="state === 'ready' && !filtered" #meta>
         <span>{{ t('clients.count', total) }}</span>
       </template>
-      <template v-if="canExport" #actions>
+      <template #actions>
         <Button
+          icon="pi pi-tags"
+          :label="t('segments.title')"
+          severity="secondary"
+          variant="text"
+          @click="router.push({ name: 'tenant.clients.segments' })"
+        />
+        <Button
+          v-if="canExport"
           icon="pi pi-download"
           :label="t('bookings.export')"
           severity="secondary"
@@ -235,6 +296,50 @@ function onSaved(client: Client) {
           />
         </template>
       </FilterBar>
+      <div v-if="tagOptions.length || segmentOptions.length" class="filters2">
+        <MultiSelect
+          v-if="tagOptions.length"
+          v-model="tagIds"
+          :options="tagOptions"
+          option-label="name"
+          option-value="id"
+          :placeholder="t('segments.tags')"
+          :max-selected-labels="2"
+          class="filter"
+        />
+        <Select
+          v-if="segmentOptions.length"
+          v-model="segmentId"
+          :options="segmentOptions"
+          option-label="name"
+          option-value="id"
+          :placeholder="t('segments.segment')"
+          show-clear
+          class="filter"
+        />
+      </div>
+      <BulkActionBar
+        v-if="selected.length"
+        :label="t('bookings.bulk.selected', { n: selected.length })"
+        @clear="selected = []"
+      >
+        <Button
+          v-if="canTag && tagOptions.length"
+          size="small"
+          severity="contrast"
+          icon="pi pi-tag"
+          :label="t('clients.bulk.addTag')"
+          @click="bulkDialog = 'tag'"
+        />
+        <Button
+          v-if="canSegment && staticSegments.length"
+          size="small"
+          severity="contrast"
+          icon="pi pi-filter"
+          :label="t('clients.bulk.addToSegment')"
+          @click="bulkDialog = 'segment'"
+        />
+      </BulkActionBar>
 
       <ErrorState
         v-if="state === 'error'"
@@ -258,6 +363,7 @@ function onSaved(client: Client) {
       </EmptyState>
       <DataTable
         v-else
+        v-model:selection="selected"
         :value="clients"
         data-key="id"
         lazy
@@ -281,6 +387,7 @@ function onSaved(client: Client) {
         <template #loading>
           <div class="skeleton"><Skeleton v-for="n in 3" :key="n" height="20px" /></div>
         </template>
+        <Column v-if="canTag || canSegment" selection-mode="multiple" header-style="width: 3rem" />
         <Column :header="t('clients.columns.client')">
           <template #body="{ data }">
             <div class="person">
@@ -290,6 +397,19 @@ function onSaved(client: Client) {
                 <div class="person__id num">{{ data.member_id }}</div>
               </div>
             </div>
+          </template>
+        </Column>
+        <Column :header="t('segments.tags')">
+          <template #body="{ data }">
+            <span class="tags">
+              <Tag
+                v-for="tag in data.tags ?? []"
+                :key="tag.id"
+                class="tag-sm"
+                :value="tag.name"
+                :style="tag.color ? { background: tag.color, color: '#fff' } : undefined"
+              />
+            </span>
           </template>
         </Column>
         <Column :header="t('clients.columns.mobile')">
@@ -330,12 +450,47 @@ function onSaved(client: Client) {
     </template>
 
     <NewClientDrawer v-model:visible="drawerOpen" @saved="onSaved" />
+    <Dialog
+      :visible="bulkDialog !== null"
+      modal
+      :header="bulkDialog === 'tag' ? t('clients.bulk.addTag') : t('clients.bulk.addToSegment')"
+      :style="{ width: '380px' }"
+      @update:visible="(v: boolean) => !v && (bulkDialog = null)"
+    >
+      <Select
+        v-model="bulkTarget"
+        :options="bulkDialog === 'tag' ? tagOptions : staticSegments"
+        option-label="name"
+        option-value="id"
+        fluid
+        :aria-label="bulkDialog === 'tag' ? t('segments.tags') : t('segments.segment')"
+      />
+      <template #footer>
+        <Button
+          :label="t('common.cancel')"
+          severity="secondary"
+          variant="text"
+          @click="bulkDialog = null"
+        />
+        <Button :label="t('common.save')" :disabled="!bulkTarget" @click="applyBulk" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
 <style scoped>
 .filter {
   min-width: 150px;
+}
+.filters2 {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 .page {
   display: flex;
