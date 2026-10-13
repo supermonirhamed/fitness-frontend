@@ -20,6 +20,7 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import Tag from 'primevue/tag'
 import BookingDetailsDrawer from '@/components/bookings/BookingDetailsDrawer.vue'
+import ClientFamilyTab from '@/components/clients/ClientFamilyTab.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
 import ClientTimeline from '@/components/clients/ClientTimeline.vue'
 import ClientWaiversTab from '@/components/clients/ClientWaiversTab.vue'
@@ -147,7 +148,7 @@ const whenOptions = computed(() => [
   { value: 'past', label: t('clientProfile.past') },
 ])
 const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } as const
-const LATER = ['family', 'notes', 'memberships'] as const
+const LATER = ['notes', 'memberships'] as const
 </script>
 
 <template>
@@ -272,6 +273,7 @@ const LATER = ['family', 'notes', 'memberships'] as const
           <Tab v-if="auth.can('payments.view')" value="payments">{{
             t('clientProfile.tabs.payments')
           }}</Tab>
+          <Tab value="family">{{ t('clientProfile.tabs.family') }}</Tab>
           <Tab value="waivers">{{ t('clientProfile.tabs.waivers') }}</Tab>
           <Tab value="timeline">{{ t('clientProfile.tabs.timeline') }}</Tab>
           <Tab v-for="later in LATER" :key="later" :value="later" disabled>
@@ -480,6 +482,9 @@ const LATER = ['family', 'notes', 'memberships'] as const
             </div>
           </TabPanel>
 
+          <TabPanel value="family">
+            <ClientFamilyTab v-if="tab === 'family'" :client="client" @changed="loadOverview" />
+          </TabPanel>
           <TabPanel value="waivers">
             <ClientWaiversTab v-if="tab === 'waivers'" :client-id="client.id" />
           </TabPanel>

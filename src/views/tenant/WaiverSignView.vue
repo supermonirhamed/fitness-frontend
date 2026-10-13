@@ -6,7 +6,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete'
+import Select from 'primevue/select'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
@@ -35,37 +35,35 @@ const method = ref<'typed' | 'drawn'>('typed')
 const signerName = ref('')
 const accepted = ref(false)
 const signature = ref<string | null>(null)
-const guardianQuery = ref<string | Client>('')
-const guardianOptions = ref<Client[]>([])
 const guardian = ref<Client | null>(null)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const done = ref(false)
 
+const guardians = ref<{ id: number; name: string }[]>([])
 onMounted(async () => {
   try {
     waiver.value = await tenantApi.waivers.toSign(clientId, templateId)
     if (!waiver.value.client.minor) signerName.value = waiver.value.client.name
+    else
+      guardians.value = (await tenantApi.clients.family(clientId)).guardians
+        .filter((g) => g.client)
+        .map((g) => ({ id: g.client!.id, name: g.client!.name }))
   } catch {
     failed.value = true
   }
 })
+function chooseGuardianId(id: number) {
+  const g = guardians.value.find((x) => x.id === id)
+  guardian.value = g ? ({ id: g.id, name: g.name } as Client) : null
+  signerName.value = g?.name ?? ''
+}
 function setLang(value: 'ar' | 'en') {
   lang.value = value
   setLocale(value)
 }
 const pick = (text: Translated | null | undefined) =>
   text ? (text[lang.value] ?? text[lang.value === 'ar' ? 'en' : 'ar'] ?? '') : ''
-
-async function searchGuardian(e: AutoCompleteCompleteEvent) {
-  guardianOptions.value = (
-    await tenantApi.clients.list({ q: e.query, per_page: 8 }).catch(() => ({ data: [] }))
-  ).data.filter((c) => c.id !== clientId)
-}
-function chooseGuardian(c: Client) {
-  guardian.value = c
-  signerName.value = c.name
-}
 
 const ready = computed(
   () =>
@@ -141,16 +139,16 @@ const back = () =>
       </Message>
       <div v-if="waiver.client.minor" class="field">
         <label for="sign-guardian">{{ t('waiverSign.guardian') }} *</label>
-        <AutoComplete
-          v-model="guardianQuery"
+        <Select
+          v-if="guardians.length"
+          :model-value="guardian?.id ?? null"
           input-id="sign-guardian"
-          :suggestions="guardianOptions"
+          :options="guardians"
           option-label="name"
-          :min-length="2"
-          fluid
-          @complete="searchGuardian"
-          @option-select="chooseGuardian($event.value)"
+          option-value="id"
+          @update:model-value="chooseGuardianId"
         />
+        <Message v-else severity="warn" :closable="false">{{ t('waiverSign.noGuardian') }}</Message>
       </div>
 
       <div class="field">

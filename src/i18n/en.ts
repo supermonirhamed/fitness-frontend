@@ -1752,6 +1752,29 @@ export default {
     noPayments: 'No payments recorded.',
     payment: { Recorded: 'Recorded', Voided: 'Voided' },
   },
+  family: {
+    loadError: "The family couldn't be loaded.",
+    guardians: 'Guardians',
+    dependents: 'Children',
+    none: { guardians: 'No guardian linked.', dependents: 'No children linked.' },
+    childInfo:
+      'Children don’t have their own login. Guardians manage their bookings, payments and notifications.',
+    addChild: 'Add a child',
+    linkChild: 'Link existing client',
+    addGuardian: 'Add guardian',
+    unlink: 'Remove from family',
+    relation: 'Relation',
+    relationOf: 'Relation',
+    relations: { mother: 'Mother', father: 'Father', guardian: 'Guardian', other: 'Other' },
+    permissions: {
+      can_book: 'Can book',
+      can_pay: 'Can pay',
+      can_view_performance: 'Sees performance',
+      receives_notifications: 'Gets notifications',
+    },
+    dialogs: { child: 'Add a child', linkChild: 'Link a child', linkGuardian: 'Add a guardian' },
+    noContactNeeded: 'A child needs no email or phone; their guardians are contacted.',
+  },
   waivers: {
     intro:
       'Clients sign these on a staff tablet before booking. A missing required waiver blocks the booking unless a manager overrides it.',
@@ -1791,6 +1814,7 @@ export default {
     loadError: "This waiver couldn't be loaded.",
     version: 'Version {n}',
     onBehalf: 'Signing on behalf of {name} (child). A guardian signs.',
+    noGuardian: 'This child has no guardian yet. Add one in the Family tab first.',
     guardian: 'Guardian',
     how: 'How do you want to sign?',
     typed: 'Type my name',

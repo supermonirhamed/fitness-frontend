@@ -697,6 +697,33 @@ export interface ClientFilters {
   visited_to?: string
 }
 
+export type GuardianPermission =
+  'can_book' | 'can_pay' | 'can_view_performance' | 'receives_notifications'
+
+/** A guardian–child link (US-05.08), seen from one side: `client` is the other person. */
+export interface FamilyLink {
+  id: number
+  relation: 'mother' | 'father' | 'guardian' | 'other'
+  can_book: boolean
+  can_pay: boolean
+  can_view_performance: boolean
+  receives_notifications: boolean
+  client: {
+    id: number
+    name: string
+    member_id: string | null
+    age: number | null
+    status: Client['status']
+    photo_url: string | null
+  } | null
+}
+
+export interface ClientFamily {
+  is_child: boolean
+  guardians: FamilyLink[]
+  dependents: FamilyLink[]
+}
+
 /** A waiver template (US-05.07), with its latest text. */
 export interface WaiverTemplate {
   id: number
@@ -1556,6 +1583,39 @@ export const tenantApi = {
       ignore?: number | null
     }): Promise<ClientMatch[]> {
       return (await http.get('/api/clients/duplicates', { params })).data.data
+    },
+    /** Guardians and children (US-05.08). */
+    async family(id: number): Promise<ClientFamily> {
+      return (await http.get(`/api/clients/${id}/family`)).data.data
+    },
+    async addChild(
+      guardianId: number,
+      input: {
+        first_name: string
+        last_name: string
+        date_of_birth: string | null
+        gender: 'female' | 'male' | null
+        relation: FamilyLink['relation']
+        permissions?: Partial<Record<GuardianPermission, boolean>>
+      },
+    ): Promise<ClientFamily & { child_id: number }> {
+      return (await http.post(`/api/clients/${guardianId}/children`, input)).data.data
+    },
+    /** `as: 'dependent'` links `clientId` as this client's child; `as: 'guardian'` as their guardian. */
+    async linkFamily(
+      id: number,
+      input: { client_id: number; as: 'dependent' | 'guardian'; relation: FamilyLink['relation'] },
+    ): Promise<ClientFamily> {
+      return (await http.post(`/api/clients/${id}/family/link`, input)).data.data
+    },
+    async updateGuardianship(
+      linkId: number,
+      input: Partial<Pick<FamilyLink, 'relation' | GuardianPermission>>,
+    ): Promise<FamilyLink> {
+      return (await http.put(`/api/guardianships/${linkId}`, input)).data.data
+    },
+    async unlinkFamily(linkId: number): Promise<void> {
+      await http.delete(`/api/guardianships/${linkId}`)
     },
     async health(id: number): Promise<ClientHealth> {
       return (await http.get(`/api/clients/${id}/health`)).data.data
