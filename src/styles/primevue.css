@@ -165,6 +165,53 @@
   color: var(--text-muted);
   font-size: 14px;
 }
+/* Our input padding above is unlayered, so it beat PrimeVue's room for icons: give it back. */
+.p-iconfield .p-inputtext:not(:first-child) {
+  padding-inline-start: 34px;
+}
+.p-iconfield .p-inputtext:not(:last-child) {
+  padding-inline-end: 34px;
+}
+.p-datepicker:has(.p-datepicker-input-icon-container) .p-inputtext {
+  padding-inline-end: 34px;
+}
+/* Number inputs with up/down buttons: a slim column on the end edge, inside the border. */
+.p-inputnumber-stacked {
+  position: relative;
+}
+.p-inputnumber-stacked .p-inputnumber-input {
+  width: 100%;
+  padding-inline-end: 34px;
+}
+.p-inputnumber-stacked .p-inputnumber-button-group {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  inset-inline-end: 1px;
+  inset-inline-start: auto;
+  width: 26px;
+  display: flex;
+  flex-direction: column;
+  border-inline-start: 1px solid var(--border-default);
+}
+.p-inputnumber-stacked .p-inputnumber-button {
+  flex: 1;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+.p-inputnumber-stacked .p-inputnumber-button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.p-inputnumber-stacked .p-inputnumber-increment-button {
+  border-bottom: 1px solid var(--border-subtle);
+}
 .p-select-overlay,
 .p-multiselect-overlay,
 .p-autocomplete-overlay,
