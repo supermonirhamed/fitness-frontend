@@ -19,6 +19,7 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import type { MenuItem } from 'primevue/menuitem'
 import BookingDrawer from '@/components/bookings/BookingDrawer.vue'
+import CancelBookingDialog from '@/components/bookings/CancelBookingDialog.vue'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
 import ConflictList from '@/components/patterns/ConflictList.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -97,6 +98,25 @@ const canBook = computed(
     !['cancelled', 'completed', 'started'].includes(session.value.booking.reason ?? ''),
 )
 const bookingOpen = ref(false)
+// Cancel a booking (US-04.04): until the session starts.
+const canCancelBookings = computed(
+  () => auth.can('bookings.delete') && !!session.value && !session.value.locked,
+)
+const cancelBookingOpen = ref(false)
+const cancelling = ref<Booking | null>(null)
+function cancelBooking(booking: Booking) {
+  cancelling.value = booking
+  cancelBookingOpen.value = true
+}
+function onBookingCancelled(booking: Booking) {
+  toast.add({
+    severity: booking.status === 'LateCancel' ? 'warn' : 'success',
+    summary: t(booking.status === 'LateCancel' ? 'cancelBooking.doneLate' : 'cancelBooking.done'),
+    detail: booking.client.name ?? undefined,
+    life: 4000,
+  })
+  load()
+}
 function onBooked(booking: Booking) {
   toast.add({
     severity: 'success',
@@ -520,6 +540,20 @@ const moreItems = computed<MenuItem[]>(() => {
                   <span class="muted">{{ data.booked_by ?? '—' }}</span>
                 </template>
               </Column>
+              <Column v-if="canCancelBookings" header-class="row-end" body-class="row-end">
+                <template #body="{ data }">
+                  <Button
+                    v-if="data.status === 'Confirmed'"
+                    v-tooltip.top="t('cancelBooking.action')"
+                    icon="pi pi-times"
+                    severity="secondary"
+                    variant="text"
+                    size="small"
+                    :aria-label="`${t('cancelBooking.action')}: ${data.client.name}`"
+                    @click="cancelBooking(data)"
+                  />
+                </template>
+              </Column>
             </DataTable>
           </TabPanel>
           <TabPanel value="waitlist">
@@ -663,6 +697,13 @@ const moreItems = computed<MenuItem[]>(() => {
         @saved="onCreated"
       />
       <BookingDrawer v-model:visible="bookingOpen" :session="session" @booked="onBooked" />
+      <CancelBookingDialog
+        v-model:visible="cancelBookingOpen"
+        :booking="cancelling"
+        :session="`${session.service.name} · ${dayLabel(session.local.date)} ${session.local.start}`"
+        :timezone="session.location.timezone"
+        @cancelled="onBookingCancelled"
+      />
       <SubstituteCoachDrawer
         v-model:visible="substituteOpen"
         :session="session"

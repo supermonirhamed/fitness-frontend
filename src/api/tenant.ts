@@ -683,6 +683,19 @@ export interface Booking {
   overridden: OverridableCheck[]
   booked_by: string | null
   created_at: string | null
+  cancelled_at: string | null
+  penalty: Penalty | null
+  penalty_fee: number | null
+  penalty_waived: boolean
+}
+
+/** What cancelling a booking now means (US-04.04). */
+export interface CancellationTerms {
+  late: boolean
+  free_until: string
+  penalty: Penalty
+  fee: number | null
+  can_waive: boolean
 }
 
 /** Whether a client can book a session (US-04.01): every check in order, and why not. */
@@ -1254,6 +1267,16 @@ export const tenantApi = {
       input: { client_id: number; override?: OverridableCheck[]; override_reason?: string | null },
     ): Promise<BookingEligibility> {
       return (await http.post(`/api/sessions/${sessionId}/eligibility`, input)).data.data
+    },
+    async cancelTerms(id: number): Promise<CancellationTerms> {
+      return (await http.get(`/api/bookings/${id}/cancel-terms`)).data.data
+    },
+    /** 409 booking_not_cancellable / booking_session_started; waiving needs bookings.override. */
+    async cancel(
+      id: number,
+      input: { reason?: string | null; waive_penalty?: boolean; waive_reason?: string | null },
+    ): Promise<Booking> {
+      return (await http.post(`/api/bookings/${id}/cancel`, input)).data.data
     },
     /** 409 not_eligible carries `eligibility`; 422 entitlement_unavailable. */
     async create(input: {
