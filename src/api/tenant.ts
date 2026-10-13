@@ -637,6 +637,9 @@ export interface Client {
   home_location: { id: number; name: string } | null
   marketing_consent: boolean
   status: 'Active' | 'Inactive' | 'Blocked' | 'Lead'
+  /** In the list (US-05.04). */
+  last_visit_at?: string | null
+  upcoming_bookings?: number
   /** A health note exists (US-05.03); reading it needs clients.health_view. */
   has_health_notes: boolean
   photo_url: string | null
@@ -655,6 +658,20 @@ export interface ClientInput {
   preferred_language: 'ar' | 'en' | null
   home_location_id: number | null
   marketing_consent: boolean
+}
+
+/** The clients list filters (US-05.04). Dates are Y-m-d. */
+export interface ClientFilters {
+  q?: string
+  location_id?: number
+  status?: Client['status'][]
+  age_min?: number
+  age_max?: number
+  created_from?: string
+  created_to?: string
+  last_visit?: 'never'
+  visited_from?: string
+  visited_to?: string
 }
 
 /** Emergency contacts and health notes (US-05.03). */
@@ -1430,11 +1447,21 @@ export const tenantApi = {
     },
   },
   clients: {
-    async list(params: { q?: string; page?: number; per_page?: number } = {}): Promise<{
+    async list(params: ClientFilters & { page?: number; per_page?: number } = {}): Promise<{
       data: Client[]
       meta: { total: number; current_page: number; last_page: number }
     }> {
       return (await http.get('/api/clients', { params })).data
+    },
+    /** The filtered list as CSV (clients.export); opened as a download link. */
+    exportUrl(filters: ClientFilters): string {
+      const params = new URLSearchParams()
+      for (const [key, value] of Object.entries(filters)) {
+        if (value === undefined || value === null || value === '') continue
+        if (Array.isArray(value)) value.forEach((v) => params.append(`${key}[]`, String(v)))
+        else params.append(key, String(value))
+      }
+      return `/api/clients/export?${params}`
     },
     async get(id: number): Promise<Client> {
       return (await http.get(`/api/clients/${id}`)).data.data

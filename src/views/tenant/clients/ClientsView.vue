@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Clients (US-05.01), as the design's ClientsScreen: header with the count and New client, a search
-// by name, mobile, email or member ID, and the clients the user can see (their branches, US-00.09).
-// Filters, bulk actions and export come with US-05.04.
+// by name, mobile, email or member ID, and the clients the user can see (their branches, US-00.09;
+// coaches only clients booked with them). Filters, last visit, upcoming bookings and CSV export
+// (US-05.04); tags, segments and messages join with US-05.12 and EP-12.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -9,6 +10,10 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable, { type DataTablePageEvent } from 'primevue/datatable'
+import DatePicker from 'primevue/datepicker'
+import MultiSelect from 'primevue/multiselect'
+import Select from 'primevue/select'
+import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
@@ -18,7 +23,7 @@ import PageHeader from '@/components/patterns/PageHeader.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import NewClientDrawer from '@/components/clients/NewClientDrawer.vue'
-import { tenantApi, type Client } from '@/api/tenant'
+import { tenantApi, type Client, type ClientFilters } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -37,6 +42,63 @@ const clients = ref<Client[]>([])
 const total = ref(0)
 const page = ref(1)
 const search = ref('')
+const locationId = ref<number | null>(null)
+const statuses = ref<Client['status'][]>([])
+const age = ref<'any' | 'minor' | 'adult'>('any')
+const lastVisit = ref<'any' | 'recent' | 'lapsed' | 'never'>('any')
+const created = ref<(Date | null)[] | null>(null)
+const ownOnly = computed(() => auth.user?.scope === 'own')
+const locations = computed(() => auth.user?.switchable_locations ?? [])
+
+const ymd = (d: Date | null | undefined) =>
+  d
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    : undefined
+const daysAgo = (n: number) => ymd(new Date(Date.now() - n * 864e5))
+// "Visited in the last 30 days", "Not for 30 days", "Never visited"; minors under 18.
+const filters = computed<ClientFilters>(() => ({
+  q: search.value.trim() || undefined,
+  location_id: locationId.value ?? undefined,
+  status: statuses.value.length ? statuses.value : undefined,
+  age_max: age.value === 'minor' ? 17 : undefined,
+  age_min: age.value === 'adult' ? 18 : undefined,
+  last_visit: lastVisit.value === 'never' ? 'never' : undefined,
+  visited_from: lastVisit.value === 'recent' ? daysAgo(30) : undefined,
+  visited_to: lastVisit.value === 'lapsed' ? daysAgo(30) : undefined,
+  created_from: ymd(created.value?.[0]),
+  created_to: ymd(created.value?.[1] ?? created.value?.[0]),
+}))
+const filtered = computed(() => Object.values(filters.value).some((v) => v !== undefined))
+function clearFilters() {
+  search.value = ''
+  locationId.value = null
+  statuses.value = []
+  age.value = 'any'
+  lastVisit.value = 'any'
+  created.value = null
+}
+const statusOptions = computed(() =>
+  (['Active', 'Inactive', 'Lead', 'Blocked'] as const).map((s) => ({
+    value: s,
+    label: t(`status.${s}`),
+  })),
+)
+const ageOptions = computed(() =>
+  (['any', 'minor', 'adult'] as const).map((v) => ({
+    value: v,
+    label: t(`clients.filters.age.${v}`),
+  })),
+)
+const visitOptions = computed(() =>
+  (['any', 'recent', 'lapsed', 'never'] as const).map((v) => ({
+    value: v,
+    label: t(`clients.filters.visit.${v}`),
+  })),
+)
+const canExport = computed(() => auth.can('clients.export'))
+function exportCsv() {
+  window.location.href = tenantApi.clients.exportUrl(filters.value)
+}
 
 let request = 0
 async function load() {
@@ -44,7 +106,7 @@ async function load() {
   state.value = 'loading'
   try {
     const result = await tenantApi.clients.list({
-      q: search.value.trim() || undefined,
+      ...filters.value,
       page: page.value,
       per_page: PER_PAGE,
     })
@@ -57,13 +119,17 @@ async function load() {
   }
 }
 let timer: ReturnType<typeof setTimeout> | undefined
-watch(search, () => {
-  clearTimeout(timer)
-  timer = setTimeout(() => {
-    page.value = 1
-    load()
-  }, 300)
-})
+watch(
+  filters,
+  () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      page.value = 1
+      load()
+    }, 300)
+  },
+  { deep: true },
+)
 const drawerOpen = ref(false)
 onMounted(async () => {
   await load()
@@ -91,8 +157,17 @@ function onSaved(client: Client) {
 <template>
   <div class="page">
     <PageHeader :title="t('clients.title')">
-      <template v-if="state === 'ready' && !search" #meta>
+      <template v-if="state === 'ready' && !filtered" #meta>
         <span>{{ t('clients.count', total) }}</span>
+      </template>
+      <template v-if="canExport" #actions>
+        <Button
+          icon="pi pi-download"
+          :label="t('bookings.export')"
+          severity="secondary"
+          variant="outlined"
+          @click="exportCsv"
+        />
       </template>
       <template v-if="canCreate" #primary>
         <Button icon="pi pi-user-plus" :label="t('clients.new')" @click="drawerOpen = true" />
@@ -101,7 +176,65 @@ function onSaved(client: Client) {
 
     <NoPermission v-if="state === 'forbidden'" class="card" />
     <template v-else>
-      <FilterBar v-model:search="search" :placeholder="t('clients.search')" />
+      <Message v-if="ownOnly" severity="info" :closable="false" icon="pi pi-info-circle">{{
+        t('clients.coachOnly')
+      }}</Message>
+      <FilterBar v-model:search="search" :placeholder="t('clients.search')">
+        <Select
+          v-if="locations.length > 1"
+          v-model="locationId"
+          :options="locations"
+          option-label="name"
+          option-value="id"
+          :placeholder="t('clients.filters.home')"
+          show-clear
+          class="filter"
+        />
+        <MultiSelect
+          v-model="statuses"
+          :options="statusOptions"
+          option-label="label"
+          option-value="value"
+          :placeholder="t('clients.columns.status')"
+          :max-selected-labels="1"
+          class="filter"
+        />
+        <Select
+          v-model="age"
+          :options="ageOptions"
+          option-label="label"
+          option-value="value"
+          class="filter"
+        />
+        <Select
+          v-model="lastVisit"
+          :options="visitOptions"
+          option-label="label"
+          option-value="value"
+          class="filter"
+        />
+        <DatePicker
+          v-model="created"
+          selection-mode="range"
+          date-format="yy-mm-dd"
+          :manual-input="false"
+          :placeholder="t('clients.filters.created')"
+          :aria-label="t('clients.filters.created')"
+          show-icon
+          icon-display="input"
+          show-button-bar
+          class="filter"
+        />
+        <template #end>
+          <Button
+            v-if="filtered"
+            :label="t('bookings.clear')"
+            variant="text"
+            severity="secondary"
+            @click="clearFilters"
+          />
+        </template>
+      </FilterBar>
 
       <ErrorState
         v-if="state === 'error'"
@@ -110,7 +243,7 @@ function onSaved(client: Client) {
         @retry="load"
       />
       <EmptyState
-        v-else-if="state === 'ready' && !clients.length && !search"
+        v-else-if="state === 'ready' && !clients.length && !filtered"
         class="card card--tall"
         icon="pi-users"
         :title="t('clients.empty')"
@@ -171,6 +304,18 @@ function onSaved(client: Client) {
         <Column :header="t('clients.columns.status')">
           <template #body="{ data }"><StatusTag :status="data.status" /></template>
         </Column>
+        <Column :header="t('clients.columns.lastVisit')">
+          <template #body="{ data }">
+            <span class="muted">{{
+              data.last_visit_at ? format.date(data.last_visit_at) : t('clients.never')
+            }}</span>
+          </template>
+        </Column>
+        <Column :header="t('clients.columns.upcoming')" header-class="row-end" body-class="row-end">
+          <template #body="{ data }"
+            ><span class="num">{{ data.upcoming_bookings ?? 0 }}</span></template
+          >
+        </Column>
         <Column :header="t('clients.columns.since')">
           <template #body="{ data }">
             <span class="muted">{{ data.created_at ? format.date(data.created_at) : '—' }}</span>
@@ -189,6 +334,9 @@ function onSaved(client: Client) {
 </template>
 
 <style scoped>
+.filter {
+  min-width: 150px;
+}
 .page {
   display: flex;
   flex-direction: column;

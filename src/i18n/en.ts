@@ -469,7 +469,22 @@ export default {
     noMatch: 'No clients match',
     noMatchHint: 'Try a different name, mobile or member ID.',
     loadError: "Clients couldn't be loaded.",
+    never: 'Never',
+    coachOnly: 'You see the clients booked in your sessions.',
+    filters: {
+      home: 'Home branch',
+      created: 'Created',
+      age: { any: 'Any age', minor: 'Under 18', adult: '18 and over' },
+      visit: {
+        any: 'Any last visit',
+        recent: 'Visited in the last 30 days',
+        lapsed: 'Not visited for 30 days',
+        never: 'Never visited',
+      },
+    },
     columns: {
+      lastVisit: 'Last visit',
+      upcoming: 'Upcoming',
       client: 'Client',
       mobile: 'Mobile',
       home: 'Home branch',
