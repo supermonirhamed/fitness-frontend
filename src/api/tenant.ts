@@ -677,16 +677,40 @@ export interface Booking {
   id: number
   session_id: number
   client: { id: number; name: string | null; member_id: string | null; photo_url: string | null }
-  status: 'Confirmed' | 'Attended' | 'Cancelled' | 'LateCancel' | 'NoShow' | 'CancelledByBusiness'
+  status:
+    | 'Confirmed'
+    | 'Attended'
+    | 'Cancelled'
+    | 'LateCancel'
+    | 'NoShow'
+    | 'CancelledByBusiness'
+    | 'Rescheduled'
+  /** Moved here from another session (US-04.05). */
+  rescheduled_from: { session_id: number; starts_at: string | null; timezone: string | null } | null
   channel: 'staff' | 'web' | 'app' | 'waitlist'
   entitlement_source: EntitlementSource | null
-  overridden: OverridableCheck[]
+  overridden: (OverridableCheck | 'cancellation_window')[]
   booked_by: string | null
   created_at: string | null
   cancelled_at: string | null
   penalty: Penalty | null
   penalty_fee: number | null
   penalty_waived: boolean
+}
+
+/** Where a booking can move (US-04.05), and whether it is past the free window. */
+export interface RescheduleOptions extends Omit<CancellationTerms, 'can_waive'> {
+  can_override: boolean
+  sessions: {
+    id: number
+    location: { id: number; name: string }
+    facility: string | null
+    local: { date: string; start: string; end: string }
+    capacity: number | null
+    booked: number
+    status: string
+    booking: SessionDetails['booking']
+  }[]
 }
 
 /** What cancelling a booking now means (US-04.04). */
@@ -1267,6 +1291,21 @@ export const tenantApi = {
       input: { client_id: number; override?: OverridableCheck[]; override_reason?: string | null },
     ): Promise<BookingEligibility> {
       return (await http.post(`/api/sessions/${sessionId}/eligibility`, input)).data.data
+    },
+    async rescheduleOptions(id: number): Promise<RescheduleOptions> {
+      return (await http.get(`/api/bookings/${id}/reschedule-options`)).data.data
+    },
+    /** The new booking; 409 reschedule_late / not_eligible (with `eligibility`) / reschedule_other_service. */
+    async reschedule(
+      id: number,
+      input: {
+        session_id: number
+        override?: OverridableCheck[]
+        override_window?: boolean
+        override_reason?: string | null
+      },
+    ): Promise<Booking> {
+      return (await http.post(`/api/bookings/${id}/reschedule`, input)).data.data
     },
     async cancelTerms(id: number): Promise<CancellationTerms> {
       return (await http.get(`/api/bookings/${id}/cancel-terms`)).data.data

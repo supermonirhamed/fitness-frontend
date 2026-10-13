@@ -20,6 +20,7 @@ import Tabs from 'primevue/tabs'
 import type { MenuItem } from 'primevue/menuitem'
 import BookingDrawer from '@/components/bookings/BookingDrawer.vue'
 import CancelBookingDialog from '@/components/bookings/CancelBookingDialog.vue'
+import RescheduleBookingDialog from '@/components/bookings/RescheduleBookingDialog.vue'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
 import ConflictList from '@/components/patterns/ConflictList.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -108,6 +109,26 @@ function cancelBooking(booking: Booking) {
   cancelling.value = booking
   cancelBookingOpen.value = true
 }
+// Reschedule (US-04.05): a confirmed booking, until the session starts.
+const canReschedule = computed(
+  () => auth.can('bookings.update') && !!session.value && !session.value.locked,
+)
+const rescheduleOpen = ref(false)
+function rescheduleBooking(booking: Booking) {
+  cancelling.value = booking
+  rescheduleOpen.value = true
+}
+function onMoved(booking: Booking, label: string) {
+  toast.add({
+    severity: 'success',
+    summary: t('reschedule.done'),
+    detail: t('reschedule.doneDetail', { client: booking.client.name, session: label }),
+    life: 4000,
+  })
+  load()
+}
+const movedFrom = (from: NonNullable<Booking['rescheduled_from']>) =>
+  from.starts_at ? format.dateTime(from.starts_at, from.timezone ?? undefined) : ''
 function onBookingCancelled(booking: Booking) {
   toast.add({
     severity: booking.status === 'LateCancel' ? 'warn' : 'success',
@@ -511,6 +532,12 @@ const moreItems = computed<MenuItem[]>(() => {
                     <span>
                       <span class="person__name">{{ data.client.name }}</span>
                       <small class="muted num">{{ data.client.member_id }}</small>
+                      <small v-if="data.rescheduled_from" class="muted"
+                        ><i class="pi pi-arrow-right-arrow-left" aria-hidden="true" />
+                        {{
+                          t('reschedule.from', { date: movedFrom(data.rescheduled_from) })
+                        }}</small
+                      >
                     </span>
                   </RouterLink>
                 </template>
@@ -540,10 +567,24 @@ const moreItems = computed<MenuItem[]>(() => {
                   <span class="muted">{{ data.booked_by ?? '—' }}</span>
                 </template>
               </Column>
-              <Column v-if="canCancelBookings" header-class="row-end" body-class="row-end">
+              <Column
+                v-if="canCancelBookings || canReschedule"
+                header-class="row-end"
+                body-class="row-end"
+              >
                 <template #body="{ data }">
                   <Button
-                    v-if="data.status === 'Confirmed'"
+                    v-if="canReschedule && data.status === 'Confirmed'"
+                    v-tooltip.top="t('reschedule.action')"
+                    icon="pi pi-arrow-right-arrow-left"
+                    severity="secondary"
+                    variant="text"
+                    size="small"
+                    :aria-label="`${t('reschedule.action')}: ${data.client.name}`"
+                    @click="rescheduleBooking(data)"
+                  />
+                  <Button
+                    v-if="canCancelBookings && data.status === 'Confirmed'"
                     v-tooltip.top="t('cancelBooking.action')"
                     icon="pi pi-times"
                     severity="secondary"
@@ -697,6 +738,13 @@ const moreItems = computed<MenuItem[]>(() => {
         @saved="onCreated"
       />
       <BookingDrawer v-model:visible="bookingOpen" :session="session" @booked="onBooked" />
+      <RescheduleBookingDialog
+        v-model:visible="rescheduleOpen"
+        :booking="cancelling"
+        :session="`${dayLabel(session.local.date)} ${session.local.start}`"
+        :timezone="session.location.timezone"
+        @moved="onMoved"
+      />
       <CancelBookingDialog
         v-model:visible="cancelBookingOpen"
         :booking="cancelling"

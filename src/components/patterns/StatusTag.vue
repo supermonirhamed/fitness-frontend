@@ -24,6 +24,7 @@ const SEVERITY: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'seconda
     LateCancel: 'warn',
     NoShow: 'danger',
     CancelledByBusiness: 'contrast',
+    Rescheduled: 'secondary',
   }
 
 const props = defineProps<{ status: string; size?: 'sm' }>()

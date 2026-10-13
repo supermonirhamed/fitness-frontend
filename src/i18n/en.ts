@@ -22,6 +22,7 @@ export default {
     refresh: 'Refresh',
   },
   status: {
+    Rescheduled: 'Rescheduled',
     Confirmed: 'Confirmed',
     Attended: 'Attended',
     LateCancel: 'Late cancel',
@@ -1576,6 +1577,25 @@ export default {
     confirmed: 'Booking confirmed',
     confirmedDetail: '{client} · {session} {time}',
   },
+  reschedule: {
+    title: 'Reschedule booking',
+    subtitle: '{client} · now {session}',
+    pick: 'Move to',
+    none: 'No other upcoming sessions of this service in the next 60 days.',
+    late: 'Free cancellation ended {date}. Moving the booking now needs an override.',
+    lateNoPermission:
+      'Free cancellation ended {date}. A manager can still move it with an override.',
+    overrideReason: 'Override reason',
+    overrideHint: 'Recorded with the booking and in the audit log.',
+    entitlement: 'The booking keeps its payment; nothing is charged twice.',
+    confirm: 'Move booking',
+    overrideConfirm: 'Override and move',
+    loadError: "The sessions couldn't be loaded.",
+    done: 'Booking moved',
+    doneDetail: '{client} · {session}',
+    action: 'Reschedule',
+    from: 'Moved from {date}',
+  },
   cancelBooking: {
     title: 'Cancel booking',
     subtitle: '{client} · {session}',
@@ -1609,6 +1629,7 @@ export default {
       overlap: 'Overlapping booking',
       waivers: 'Waivers',
       entitlement: 'Payment',
+      cancellation_window: 'Free cancellation window',
     },
     passed: {
       session: 'Session open for booking',
