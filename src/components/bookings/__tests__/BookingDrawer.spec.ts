@@ -10,7 +10,10 @@ import { useStaffAuth } from '@/stores/staffAuth'
 
 vi.mock('@/api/tenant', () => ({
   tenantApi: {
-    clients: { list: vi.fn() },
+    clients: {
+      list: vi.fn(),
+      family: vi.fn().mockResolvedValue({ is_child: false, guardians: [], dependents: [] }),
+    },
     bookings: { eligibility: vi.fn(), create: vi.fn(), joinWaitlist: vi.fn() },
   },
 }))
@@ -119,6 +122,7 @@ describe('BookingDrawer', () => {
     expect(tenantApi.bookings.create).toHaveBeenCalledWith({
       session_id: 7,
       client_id: 3,
+      payer_client_id: null,
       entitlement_source: 'pay_at_desk',
       override: [],
       override_reason: null,
@@ -274,5 +278,59 @@ describe('BookingDrawer, full session (US-04.10)', () => {
       entitlement_source: 'pay_at_desk',
     })
     expect(wrapper.emitted('waitlisted')).toHaveLength(1)
+  })
+})
+
+describe('BookingDrawer, booking for a child (US-05.09)', () => {
+  beforeEach(() => {
+    setLocale('en')
+    vi.clearAllMocks()
+  })
+
+  it('checks and books the child, with the guardian as payer', async () => {
+    vi.mocked(tenantApi.clients.family).mockResolvedValue({
+      is_child: false,
+      guardians: [],
+      dependents: [
+        {
+          id: 1,
+          relation: 'mother',
+          can_book: true,
+          can_pay: true,
+          can_view_performance: true,
+          receives_notifications: true,
+          client: {
+            id: 9,
+            name: 'Yousef Ali',
+            member_id: null,
+            age: 9,
+            status: 'Active',
+            photo_url: null,
+          },
+        },
+      ],
+    })
+    vi.mocked(tenantApi.bookings.eligibility).mockResolvedValue(eligibility(true))
+    vi.mocked(tenantApi.bookings.create).mockResolvedValue({ id: 1 } as never)
+    const wrapper = render(['bookings.create'])
+    await wrapper.get('.pick').trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Yousef Ali (child)')!
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Yousef attends · Sara pays')
+    expect(tenantApi.bookings.eligibility).toHaveBeenLastCalledWith(
+      7,
+      expect.objectContaining({ client_id: 9 }),
+    )
+
+    await confirmButton(wrapper).trigger('click')
+    await flushPromises()
+    expect(tenantApi.bookings.create).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: 9, payer_client_id: 3 }),
+    )
   })
 })

@@ -152,10 +152,43 @@ async function search(event: AutoCompleteCompleteEvent) {
 
 function choose(picked: Client) {
   client.value = picked
+  forWho.value = null
+  children.value = []
   reset()
   if (mode.value === 'guest') loadGuestSources()
-  else check()
+  else {
+    check()
+    loadChildren(picked)
+  }
 }
+
+// Booking for a child (US-05.09): the child attends, the client (their guardian) pays.
+const forWho = ref<number | null>(null)
+const children = ref<{ id: number; name: string; first_name: string }[]>([])
+async function loadChildren(guardian: Client) {
+  const family = await tenantApi.clients.family(guardian.id).catch(() => null)
+  if (client.value?.id !== guardian.id) return
+  children.value = (family?.dependents ?? [])
+    .filter((d) => d.can_book && d.client)
+    .map((d) => ({
+      id: d.client!.id,
+      name: d.client!.name,
+      first_name: d.client!.name.split(' ')[0]!,
+    }))
+}
+const attendeeId = computed(() => forWho.value ?? client.value?.id ?? 0)
+const child = computed(() => children.value.find((c) => c.id === forWho.value) ?? null)
+const forWhoOptions = computed(() => [
+  { value: null, label: client.value?.name ?? '' },
+  ...children.value.map((c) => ({
+    value: c.id,
+    label: t('booking.childOption', { name: c.name }),
+  })),
+])
+watch(forWho, () => {
+  reset()
+  check()
+})
 
 function change() {
   client.value = null
@@ -194,7 +227,7 @@ async function check() {
   error.value = null
   try {
     result.value = await tenantApi.bookings.eligibility(props.session.id, {
-      client_id: client.value.id,
+      client_id: attendeeId.value,
       override: override.value,
       override_reason: overrideReason.value,
     })
@@ -240,7 +273,7 @@ async function confirmRecurring() {
   errors.value = {}
   try {
     recurring.value = await tenantApi.bookings.createRecurring({
-      client_id: client.value.id,
+      client_id: attendeeId.value,
       series_id: props.session.series_id,
       starts_on: ymd(repeatFrom.value)!,
       ends_on: untilMode.value === 'date' ? ymd(repeatUntil.value) : null,
@@ -271,7 +304,7 @@ async function joinWaitlist() {
   error.value = null
   try {
     const entry = await tenantApi.bookings.joinWaitlist(props.session.id, {
-      client_id: client.value.id,
+      client_id: attendeeId.value,
       entitlement_source: payment.value,
     })
     emit('waitlisted', entry)
@@ -351,7 +384,8 @@ async function confirm() {
           })
         : await tenantApi.bookings.create({
             session_id: props.session.id,
-            client_id: client.value.id,
+            client_id: attendeeId.value,
+            payer_client_id: forWho.value ? client.value.id : null,
             entitlement_source: payment.value,
             override: override.value,
             override_reason: overrideReason.value,
@@ -567,6 +601,21 @@ async function confirm() {
         }}</small>
         <small class="field__hint">{{ t('booking.guestChecked') }}</small>
       </fieldset>
+
+      <div v-if="mode === 'client' && client && children.length" class="field">
+        <span id="booking-for" class="field__label">{{ t('booking.for') }}</span>
+        <SelectButton
+          v-model="forWho"
+          :options="forWhoOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          aria-labelledby="booking-for"
+        />
+        <Message v-if="child" severity="info" :closable="false" icon="pi pi-users">{{
+          t('booking.childPays', { child: child.first_name, payer: client.first_name })
+        }}</Message>
+      </div>
 
       <div v-if="checking && !result" class="stack" aria-busy="true">
         <Skeleton height="200px" />

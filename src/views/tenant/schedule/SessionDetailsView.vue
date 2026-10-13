@@ -618,6 +618,10 @@ const moreItems = computed<MenuItem[]>(() => {
                         ><i class="pi pi-replay" aria-hidden="true" />
                         {{ t('recurring.tag') }}</small
                       >
+                      <small v-if="data.payer" class="muted"
+                        ><i class="pi pi-users" aria-hidden="true" />
+                        {{ t('booking.paidBy', { name: data.payer.name }) }}</small
+                      >
                       <small v-if="data.host" class="muted"
                         ><i class="pi pi-user-plus" aria-hidden="true" />
                         {{ t('booking.guestOf', { name: data.host.name }) }}</small

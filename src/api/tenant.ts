@@ -953,6 +953,8 @@ export interface Booking {
   attended_at: string | null
   /** Made by a recurring booking (US-04.08); `active` until it ends or is cancelled. */
   standing: { id: number; active: boolean } | null
+  /** The guardian who pays for a child's booking (US-05.09). */
+  payer: { id: number; name: string | null } | null
   /** The member who brought this guest (US-04.07). */
   host: { id: number; name: string | null } | null
   /** Moved here from another session (US-04.05). */
@@ -1894,6 +1896,8 @@ export const tenantApi = {
     async create(input: {
       session_id: number
       client_id: number
+      /** A guardian paying for their child's booking (US-05.09). */
+      payer_client_id?: number | null
       entitlement_source: EntitlementSource
       override?: OverridableCheck[]
       override_reason?: string | null

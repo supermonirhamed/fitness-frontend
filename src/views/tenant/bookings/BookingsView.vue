@@ -393,7 +393,9 @@ function exportCsv() {
                   {{
                     data.host
                       ? t('booking.guestOf', { name: data.host.name })
-                      : data.client.member_id
+                      : data.payer
+                        ? t('booking.paidBy', { name: data.payer.name })
+                        : data.client.member_id
                   }}
                 </div>
               </div>
