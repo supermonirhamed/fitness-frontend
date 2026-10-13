@@ -331,8 +331,8 @@ const confirmDisabled = computed(() => {
   return !result.value?.ok || !payment.value || checking.value
 })
 
-// What the server offers (US-04.03), best first; the staff options always show, and memberships
-// are marked as coming until EP-06 resolves them.
+// What the server offers (US-04.03), best first: the client's covering membership or package
+// (EP-06), then the staff options, which always show.
 const STAFF_PAYMENTS: EntitlementSource[] = ['complimentary', 'pay_at_desk']
 const paymentOptions = computed(() => {
   if (mode.value === 'guest')
@@ -348,12 +348,6 @@ const paymentOptions = computed(() => {
     label: t(`booking.payments.${value}`),
     disabled: !offered.includes(value),
   }))
-  if (!shown.includes('membership'))
-    options.push({
-      value: 'membership',
-      label: `${t('booking.payments.membership')} · ${t('booking.soon')}`,
-      disabled: true,
-    })
   return options
 })
 
@@ -673,6 +667,14 @@ async function confirm() {
           <small v-if="payment" class="field__hint">{{
             t(`booking.paymentHints.${payment}`)
           }}</small>
+          <Message
+            v-if="result.entitlement_note"
+            severity="warn"
+            size="small"
+            :closable="false"
+            icon="pi pi-id-card"
+            >{{ result.entitlement_note.message }}</Message
+          >
         </div>
 
         <div v-if="result.ok && canRepeat" class="repeat">

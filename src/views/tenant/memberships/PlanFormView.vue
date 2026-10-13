@@ -1,14 +1,16 @@
 <script setup lang="ts">
-// A membership plan's editor page (US-06.01): basics (AR/EN name, description, status), access
-// (unlimited or N visits a week/month), billing (recurring with a minimum commitment, or one-time for
-// a duration) and joining fee, a price per branch (VAT from the branch), and the entitlement rules —
-// services covered, branches, limits per day / week and off-peak hours. A live summary on the side
-// shows the plan as it will appear in the plans list.
+// The editor page for a product (EP-06): basics (AR/EN name, description, status); for a membership
+// plan (US-06.01) access (unlimited or N visits a week/month) and billing (recurring with a minimum
+// commitment, or one-time for a duration) with a joining fee; for a credit package (US-06.02) credits
+// and validity, or a single-service drop-in; when it starts (US-06.03); a price per branch (VAT from
+// the branch); and the entitlement rules — services covered with exclusions (US-06.04), branches
+// (US-06.05), limits per day / week and off-peak hours. A live summary shows it as it will be listed.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
+import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import MultiSelect from 'primevue/multiselect'
@@ -24,7 +26,12 @@ import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import TimeField from '@/components/patterns/TimeField.vue'
 import TranslatedField from '@/components/patterns/TranslatedField.vue'
-import { tenantApi, type MembershipPlan, type MembershipPlanInput } from '@/api/tenant'
+import {
+  tenantApi,
+  type MembershipPlan,
+  type MembershipPlanInput,
+  type PlanKind,
+} from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
 import { statusOf, validationErrors } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
@@ -40,8 +47,13 @@ const org = useOrganization()
 const format = useFormat()
 const currency = computed(() => org.organization?.currency ?? 'SAR')
 const planId = computed(() => (route.params.id ? Number(route.params.id) : null))
+const kind = computed<PlanKind>(() =>
+  plan.value ? plan.value.kind : route.meta.kind === 'package' ? 'package' : 'membership',
+)
+const isPackage = computed(() => kind.value === 'package')
 
 const blank = (): MembershipPlanInput => ({
+  kind: route.meta.kind === 'package' ? 'package' : 'membership',
   name: { ar: '', en: '' },
   description: { ar: '', en: '' },
   status: 'Draft',
@@ -54,10 +66,23 @@ const blank = (): MembershipPlanInput => ({
   billing_interval: 'month',
   min_commitment_months: null,
   joining_fee: null,
+  credits: 10,
+  validity_mode: 'days',
+  validity_days: 60,
+  valid_until: null,
+  drop_in_service_id: null,
+  activation: 'purchase',
+  activation_max_wait_days: 30,
   prices: [],
   rules: {
-    services: { mode: 'all', category_ids: [], service_ids: [] },
-    locations: { mode: 'all', location_ids: [] },
+    services: {
+      mode: 'all',
+      category_ids: [],
+      service_ids: [],
+      program_ids: [],
+      exclude_service_ids: [],
+    },
+    locations: { mode: 'all', location_ids: [], include_future: true },
     limits: { per_day: null, per_week: null, hours: null },
   },
 })
@@ -71,6 +96,8 @@ const offPeak = ref(false)
 const hours = ref({ from: '06:00', to: '16:00' })
 const categories = ref<{ id: number; name: string }[]>([])
 const services = ref<{ id: number; name: string }[]>([])
+const programs = ref<{ id: number; name: string }[]>([])
+const dropIn = ref(false)
 const branches = computed(() => auth.user?.switchable_locations ?? [])
 const errors = ref<Record<string, string[]>>({})
 const error = ref<string | null>(null)
@@ -79,23 +106,41 @@ const saving = ref(false)
 async function load() {
   state.value = 'loading'
   try {
-    const [p, cats, svcs] = await Promise.all([
+    const [p, cats, svcs, progs] = await Promise.all([
       planId.value ? tenantApi.membershipPlans.get(planId.value) : Promise.resolve(null),
       tenantApi.serviceCategories.list().catch(() => []),
       tenantApi.services.list().catch(() => []),
+      tenantApi.programs.list().catch(() => []),
     ])
     categories.value = cats.map((c) => ({ id: c.id, name: c.display_name ?? '' }))
     services.value = svcs.map((s) => ({ id: s.id, name: s.display_name ?? '' }))
+    programs.value = progs.map((x) => ({ id: x.id, name: x.display_name ?? '' }))
     plan.value = p
+    const base = blank()
     form.value = p
       ? {
+          ...base,
           ...JSON.parse(JSON.stringify(p)),
           description: p.description ?? { ar: '', en: '' },
+          type: p.type ?? 'Unlimited',
+          billing: p.billing ?? 'recurring',
           visit_period: p.visit_period ?? 'week',
           duration_unit: p.duration_unit ?? 'months',
           billing_interval: p.billing_interval ?? 'month',
+          validity_mode: p.validity_mode ?? 'days',
+          activation_max_wait_days: p.activation_max_wait_days ?? 30,
+          rules: {
+            ...p.rules,
+            services: { ...base.rules.services, ...p.rules.services },
+            locations: {
+              ...p.rules.locations,
+              // Saved before include_future existed: it covered every branch.
+              include_future: p.rules.locations.include_future ?? true,
+            },
+          },
         }
-      : blank()
+      : base
+    dropIn.value = !!p?.drop_in_service_id
     priceAt.value = Object.fromEntries(
       branches.value.map((b) => {
         const price = p?.prices.find((x) => x.location_id === b.id)
@@ -137,6 +182,34 @@ const typeChoices = computed(() =>
     Limited: 'pi-ticket',
   }),
 )
+const validityChoices = computed(() =>
+  choices(['days', 'fixed_date'], 'plans.validityModes', {
+    days: 'pi-hourglass',
+    fixed_date: 'pi-calendar-times',
+  }),
+)
+const activationChoices = computed(() =>
+  choices(['purchase', 'chosen_date', 'first_use'], 'plans.activations', {
+    purchase: 'pi-shopping-bag',
+    chosen_date: 'pi-calendar',
+    first_use: 'pi-sign-in',
+  }),
+)
+// A drop-in is one credit for one service (US-06.02).
+function toggleDropIn(on: boolean) {
+  dropIn.value = on
+  if (on) form.value.credits = 1
+  else form.value.drop_in_service_id = null
+}
+const minDate = new Date()
+const validUntil = computed({
+  get: () => (form.value.valid_until ? new Date(`${form.value.valid_until}T00:00:00`) : null),
+  set: (d: Date | null) => {
+    form.value.valid_until = d
+      ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      : null
+  },
+})
 const billingChoices = computed(() =>
   choices(['recurring', 'one_time'], 'plans.billings', {
     recurring: 'pi-refresh',
@@ -170,37 +243,58 @@ const previewPrice = computed(() => {
   return min === max ? format.money(min) : `${format.money(min)} – ${format.money(max)}`
 })
 const previewAccess = computed(() =>
-  form.value.type === 'Unlimited'
-    ? t('plans.types.Unlimited')
-    : t('plans.limitedSummary', {
-        n: form.value.visit_limit ?? '–',
-        per: t(`plans.per.${form.value.visit_period ?? 'week'}`),
-      }),
+  isPackage.value
+    ? dropIn.value
+      ? t('plans.dropInSummary', {
+          service: services.value.find((x) => x.id === form.value.drop_in_service_id)?.name ?? '–',
+        })
+      : t('plans.creditsSummary', { n: form.value.credits ?? '–' })
+    : form.value.type === 'Unlimited'
+      ? t('plans.types.Unlimited')
+      : t('plans.limitedSummary', {
+          n: form.value.visit_limit ?? '–',
+          per: t(`plans.per.${form.value.visit_period ?? 'week'}`),
+        }),
 )
 const previewBilling = computed(() =>
-  form.value.billing === 'recurring'
-    ? [
-        t(`plans.intervals.${form.value.billing_interval ?? 'month'}`),
-        form.value.min_commitment_months
-          ? t('plans.commitmentSummary', { n: form.value.min_commitment_months })
-          : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : t('plans.durationSummary', {
-        n: form.value.duration_value ?? '–',
-        unit: t(`plans.units.${form.value.duration_unit ?? 'months'}`),
-      }),
+  isPackage.value
+    ? form.value.validity_mode === 'fixed_date'
+      ? t('plans.validUntilSummary', {
+          date: form.value.valid_until ? format.date(form.value.valid_until) : '–',
+        })
+      : t('plans.validDaysSummary', { n: form.value.validity_days ?? '–' })
+    : form.value.billing === 'recurring'
+      ? [
+          t(`plans.intervals.${form.value.billing_interval ?? 'month'}`),
+          form.value.min_commitment_months
+            ? t('plans.commitmentSummary', { n: form.value.min_commitment_months })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : t('plans.durationSummary', {
+          n: form.value.duration_value ?? '–',
+          unit: t(`plans.units.${form.value.duration_unit ?? 'months'}`),
+        }),
 )
 const previewCovers = computed(() => {
   const s = form.value.rules.services
   if (s.mode === 'categories') return t('plans.coversCategories', { n: s.category_ids.length })
   if (s.mode === 'services') return t('plans.coversServices', { n: s.service_ids.length })
-  return t('plans.coverModes.all')
+  if (s.mode === 'programs') return t('plans.coversPrograms', { n: s.program_ids.length })
+  return s.exclude_service_ids.length
+    ? t('plans.coversAllExcept', { n: s.exclude_service_ids.length })
+    : t('plans.coverModes.all')
 })
+const previewActivation = computed(() =>
+  form.value.activation === 'first_use'
+    ? t('plans.activationSummary.first_use', { n: form.value.activation_max_wait_days ?? 30 })
+    : t(`plans.activationSummary.${form.value.activation}`),
+)
 const previewWhere = computed(() => {
   const l = form.value.rules.locations
   if (l.mode === 'selected') return t('plans.validAtCount', { n: l.location_ids.length })
+  if (l.mode === 'all' && !l.include_future) return t('plans.allCurrentBranches')
   return t(`plans.locationModes.${l.mode}`)
 })
 const checklist = computed(() => [
@@ -208,15 +302,29 @@ const checklist = computed(() => [
     done: !!(form.value.name.en?.trim() || form.value.name.ar?.trim()),
     label: t('plans.check.name'),
   },
-  {
-    done:
-      form.value.type === 'Unlimited' || (!!form.value.visit_limit && form.value.visit_limit > 0),
-    label: t('plans.check.access'),
-  },
-  {
-    done: form.value.billing === 'recurring' || !!form.value.duration_value,
-    label: t('plans.check.billing'),
-  },
+  isPackage.value
+    ? {
+        done: !!form.value.credits && (!dropIn.value || !!form.value.drop_in_service_id),
+        label: t('plans.check.credits'),
+      }
+    : {
+        done:
+          form.value.type === 'Unlimited' ||
+          (!!form.value.visit_limit && form.value.visit_limit > 0),
+        label: t('plans.check.access'),
+      },
+  isPackage.value
+    ? {
+        done:
+          form.value.validity_mode === 'days'
+            ? !!form.value.validity_days
+            : !!form.value.valid_until,
+        label: t('plans.check.validity'),
+      }
+    : {
+        done: form.value.billing === 'recurring' || !!form.value.duration_value,
+        label: t('plans.check.billing'),
+      },
   { done: pricedBranches.value.length > 0, label: t('plans.check.price') },
 ])
 
@@ -225,16 +333,27 @@ async function save() {
   errors.value = {}
   error.value = null
   const f = form.value
-  const limited = f.type === 'Limited'
-  const oneTime = f.billing === 'one_time'
+  const pkg = isPackage.value
+  const limited = !pkg && f.type === 'Limited'
+  const oneTime = !pkg && f.billing === 'one_time'
   const input: MembershipPlanInput = {
     ...f,
+    kind: kind.value,
+    type: pkg ? null : f.type,
+    billing: pkg ? null : f.billing,
+    joining_fee: pkg ? null : f.joining_fee,
+    credits: pkg ? f.credits : null,
+    validity_mode: pkg ? f.validity_mode : null,
+    validity_days: pkg && f.validity_mode === 'days' ? f.validity_days : null,
+    valid_until: pkg && f.validity_mode === 'fixed_date' ? f.valid_until : null,
+    drop_in_service_id: pkg && dropIn.value ? f.drop_in_service_id : null,
+    activation_max_wait_days: f.activation === 'first_use' ? f.activation_max_wait_days : null,
     visit_limit: limited ? f.visit_limit : null,
     visit_period: limited ? (f.visit_period ?? 'week') : null,
     duration_value: oneTime ? f.duration_value : null,
     duration_unit: oneTime ? (f.duration_unit ?? 'months') : null,
-    billing_interval: oneTime ? null : (f.billing_interval ?? 'month'),
-    min_commitment_months: oneTime ? null : f.min_commitment_months,
+    billing_interval: pkg || oneTime ? null : (f.billing_interval ?? 'month'),
+    min_commitment_months: pkg || oneTime ? null : f.min_commitment_months,
     prices: Object.entries(priceAt.value)
       .filter(([, v]) => v.on && v.price !== null)
       .map(([id, v]) => ({ location_id: Number(id), price: v.price! })),
@@ -261,7 +380,9 @@ async function save() {
   }
 }
 const cancel = () => router.push({ name: 'tenant.memberships' })
-const title = computed(() => (plan.value ? plan.value.display_name : t('plans.new')))
+const title = computed(() =>
+  plan.value ? plan.value.display_name : isPackage.value ? t('plans.newPackage') : t('plans.new'),
+)
 </script>
 
 <template>
@@ -270,7 +391,7 @@ const title = computed(() => (plan.value ? plan.value.display_name : t('plans.ne
       :title="title"
       :breadcrumb="[
         { label: t('plans.title'), to: { name: 'tenant.memberships' } },
-        { label: plan ? t('plans.edit') : t('plans.new') },
+        { label: plan ? t('plans.edit') : title },
       ]"
     >
       <template v-if="plan" #status><StatusTag :status="plan.status" /></template>
@@ -364,8 +485,122 @@ const title = computed(() => (plan.value ? plan.value.display_name : t('plans.ne
           </div>
         </section>
 
+        <!-- 2a. Package: credits and validity (US-06.02) -->
+        <section v-if="isPackage" class="card section">
+          <header class="section__head">
+            <span class="section__icon"><i class="pi pi-ticket" aria-hidden="true" /></span>
+            <div>
+              <h2>{{ t('plans.sections.credits') }}</h2>
+              <p>{{ t('plans.sectionHints.credits') }}</p>
+            </div>
+          </header>
+          <div class="toggle">
+            <ToggleSwitch
+              :model-value="dropIn"
+              input-id="plan-dropin"
+              @update:model-value="toggleDropIn"
+            />
+            <label for="plan-dropin">{{ t('plans.dropIn') }}</label>
+          </div>
+          <div class="grid2">
+            <FormField
+              v-if="dropIn"
+              :label="t('plans.dropInService')"
+              for="plan-dropin-service"
+              required
+              :help="t('plans.dropInHelp')"
+              :error="err('drop_in_service_id')"
+            >
+              <Select
+                v-model="form.drop_in_service_id"
+                input-id="plan-dropin-service"
+                :options="services"
+                option-label="name"
+                option-value="id"
+                filter
+                fluid
+                :placeholder="t('plans.pickService')"
+                :invalid="!!err('drop_in_service_id')"
+              />
+            </FormField>
+            <FormField
+              v-else
+              :label="t('plans.credits')"
+              for="plan-credits"
+              required
+              :help="t('plans.creditsHelp')"
+              :error="err('credits')"
+            >
+              <InputNumber
+                v-model="form.credits"
+                input-id="plan-credits"
+                :min="1"
+                :max="500"
+                show-buttons
+                :invalid="!!err('credits')"
+                fluid
+              />
+            </FormField>
+          </div>
+          <div class="field">
+            <span id="plan-validity" class="label">{{ t('plans.validity') }}</span>
+            <div class="choices" role="radiogroup" aria-labelledby="plan-validity">
+              <button
+                v-for="c in validityChoices"
+                :key="c.value"
+                type="button"
+                role="radio"
+                :aria-checked="form.validity_mode === c.value"
+                :class="['choice', { 'choice--on': form.validity_mode === c.value }]"
+                @click="form.validity_mode = c.value as 'days' | 'fixed_date'"
+              >
+                <i :class="['pi', c.icon]" aria-hidden="true" />
+                <span class="choice__title">{{ c.label }}</span>
+                <span class="choice__hint">{{ c.hint }}</span>
+              </button>
+            </div>
+          </div>
+          <div class="grid2">
+            <FormField
+              v-if="form.validity_mode === 'days'"
+              :label="t('plans.validityDays')"
+              for="plan-validity-days"
+              required
+              :error="err('validity_days')"
+            >
+              <InputNumber
+                v-model="form.validity_days"
+                input-id="plan-validity-days"
+                :min="1"
+                :max="3650"
+                :suffix="` ${t('plans.units.days')}`"
+                :invalid="!!err('validity_days')"
+                fluid
+              />
+            </FormField>
+            <FormField
+              v-else
+              :label="t('plans.validUntil')"
+              for="plan-valid-until"
+              required
+              :error="err('valid_until')"
+            >
+              <DatePicker
+                v-model="validUntil"
+                input-id="plan-valid-until"
+                date-format="yy-mm-dd"
+                :min-date="minDate"
+                show-icon
+                icon-display="input"
+                :invalid="!!err('valid_until')"
+                fluid
+              />
+            </FormField>
+          </div>
+        </section>
+
         <!-- 2. Access -->
-        <section class="card section">
+        <section v-if="!isPackage" class="card section">
           <header class="section__head">
             <span class="section__icon"><i class="pi pi-ticket" aria-hidden="true" /></span>
             <div>
@@ -419,7 +654,7 @@ const title = computed(() => (plan.value ? plan.value.display_name : t('plans.ne
         </section>
 
         <!-- 3. Billing -->
-        <section class="card section">
+        <section v-if="!isPackage" class="card section">
           <header class="section__head">
             <span class="section__icon"><i class="pi pi-wallet" aria-hidden="true" /></span>
             <div>
@@ -519,6 +754,56 @@ const title = computed(() => (plan.value ? plan.value.display_name : t('plans.ne
           </div>
         </section>
 
+        <!-- Activation (US-06.03) -->
+        <section class="card section">
+          <header class="section__head">
+            <span class="section__icon"><i class="pi pi-play" aria-hidden="true" /></span>
+            <div>
+              <h2>{{ t('plans.sections.activation') }}</h2>
+              <p>{{ t('plans.sectionHints.activation') }}</p>
+            </div>
+          </header>
+          <div
+            class="choices choices--3"
+            role="radiogroup"
+            :aria-label="t('plans.sections.activation')"
+          >
+            <button
+              v-for="c in activationChoices"
+              :key="c.value"
+              type="button"
+              role="radio"
+              :aria-checked="form.activation === c.value"
+              :class="['choice', { 'choice--on': form.activation === c.value }]"
+              @click="form.activation = c.value as MembershipPlan['activation']"
+            >
+              <i :class="['pi', c.icon]" aria-hidden="true" />
+              <span class="choice__title">{{ c.label }}</span>
+              <span class="choice__hint">{{ c.hint }}</span>
+            </button>
+          </div>
+          <div v-if="form.activation === 'first_use'" class="grid2">
+            <FormField
+              :label="t('plans.maxWait')"
+              for="plan-max-wait"
+              :help="t('plans.maxWaitHelp')"
+              :error="err('activation_max_wait_days')"
+            >
+              <InputNumber
+                v-model="form.activation_max_wait_days"
+                input-id="plan-max-wait"
+                :min="1"
+                :max="365"
+                :suffix="` ${t('plans.units.days')}`"
+                fluid
+              />
+            </FormField>
+          </div>
+          <Message severity="secondary" :closable="false" icon="pi pi-info-circle" size="small">{{
+            t('plans.expiryFromActivation')
+          }}</Message>
+        </section>
+
         <!-- 4. Prices -->
         <section class="card section">
           <header class="section__head">
@@ -597,11 +882,19 @@ const title = computed(() => (plan.value ? plan.value.display_name : t('plans.ne
               <p>{{ t('plans.sectionHints.rules') }}</p>
             </div>
           </header>
-          <div class="field">
+          <Message
+            v-if="isPackage && dropIn"
+            severity="secondary"
+            :closable="false"
+            icon="pi pi-info-circle"
+            size="small"
+            >{{ t('plans.dropInCovers') }}</Message
+          >
+          <div v-else class="field">
             <span id="plan-covers" class="label">{{ t('plans.covers') }}</span>
             <SelectButton
               v-model="form.rules.services.mode"
-              :options="options(['all', 'categories', 'services'], 'plans.coverModes')"
+              :options="options(['all', 'categories', 'services', 'programs'], 'plans.coverModes')"
               option-label="label"
               option-value="value"
               :allow-empty="false"
@@ -633,6 +926,37 @@ const title = computed(() => (plan.value ? plan.value.display_name : t('plans.ne
               :invalid="!!err('rules.services.service_ids')"
               :aria-label="t('plans.coverModes.services')"
             />
+            <MultiSelect
+              v-if="form.rules.services.mode === 'programs'"
+              v-model="form.rules.services.program_ids"
+              :options="programs"
+              option-label="name"
+              option-value="id"
+              display="chip"
+              filter
+              fluid
+              :placeholder="t('plans.pickPrograms')"
+              :invalid="!!err('rules.services.program_ids')"
+              :aria-label="t('plans.coverModes.programs')"
+            />
+            <FormField
+              v-if="form.rules.services.mode === 'all' || form.rules.services.mode === 'categories'"
+              :label="t('plans.exclude')"
+              for="plan-exclude"
+              :help="t('plans.excludeHelp')"
+            >
+              <MultiSelect
+                v-model="form.rules.services.exclude_service_ids"
+                input-id="plan-exclude"
+                :options="services"
+                option-label="name"
+                option-value="id"
+                display="chip"
+                filter
+                fluid
+                :placeholder="t('plans.noExclusions')"
+              />
+            </FormField>
           </div>
           <div class="field">
             <span id="plan-where" class="label">{{ t('plans.validAt') }}</span>
@@ -656,6 +980,13 @@ const title = computed(() => (plan.value ? plan.value.display_name : t('plans.ne
               :invalid="!!err('rules.locations.location_ids')"
               :aria-label="t('plans.locationModes.selected')"
             />
+            <div v-if="form.rules.locations.mode === 'all'" class="toggle">
+              <ToggleSwitch
+                v-model="form.rules.locations.include_future"
+                input-id="plan-include-future"
+              />
+              <label for="plan-include-future">{{ t('plans.includeFuture') }}</label>
+            </div>
           </div>
           <h3 class="sub">{{ t('plans.usageLimits') }}</h3>
           <div class="grid2">
@@ -705,20 +1036,21 @@ const title = computed(() => (plan.value ? plan.value.display_name : t('plans.ne
           </div>
           <div class="preview__price num">
             {{ previewPrice ?? t('plans.noPriceYet') }}
-            <small v-if="previewPrice && form.billing === 'recurring'">{{
+            <small v-if="previewPrice && !isPackage && form.billing === 'recurring'">{{
               t(`plans.perInterval.${form.billing_interval ?? 'month'}`)
             }}</small>
           </div>
           <ul class="facts">
             <li><i class="pi pi-ticket" aria-hidden="true" />{{ previewAccess }}</li>
             <li><i class="pi pi-refresh" aria-hidden="true" />{{ previewBilling }}</li>
-            <li v-if="form.joining_fee">
+            <li v-if="!isPackage && form.joining_fee">
               <i class="pi pi-plus-circle" aria-hidden="true" />{{
                 t('plans.feeSummary', { fee: format.money(form.joining_fee) })
               }}
             </li>
             <li><i class="pi pi-th-large" aria-hidden="true" />{{ previewCovers }}</li>
             <li><i class="pi pi-map-marker" aria-hidden="true" />{{ previewWhere }}</li>
+            <li><i class="pi pi-play" aria-hidden="true" />{{ previewActivation }}</li>
             <li v-if="offPeak">
               <i class="pi pi-clock" aria-hidden="true" />{{ t('plans.hoursSummary', hours) }}
             </li>

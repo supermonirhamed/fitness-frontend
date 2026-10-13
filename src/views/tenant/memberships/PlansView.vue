@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Memberships → Plans (US-06.01): every plan with what it gives, how it is billed, its prices per
-// branch and status, filtered by status and searched by name. Only Published plans can be sold
+// Memberships → Plans & packages (US-06.01/02): every membership plan and credit package with what
+// it gives, how it is billed or how long it lasts, its prices per branch and status, filtered by kind
+// and status and searched by name. Only Published plans can be sold
 // (selling arrives with the next EP-06 stories). New and edit open the plan's own page.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -14,7 +15,7 @@ import FilterBar from '@/components/patterns/FilterBar.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
-import { tenantApi, type MembershipPlan } from '@/api/tenant'
+import { tenantApi, type MembershipPlan, type PlanKind } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -39,6 +40,12 @@ async function load() {
 onMounted(load)
 
 const search = ref('')
+const kind = ref<'all' | PlanKind>('all')
+const kindOptions = computed(() => [
+  { value: 'all', label: t('plans.kinds.all') },
+  { value: 'membership', label: t('plans.kinds.membership') },
+  { value: 'package', label: t('plans.kinds.package') },
+])
 const status = ref<'all' | MembershipPlan['status']>('all')
 const count = (s: MembershipPlan['status']) => plans.value.filter((p) => p.status === s).length
 const statusOptions = computed(() => [
@@ -53,6 +60,7 @@ const shown = computed(() => {
   return plans.value.filter(
     (p) =>
       (status.value === 'all' || p.status === status.value) &&
+      (kind.value === 'all' || p.kind === kind.value) &&
       (!q ||
         [p.display_name, p.name.ar, p.name.en].some((n) => (n ?? '').toLowerCase().includes(q))),
   )
@@ -62,42 +70,63 @@ const stats = computed(() => [
   { icon: 'pi-shopping-cart', label: t('plans.stats.onSale'), value: count('Published') },
   { icon: 'pi-pencil', label: t('plans.stats.drafts'), value: count('Draft') },
   {
-    icon: 'pi-refresh',
-    label: t('plans.stats.recurring'),
-    value: plans.value.filter((p) => p.billing === 'recurring' && p.status !== 'Archived').length,
+    icon: 'pi-id-card',
+    label: t('plans.stats.memberships'),
+    value: plans.value.filter((p) => p.kind === 'membership' && p.status !== 'Archived').length,
   },
   {
     icon: 'pi-ticket',
-    label: t('plans.stats.limited'),
-    value: plans.value.filter((p) => p.type === 'Limited' && p.status !== 'Archived').length,
+    label: t('plans.stats.packages'),
+    value: plans.value.filter((p) => p.kind === 'package' && p.status !== 'Archived').length,
   },
 ])
 
 const create = () => router.push({ name: 'tenant.memberships.new' })
+const createPackage = () => router.push({ name: 'tenant.memberships.newPackage' })
 const edit = (p: MembershipPlan) =>
   canManage.value && router.push({ name: 'tenant.memberships.edit', params: { id: p.id } })
 
 const access = (p: MembershipPlan) =>
-  p.type === 'Unlimited'
-    ? t('plans.types.Unlimited')
-    : t('plans.limitedSummary', { n: p.visit_limit, per: t(`plans.per.${p.visit_period}`) })
+  p.kind === 'package'
+    ? p.drop_in_service_id
+      ? t('plans.dropInSummary', { service: p.drop_in_service ?? '–' })
+      : t('plans.creditsSummary', { n: p.credits })
+    : p.type === 'Unlimited'
+      ? t('plans.types.Unlimited')
+      : t('plans.limitedSummary', { n: p.visit_limit, per: t(`plans.per.${p.visit_period}`) })
 const billing = (p: MembershipPlan) =>
-  p.billing === 'recurring'
-    ? [
-        t(`plans.intervals.${p.billing_interval}`),
-        p.min_commitment_months
-          ? t('plans.commitmentSummary', { n: p.min_commitment_months })
-          : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : t('plans.durationSummary', { n: p.duration_value, unit: t(`plans.units.${p.duration_unit}`) })
+  p.kind === 'package'
+    ? p.validity_mode === 'fixed_date'
+      ? t('plans.validUntilSummary', { date: p.valid_until ? format.date(p.valid_until) : '–' })
+      : t('plans.validDaysSummary', { n: p.validity_days })
+    : p.billing === 'recurring'
+      ? [
+          t(`plans.intervals.${p.billing_interval}`),
+          p.min_commitment_months
+            ? t('plans.commitmentSummary', { n: p.min_commitment_months })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : t('plans.durationSummary', {
+          n: p.duration_value,
+          unit: t(`plans.units.${p.duration_unit}`),
+        })
 const covers = (p: MembershipPlan) => {
   const s = p.rules.services
   if (s.mode === 'categories') return t('plans.coversCategories', { n: s.category_ids.length })
   if (s.mode === 'services') return t('plans.coversServices', { n: s.service_ids.length })
-  return t('plans.coverModes.all')
+  if (s.mode === 'programs') return t('plans.coversPrograms', { n: s.program_ids?.length ?? 0 })
+  return s.exclude_service_ids?.length
+    ? t('plans.coversAllExcept', { n: s.exclude_service_ids.length })
+    : t('plans.coverModes.all')
 }
+const badge = (p: MembershipPlan) =>
+  p.kind === 'package'
+    ? { cls: 'package', icon: 'pi-ticket', label: t('plans.kindOne.package') }
+    : p.type === 'Unlimited'
+      ? { cls: 'unlimited', icon: 'pi-star', label: t('plans.types.Unlimited') }
+      : { cls: 'limited', icon: 'pi-ticket', label: t('plans.types.Limited') }
 const priceRange = (p: MembershipPlan) => {
   const prices = p.prices.map((x) => x.price)
   if (!prices.length) return null
@@ -110,6 +139,15 @@ const priceRange = (p: MembershipPlan) => {
 <template>
   <div class="page">
     <PageHeader :title="t('plans.title')" :subtitle="t('plans.subtitle')">
+      <template v-if="canManage" #actions>
+        <Button
+          icon="pi pi-ticket"
+          :label="t('plans.newPackage')"
+          severity="secondary"
+          variant="outlined"
+          @click="createPackage"
+        />
+      </template>
       <template v-if="canManage" #primary>
         <Button icon="pi pi-plus" :label="t('plans.new')" @click="create" />
       </template>
@@ -132,7 +170,16 @@ const priceRange = (p: MembershipPlan) => {
       :title="t('plans.empty')"
       :body="t('plans.emptyHint')"
     >
-      <Button v-if="canManage" icon="pi pi-plus" :label="t('plans.new')" @click="create" />
+      <div v-if="canManage" class="empty-actions">
+        <Button icon="pi pi-plus" :label="t('plans.new')" @click="create" />
+        <Button
+          icon="pi pi-ticket"
+          :label="t('plans.newPackage')"
+          severity="secondary"
+          variant="outlined"
+          @click="createPackage"
+        />
+      </div>
     </EmptyState>
 
     <template v-else>
@@ -147,6 +194,14 @@ const priceRange = (p: MembershipPlan) => {
       </div>
 
       <FilterBar v-model:search="search" :placeholder="t('plans.search')">
+        <SelectButton
+          v-model="kind"
+          :options="kindOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          :aria-label="t('plans.kinds.label')"
+        />
         <SelectButton
           v-model="status"
           :options="statusOptions"
@@ -180,12 +235,9 @@ const priceRange = (p: MembershipPlan) => {
           @keydown.enter="edit(p)"
         >
           <div class="plan__top">
-            <span :class="['type', `type--${p.type.toLowerCase()}`]">
-              <i
-                :class="['pi', p.type === 'Unlimited' ? 'pi-star' : 'pi-ticket']"
-                aria-hidden="true"
-              />
-              {{ t(`plans.types.${p.type}`) }}
+            <span :class="['type', `type--${badge(p).cls}`]">
+              <i :class="['pi', badge(p).icon]" aria-hidden="true" />
+              {{ badge(p).label }}
             </span>
             <StatusTag :status="p.status" size="sm" />
           </div>
@@ -319,6 +371,16 @@ const priceRange = (p: MembershipPlan) => {
   border-radius: 999px;
   background: var(--surface-sunken);
   color: var(--text-secondary);
+}
+.empty-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.type--package {
+  background: var(--sev-warn-bg);
+  color: var(--sev-warn-fg);
 }
 .type--unlimited {
   background: var(--primary-50);

@@ -28,6 +28,7 @@ import Tag from 'primevue/tag'
 import BookingDetailsDrawer from '@/components/bookings/BookingDetailsDrawer.vue'
 import ClientFamilyTab from '@/components/clients/ClientFamilyTab.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
+import ClientMembershipsTab from '@/components/clients/ClientMembershipsTab.vue'
 import ClientNotesTab from '@/components/clients/ClientNotesTab.vue'
 import MergeClientsDialog from '@/components/clients/MergeClientsDialog.vue'
 import ClientTimeline from '@/components/clients/ClientTimeline.vue'
@@ -263,7 +264,6 @@ const whenOptions = computed(() => [
   { value: 'past', label: t('clientProfile.past') },
 ])
 const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } as const
-const LATER = ['memberships'] as const
 </script>
 
 <template>
@@ -436,11 +436,9 @@ const LATER = ['memberships'] as const
           <Tab value="waivers">{{ t('clientProfile.tabs.waivers') }}</Tab>
           <Tab value="notes">{{ t('clientProfile.tabs.notes') }}</Tab>
           <Tab value="timeline">{{ t('clientProfile.tabs.timeline') }}</Tab>
-          <Tab v-for="later in LATER" :key="later" :value="later" disabled>
-            <span v-tooltip.top="t('clientProfile.later')">{{
-              t(`clientProfile.tabs.${later}`)
-            }}</span>
-          </Tab>
+          <Tab v-if="auth.can('entitlements.view')" value="memberships">{{
+            t('clientProfile.tabs.memberships')
+          }}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="overview">
@@ -650,6 +648,9 @@ const LATER = ['memberships'] as const
           </TabPanel>
           <TabPanel value="notes">
             <ClientNotesTab v-if="tab === 'notes'" :client-id="client.id" />
+          </TabPanel>
+          <TabPanel value="memberships">
+            <ClientMembershipsTab v-if="tab === 'memberships'" :client-id="client.id" />
           </TabPanel>
           <TabPanel value="timeline">
             <ClientTimeline v-if="tab === 'timeline'" :client-id="client.id" />

@@ -752,28 +752,50 @@ export interface FamilyPage {
 }
 
 /** A membership plan (US-06.01). */
+export type PlanKind = 'membership' | 'package'
+export type PlanActivation = 'purchase' | 'chosen_date' | 'first_use'
+
+/**
+ * A product clients buy (EP-06): a membership plan (US-06.01) or a credit package (US-06.02), with
+ * its activation rule (US-06.03), service eligibility (US-06.04) and branches (US-06.05).
+ */
 export interface MembershipPlan {
   id: number
+  kind: PlanKind
   name: Translated
   description: Translated | null
   display_name: string
   status: 'Draft' | 'Published' | 'Archived'
-  type: 'Unlimited' | 'Limited'
+  type: 'Unlimited' | 'Limited' | null
   visit_limit: number | null
   visit_period: 'week' | 'month' | null
-  billing: 'one_time' | 'recurring'
+  billing: 'one_time' | 'recurring' | null
   duration_value: number | null
   duration_unit: 'days' | 'weeks' | 'months' | 'years' | null
   billing_interval: 'month' | 'year' | null
   min_commitment_months: number | null
   joining_fee: number | null
+  credits: number | null
+  validity_mode: 'days' | 'fixed_date' | null
+  validity_days: number | null
+  valid_until: string | null
+  drop_in_service_id: number | null
+  drop_in_service?: string | null
+  activation: PlanActivation
+  activation_max_wait_days: number | null
   rules: {
     services: {
-      mode: 'all' | 'categories' | 'services'
+      mode: 'all' | 'categories' | 'services' | 'programs'
       category_ids: number[]
       service_ids: number[]
+      program_ids: number[]
+      exclude_service_ids: number[]
     }
-    locations: { mode: 'all' | 'home' | 'selected'; location_ids: number[] }
+    locations: {
+      mode: 'all' | 'home' | 'selected'
+      location_ids: number[]
+      include_future: boolean
+    }
     limits: {
       per_day: number | null
       per_week: number | null
@@ -786,9 +808,33 @@ export interface MembershipPlan {
 
 export type MembershipPlanInput = Omit<
   MembershipPlan,
-  'id' | 'display_name' | 'prices' | 'currency'
+  'id' | 'display_name' | 'prices' | 'currency' | 'drop_in_service'
 > & {
   prices: { location_id: number; price: number }[]
+}
+
+/** A membership or package a client holds (EP-06), as shown on their profile. */
+export interface ClientEntitlement {
+  id: number
+  kind: PlanKind
+  status: 'Pending' | 'Active' | 'Frozen' | 'Expired' | 'Cancelled' | 'Exhausted'
+  name: string
+  plan_id: number
+  type: 'Unlimited' | 'Limited' | null
+  billing: 'one_time' | 'recurring' | null
+  billing_interval: 'month' | 'year' | null
+  activation: PlanActivation
+  activated_by: 'purchase' | 'date' | 'booking' | 'check_in' | 'timeout' | null
+  credits_total: number | null
+  credits_used: number
+  credits_left: number | null
+  purchased_on: string
+  starts_on: string | null
+  ends_on: string | null
+  activate_by: string | null
+  ends_if_started_today: string | null
+  sold_at: string | null
+  locations: MembershipPlan['rules']['locations'] | null
 }
 
 /** A client import (US-05.15): file, column mapping and result report. */
@@ -1171,6 +1217,8 @@ export interface BookingEligibility {
   }[]
   can_waitlist: boolean
   entitlements: EntitlementSource[]
+  /** Why the client's memberships/packages can't pay for it (US-06.04/05), when they hold some. */
+  entitlement_note?: { code: string; message: string } | null
 }
 
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
@@ -1738,6 +1786,10 @@ export const tenantApi = {
       return (await http.get('/api/clients/duplicates', { params })).data.data
     },
     /** Guardians and children (US-05.08). */
+    /** The client's memberships and packages (EP-06), current first. */
+    async entitlements(id: number): Promise<ClientEntitlement[]> {
+      return (await http.get(`/api/clients/${id}/entitlements`)).data.data
+    },
     async family(id: number): Promise<ClientFamily> {
       return (await http.get(`/api/clients/${id}/family`)).data.data
     },
@@ -1856,8 +1908,8 @@ export const tenantApi = {
   },
   /** Membership plans (US-06.01); managing them needs memberships.update. */
   membershipPlans: {
-    async list(): Promise<MembershipPlan[]> {
-      return (await http.get('/api/membership-plans')).data.data
+    async list(params: { kind?: PlanKind } = {}): Promise<MembershipPlan[]> {
+      return (await http.get('/api/membership-plans', { params })).data.data
     },
     async get(id: number): Promise<MembershipPlan> {
       return (await http.get(`/api/membership-plans/${id}`)).data.data
