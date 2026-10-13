@@ -751,6 +751,39 @@ export interface FamilyPage {
   owed: number
 }
 
+/** A client import (US-05.15): file, column mapping and result report. */
+export interface ClientImport {
+  id: number
+  file: string
+  status: 'uploaded' | 'queued' | 'running' | 'done' | 'failed'
+  headers: string[]
+  mapping: Record<string, number>
+  duplicates: 'skip' | 'update'
+  total: number
+  created: number
+  updated: number
+  skipped: number
+  failed: number
+  report: {
+    row: number
+    status: 'update' | 'skip' | 'error'
+    messages: string[]
+    client_id?: number | null
+  }[]
+  finished_at: string | null
+  fields: string[]
+}
+
+export interface ImportPreview {
+  counts: Record<'create' | 'update' | 'skip' | 'error', number>
+  rows: {
+    row: number
+    status: 'create' | 'update' | 'skip' | 'error'
+    messages: string[]
+    values: { first_name: string; last_name: string; mobile: string | null; email: string | null }
+  }[]
+}
+
 /** Merging duplicate clients (US-05.14). */
 export interface MergePreview {
   primary: Client
@@ -1779,6 +1812,33 @@ export const tenantApi = {
       const body = new FormData()
       body.append('photo', file)
       return (await http.post(`/api/clients/${id}/photo`, body)).data.data
+    },
+  },
+  /** Import clients from CSV or Excel (US-05.15). */
+  imports: {
+    templateUrl: '/api/client-imports/template',
+    async upload(file: File): Promise<ClientImport> {
+      const body = new FormData()
+      body.append('file', file)
+      return (await http.post('/api/client-imports', body)).data.data
+    },
+    async get(id: number): Promise<ClientImport> {
+      return (await http.get(`/api/client-imports/${id}`)).data.data
+    },
+    async preview(
+      id: number,
+      mapping: Record<string, number | null>,
+      duplicates: 'skip' | 'update',
+    ): Promise<ImportPreview> {
+      return (await http.post(`/api/client-imports/${id}/preview`, { mapping, duplicates })).data
+        .data
+    },
+    async run(
+      id: number,
+      mapping: Record<string, number | null>,
+      duplicates: 'skip' | 'update',
+    ): Promise<ClientImport> {
+      return (await http.post(`/api/client-imports/${id}/run`, { mapping, duplicates })).data.data
     },
   },
   /** Tags and segments (US-05.12). */

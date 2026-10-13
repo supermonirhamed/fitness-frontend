@@ -215,6 +215,14 @@ function onSaved(client: Client) {
       </template>
       <template #actions>
         <Button
+          v-if="canCreate"
+          icon="pi pi-upload"
+          :label="t('import.title')"
+          severity="secondary"
+          variant="text"
+          @click="router.push({ name: 'tenant.clients.import' })"
+        />
+        <Button
           icon="pi pi-tags"
           :label="t('segments.title')"
           severity="secondary"

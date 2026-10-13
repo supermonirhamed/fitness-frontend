@@ -99,6 +99,12 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'clients.view' },
       },
       {
+        path: 'clients/import',
+        name: 'tenant.clients.import',
+        component: () => import('@/views/tenant/clients/ImportClientsView.vue'),
+        meta: { permission: 'clients.create' },
+      },
+      {
         path: 'clients/segments',
         name: 'tenant.clients.segments',
         component: () => import('@/views/tenant/clients/SegmentsView.vue'),

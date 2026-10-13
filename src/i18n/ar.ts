@@ -2,6 +2,7 @@ import type en from './en'
 
 const ar: typeof en = {
   common: {
+    back: 'رجوع',
     language: 'English',
     retry: 'إعادة المحاولة',
     cancel: 'إلغاء',
@@ -1701,6 +1702,50 @@ const ar: typeof en = {
     waitlisted: 'في الانتظار: {n} حصص',
     done: 'تم',
     tag: 'متكرر',
+  },
+  import: {
+    title: 'استيراد العملاء',
+    steps: { upload: 'الرفع', map: 'الأعمدة', preview: 'التحقق', result: 'النتيجة' },
+    intro:
+      'انقل عملاءك من نظام آخر. ابدأ من القالب أو استخدم ملفك: ستطابق أعمدته في الخطوة التالية.',
+    template: 'تنزيل القالب (CSV)',
+    choose: 'اختر ملف CSV أو Excel',
+    formats:
+      'CSV (UTF-8) أو Excel ‏.xlsx (الورقة الأولى)، حتى 5 ميجابايت. يحتوي الصف الأول على أسماء الأعمدة.',
+    uploadError: 'تعذّرت قراءة الملف.',
+    mapIntro: '{file}: {n} صفوف. أي عمود يحتوي كل معلومة؟',
+    skipColumn: 'عدم الاستيراد',
+    column: 'العمود {n}',
+    fields: {
+      first_name: 'الاسم الأول',
+      last_name: 'اسم العائلة',
+      mobile: 'الجوال',
+      email: 'البريد',
+      date_of_birth: 'تاريخ الميلاد',
+      gender: 'الجنس',
+      home_branch: 'الفرع الرئيسي',
+      national_id: 'الهوية',
+      address: 'العنوان',
+      preferred_language: 'اللغة',
+      marketing_consent: 'موافقة التسويق',
+    },
+    duplicates: 'العملاء الموجودون مسبقًا (نفس الجوال أو البريد)',
+    dup: { skip: 'تخطيهم', update: 'تحديث بياناتهم' },
+    check: 'التحقق من الملف',
+    counts: {
+      create: '{n} جديد',
+      update: '{n} للتحديث',
+      skip: '{n} متخطى',
+      error: '{n} بها أخطاء',
+    },
+    status: { create: 'جديد', update: 'تحديث', skip: 'متخطى', error: 'خطأ' },
+    row: 'الصف',
+    problems: 'المشكلات',
+    run: 'استيراد {n} عملاء',
+    running: 'جارٍ استيراد {n} صفوف في الخلفية. يمكنك مغادرة الصفحة.',
+    done: 'اكتمل الاستيراد.',
+    failedRun: 'توقف الاستيراد بسبب خطأ.',
+    toClients: 'الذهاب إلى العملاء',
   },
   merge: {
     title: 'دمج ملف مكرر',
