@@ -674,6 +674,16 @@ export type OverridableCheck = 'capacity' | 'window' | 'entitlement'
 export type EntitlementSource =
   'membership' | 'package' | 'drop_in' | 'complimentary' | 'pay_at_desk' | 'guest_pass'
 
+/** How a member's guest can be paid for, and the service's restrictions the guest form asks about (US-04.07). */
+export interface GuestOptions {
+  entitlements: EntitlementSource[]
+  restrictions: {
+    gender: 'Any' | 'Male' | 'Female' | null
+    age_min: number | null
+    age_max: number | null
+  }
+}
+
 /** A booking (EP-04) as the roster shows it. */
 export interface Booking {
   id: number
@@ -1334,19 +1344,26 @@ export const tenantApi = {
     ): Promise<Booking> {
       return (await http.post(`/api/bookings/${id}/cancel`, input)).data.data
     },
-    /** How a member's guest can be paid for in a session (US-04.07). */
-    async guestOptions(sessionId: number, hostId: number): Promise<EntitlementSource[]> {
+    /** How a member's guest can be paid for in a session, and what the service restricts (US-04.07). */
+    async guestOptions(sessionId: number, hostId: number): Promise<GuestOptions> {
       return (
         await http.get('/api/bookings/guest-options', {
           params: { session_id: sessionId, host_client_id: hostId },
         })
-      ).data.data.entitlements
+      ).data.data
     },
     /** Books a member's guest; 409 not_eligible / host_not_eligible, 422 validation. */
     async createGuest(input: {
       session_id: number
       host_client_id: number
-      guest: { first_name: string; last_name: string; mobile: string | null; email: string | null }
+      guest: {
+        first_name: string
+        last_name: string
+        mobile: string | null
+        email: string | null
+        gender: 'female' | 'male' | null
+        date_of_birth: string | null
+      }
       entitlement_source: EntitlementSource
       override?: OverridableCheck[]
       override_reason?: string | null

@@ -1577,6 +1577,8 @@ export default {
     guestMobile: 'Mobile',
     guestEmail: 'Email',
     guestContact: 'Enter a mobile number or an email.',
+    guestRestricted:
+      'This service is limited by gender or age, so these are needed to check the guest.',
     guestChecked:
       'The guest’s eligibility is checked when you confirm. An existing client with this mobile or email is used instead of a new record.',
     guestOf: 'Guest of {name}',

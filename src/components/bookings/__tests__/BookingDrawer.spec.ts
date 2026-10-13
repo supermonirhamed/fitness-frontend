@@ -141,7 +141,10 @@ describe('BookingDrawer, guest of a member (US-04.07)', () => {
   })
 
   it('books the member’s guest with their name and contact, paid as a drop-in', async () => {
-    tenantApi.bookings.guestOptions = vi.fn().mockResolvedValue(['drop_in'])
+    tenantApi.bookings.guestOptions = vi.fn().mockResolvedValue({
+      entitlements: ['drop_in'],
+      restrictions: { gender: 'Male', age_min: null, age_max: null },
+    })
     tenantApi.bookings.createGuest = vi.fn().mockResolvedValue({ id: 5 })
     const wrapper = render(['bookings.create'])
 
@@ -157,13 +160,26 @@ describe('BookingDrawer, guest of a member (US-04.07)', () => {
     await wrapper.get('#guest-last').setValue('Saleh')
     expect(confirmButton(wrapper).attributes('disabled')).toBeDefined() // contact needed
     await wrapper.get('#guest-mobile').setValue('0551234567')
+    // A men-only service: the guest's gender is needed to check them.
+    expect(confirmButton(wrapper).attributes('disabled')).toBeDefined()
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Male')!
+      .trigger('click')
     await confirmButton(wrapper).trigger('click')
     await flushPromises()
 
     expect(tenantApi.bookings.createGuest).toHaveBeenCalledWith({
       session_id: 7,
       host_client_id: 3,
-      guest: { first_name: 'Noor', last_name: 'Saleh', mobile: '0551234567', email: null },
+      guest: {
+        first_name: 'Noor',
+        last_name: 'Saleh',
+        mobile: '0551234567',
+        email: null,
+        gender: 'male',
+        date_of_birth: null,
+      },
       entitlement_source: 'drop_in',
       override: [],
       override_reason: null,

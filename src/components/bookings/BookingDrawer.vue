@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { AxiosError } from 'axios'
 import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete'
 import Button from 'primevue/button'
+import DatePicker from 'primevue/datepicker'
 import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -27,6 +28,7 @@ import {
   type CalendarSession,
   type Client,
   type EntitlementSource,
+  type GuestOptions,
   type OverridableCheck,
 } from '@/api/tenant'
 import { apiMessage, errorCode } from '@/lib/apiErrors'
@@ -41,7 +43,32 @@ const auth = useStaffAuth()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
 
 const mode = ref<'client' | 'guest'>('client')
-const guest = ref({ first_name: '', last_name: '', mobile: '', email: '' })
+const blankGuest = () => ({
+  first_name: '',
+  last_name: '',
+  mobile: '',
+  email: '',
+  gender: null as 'female' | 'male' | null,
+  dob: null as Date | null,
+})
+const guest = ref(blankGuest())
+// The service's restrictions: the guest form asks for what they need (gender, date of birth).
+const restrictions = ref<GuestOptions['restrictions'] | null>(null)
+const needsGender = computed(
+  () => !!restrictions.value?.gender && restrictions.value.gender !== 'Any',
+)
+const needsDob = computed(
+  () => restrictions.value?.age_min != null || restrictions.value?.age_max != null,
+)
+const genderOptions = computed(() => [
+  { value: 'female', label: t('clients.gender.female') },
+  { value: 'male', label: t('clients.gender.male') },
+])
+const maxDob = new Date()
+const ymd = (d: Date | null) =>
+  d
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    : null
 const guestSources = ref<EntitlementSource[]>([])
 const errors = ref<Record<string, string[]>>({})
 const query = ref<string | Client>('')
@@ -81,6 +108,7 @@ function reset() {
   error.value = null
   errors.value = {}
   guestSources.value = []
+  restrictions.value = null
 }
 
 async function search(event: AutoCompleteCompleteEvent) {
@@ -101,14 +129,16 @@ function choose(picked: Client) {
 function change() {
   client.value = null
   query.value = ''
-  guest.value = { first_name: '', last_name: '', mobile: '', email: '' }
+  guest.value = blankGuest()
   reset()
 }
 
 async function loadGuestSources() {
   if (!props.session || !client.value) return
   try {
-    guestSources.value = await tenantApi.bookings.guestOptions(props.session.id, client.value.id)
+    const options = await tenantApi.bookings.guestOptions(props.session.id, client.value.id)
+    guestSources.value = options.entitlements
+    restrictions.value = options.restrictions
     payment.value = guestSources.value[0] ?? null
   } catch (e) {
     error.value = apiMessage(e) ?? t('common.genericError')
@@ -118,7 +148,9 @@ const guestReady = computed(
   () =>
     !!guest.value.first_name.trim() &&
     !!guest.value.last_name.trim() &&
-    !!(guest.value.mobile.trim() || guest.value.email.trim()),
+    !!(guest.value.mobile.trim() || guest.value.email.trim()) &&
+    (!needsGender.value || !!guest.value.gender) &&
+    (!needsDob.value || !!guest.value.dob),
 )
 
 function onClientCreated(created: Client) {
@@ -212,6 +244,8 @@ async function confirm() {
               last_name: guest.value.last_name,
               mobile: guest.value.mobile.trim() || null,
               email: guest.value.email.trim() || null,
+              gender: guest.value.gender,
+              date_of_birth: ymd(guest.value.dob),
             },
             entitlement_source: payment.value,
             override: override.value,
@@ -381,6 +415,38 @@ async function confirm() {
             />
           </div>
         </div>
+        <div class="guest__row">
+          <div class="field">
+            <span id="guest-gender" class="field__label"
+              >{{ t('clients.genderLabel') }}<template v-if="needsGender"> *</template></span
+            >
+            <SelectButton
+              v-model="guest.gender"
+              :options="genderOptions"
+              option-label="label"
+              option-value="value"
+              :invalid="!!errors['guest.gender']"
+              aria-labelledby="guest-gender"
+            />
+          </div>
+          <div v-if="needsDob" class="field">
+            <label for="guest-dob" class="field__label">{{ t('clients.dob') }} *</label>
+            <DatePicker
+              v-model="guest.dob"
+              input-id="guest-dob"
+              date-format="yy-mm-dd"
+              :max-date="maxDob"
+              :placeholder="t('clients.pickDate')"
+              :invalid="!!errors['guest.date_of_birth']"
+              show-icon
+              icon-display="input"
+              fluid
+            />
+          </div>
+        </div>
+        <small v-if="needsGender || needsDob" class="field__hint">{{
+          t('booking.guestRestricted')
+        }}</small>
         <small class="field__hint">{{ t('booking.guestChecked') }}</small>
       </fieldset>
 
