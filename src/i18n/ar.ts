@@ -1510,6 +1510,32 @@ const ar: typeof en = {
     invalid: 'تحقق من الإعدادات المحددة.',
     saved: 'تم حفظ الإعدادات الإقليمية',
   },
+  eligibility: {
+    title: 'الأهلية',
+    overridden: 'تم التجاوز',
+    checks: {
+      session: 'الحصة متاحة للحجز',
+      window: 'فترة الحجز',
+      client: 'حالة العميل',
+      restrictions: 'العمر والجنس',
+      capacity: 'السعة',
+      duplicate: 'محجوز مسبقًا',
+      overlap: 'حجز متداخل',
+      waivers: 'الإقرارات',
+      entitlement: 'الدفع',
+    },
+    passed: {
+      session: 'الحصة متاحة للحجز',
+      window: 'ضمن فترة الحجز',
+      client: 'العميل نشط',
+      restrictions: 'العمر والجنس مطابقان',
+      capacity: 'يوجد مكان',
+      duplicate: 'غير محجوز في هذه الحصة',
+      overlap: 'لا يوجد حجز متداخل',
+      waivers: 'الإقرارات موقّعة',
+      entitlement: 'توجد طريقة دفع',
+    },
+  },
   bookingPolicy: {
     intro:
       'متى يمكن للعملاء الحجز والإلغاء، وماذا يحدث عند الإلغاء المتأخر وعدم الحضور وفي قائمة الانتظار.',
@@ -1524,6 +1550,13 @@ const ar: typeof en = {
     override: 'تجاوز',
     overrideField: 'تجاوز {field}',
     inheritedFrom: 'من {level}',
+    overlap: {
+      group: 'الحجوزات',
+      label: 'الحجوزات المتداخلة',
+      help: 'على مستوى المنشأة كلها.',
+      on: 'يمكن للعميل حجز حصص متداخلة في الوقت.',
+      off: 'لا يمكن للعميل حجز حصتين في نفس الوقت.',
+    },
     groups: {
       booking: 'فترة الحجز',
       cancellation: 'الإلغاء وعدم الحضور',

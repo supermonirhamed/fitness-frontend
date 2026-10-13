@@ -1531,6 +1531,32 @@ export default {
     invalid: 'Check the highlighted settings.',
     saved: 'Regional settings saved',
   },
+  eligibility: {
+    title: 'Eligibility',
+    overridden: 'overridden',
+    checks: {
+      session: 'Session open for booking',
+      window: 'Booking window',
+      client: 'Client status',
+      restrictions: 'Age and gender',
+      capacity: 'Capacity',
+      duplicate: 'Already booked',
+      overlap: 'Overlapping booking',
+      waivers: 'Waivers',
+      entitlement: 'Payment',
+    },
+    passed: {
+      session: 'Session open for booking',
+      window: 'Inside the booking window',
+      client: 'Client is active',
+      restrictions: 'Age and gender match',
+      capacity: 'Space available',
+      duplicate: 'Not booked on this session yet',
+      overlap: 'No overlapping booking',
+      waivers: 'Waivers signed',
+      entitlement: 'Can be paid for',
+    },
+  },
   bookingPolicy: {
     intro:
       'When clients can book and cancel, and what late cancellations, no-shows and the waitlist do.',
@@ -1545,6 +1571,13 @@ export default {
     override: 'Override',
     overrideField: 'Override {field}',
     inheritedFrom: 'From {level}',
+    overlap: {
+      group: 'Bookings',
+      label: 'Overlapping bookings',
+      help: 'For the whole organization.',
+      on: 'A client can hold bookings that overlap in time.',
+      off: "A client can't book two sessions at the same time.",
+    },
     groups: {
       booking: 'Booking window',
       cancellation: 'Cancellations & no-shows',

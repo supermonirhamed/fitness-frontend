@@ -4,16 +4,18 @@ import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import ToggleSwitch from 'primevue/toggleswitch'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
+import SettingRow from '@/components/patterns/SettingRow.vue'
 import SettingsCard from '@/components/patterns/SettingsCard.vue'
 import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
 import BookingPolicyFields from '@/components/policies/BookingPolicyFields.vue'
 import {
   tenantApi,
-  type BookingPolicy,
   type BookingPolicyOptions,
   type BookingPolicyOverrides,
+  type OrganizationBookingPolicy,
 } from '@/api/tenant'
 import { statusOf, validationErrors } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -24,21 +26,30 @@ const auth = useStaffAuth()
 
 const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
 const form = ref<BookingPolicyOverrides | null>(null)
-const saved = ref<BookingPolicy | null>(null)
+const saved = ref<OrganizationBookingPolicy | null>(null)
+// Organization-wide only (US-04.01), so it sits apart from the overridable settings.
+const allowOverlap = ref(false)
 const options = ref<BookingPolicyOptions>({ penalties: [], waitlist_modes: [] })
 const saving = ref(false)
 const error = ref<string | null>(null)
 const errors = ref<Record<string, string[]>>({})
 const canEdit = computed(() => auth.can('settings.update'))
-const dirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(saved.value))
+const current = computed(() => ({ ...form.value, allow_overlapping_bookings: allowOverlap.value }))
+const dirty = computed(() => JSON.stringify(current.value) !== JSON.stringify(saved.value))
+
+function fill(policy: OrganizationBookingPolicy) {
+  saved.value = policy
+  const { allow_overlapping_bookings, ...overridable } = policy
+  form.value = overridable
+  allowOverlap.value = allow_overlapping_bookings
+}
 
 async function load() {
   state.value = 'loading'
   try {
     const result = await tenantApi.bookingPolicy.get()
     options.value = result.options
-    saved.value = result.data
-    form.value = { ...result.data }
+    fill(result.data)
     state.value = 'ready'
   } catch (e) {
     state.value = statusOf(e) === 403 ? 'forbidden' : 'error'
@@ -47,7 +58,7 @@ async function load() {
 onMounted(load)
 
 function discard() {
-  form.value = saved.value ? { ...saved.value } : null
+  if (saved.value) fill(saved.value)
   errors.value = {}
   error.value = null
 }
@@ -58,9 +69,7 @@ async function save() {
   error.value = null
   errors.value = {}
   try {
-    const result = await tenantApi.bookingPolicy.update(form.value as BookingPolicy)
-    saved.value = result
-    form.value = { ...result }
+    fill(await tenantApi.bookingPolicy.update(current.value as OrganizationBookingPolicy))
     toast.add({ severity: 'success', summary: t('bookingPolicy.saved'), life: 3000 })
   } catch (e) {
     errors.value = validationErrors(e)
@@ -94,6 +103,20 @@ async function save() {
     <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
 
     <BookingPolicyFields v-model="form" :options="options" :disabled="!canEdit" :errors="errors" />
+
+    <SettingsCard>
+      <div class="settings-group" role="heading" aria-level="3">
+        {{ t('bookingPolicy.overlap.group') }}
+      </div>
+      <SettingRow
+        :label="t('bookingPolicy.overlap.label')"
+        :help="t('bookingPolicy.overlap.help')"
+        :example="t(`bookingPolicy.overlap.${allowOverlap ? 'on' : 'off'}`)"
+        label-for="policy-overlap"
+      >
+        <ToggleSwitch v-model="allowOverlap" input-id="policy-overlap" :disabled="!canEdit" />
+      </SettingRow>
+    </SettingsCard>
 
     <UnsavedBar v-if="canEdit && dirty" :saving="saving" @discard="discard" @save="save" />
   </form>

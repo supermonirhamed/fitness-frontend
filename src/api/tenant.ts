@@ -47,6 +47,11 @@ export interface BookingPolicy {
   waitlist_mode: 'manual' | 'automatic'
 }
 
+/** The organization's policy: the defaults plus organization-wide settings (US-04.01). */
+export interface OrganizationBookingPolicy extends BookingPolicy {
+  allow_overlapping_bookings: boolean
+}
+
 /** Overrides: null inherits from the level above. */
 export type BookingPolicyOverrides = { [K in keyof BookingPolicy]: BookingPolicy[K] | null }
 
@@ -650,6 +655,44 @@ export interface ClientMatch {
   visible: boolean
 }
 
+export type EligibilityCheck =
+  | 'session'
+  | 'window'
+  | 'client'
+  | 'restrictions'
+  | 'capacity'
+  | 'duplicate'
+  | 'overlap'
+  | 'waivers'
+  | 'entitlement'
+
+/** The checks staff with bookings.override may bypass, with a reason. */
+export type OverridableCheck = 'capacity' | 'window' | 'entitlement'
+
+export type EntitlementSource =
+  'membership' | 'package' | 'drop_in' | 'complimentary' | 'pay_at_desk'
+
+/** Whether a client can book a session (US-04.01): every check in order, and why not. */
+export interface BookingEligibility {
+  ok: boolean
+  reasons: {
+    code: string
+    check: EligibilityCheck
+    message: string
+    params: Record<string, string | number>
+    overridable: boolean
+  }[]
+  checks: {
+    check: EligibilityCheck
+    passed: boolean
+    overridden: boolean
+    reasons: string[]
+    params: Record<string, string | number>
+  }[]
+  can_waitlist: boolean
+  entitlements: EntitlementSource[]
+}
+
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
 
 /** A session with the conflicts it has now (Conflict Center, US-03.07). */
@@ -1168,9 +1211,7 @@ export const tenantApi = {
     },
   },
   clients: {
-    async list(
-      params: { q?: string; page?: number; per_page?: number } = {},
-    ): Promise<{
+    async list(params: { q?: string; page?: number; per_page?: number } = {}): Promise<{
       data: Client[]
       meta: { total: number; current_page: number; last_page: number }
     }> {
@@ -1192,6 +1233,14 @@ export const tenantApi = {
       const body = new FormData()
       body.append('photo', file)
       return (await http.post(`/api/clients/${id}/photo`, body)).data.data
+    },
+  },
+  bookings: {
+    async eligibility(
+      sessionId: number,
+      input: { client_id: number; override?: OverridableCheck[]; override_reason?: string | null },
+    ): Promise<BookingEligibility> {
+      return (await http.post(`/api/sessions/${sessionId}/eligibility`, input)).data.data
     },
   },
   mySchedule: {
@@ -1412,10 +1461,10 @@ export const tenantApi = {
     },
   },
   bookingPolicy: {
-    async get(): Promise<{ data: BookingPolicy; options: BookingPolicyOptions }> {
+    async get(): Promise<{ data: OrganizationBookingPolicy; options: BookingPolicyOptions }> {
       return (await http.get('/api/settings/booking-policy')).data
     },
-    async update(policy: BookingPolicy): Promise<BookingPolicy> {
+    async update(policy: OrganizationBookingPolicy): Promise<OrganizationBookingPolicy> {
       return (await http.put('/api/settings/booking-policy', policy)).data.data
     },
     async forLocation(

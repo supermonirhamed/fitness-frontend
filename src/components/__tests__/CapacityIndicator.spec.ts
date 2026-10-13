@@ -4,7 +4,10 @@ import { i18n, setLocale } from '@/i18n'
 import CapacityIndicator from '../patterns/CapacityIndicator.vue'
 
 const render = (props: Record<string, unknown>) =>
-  mount(CapacityIndicator, { props, global: { plugins: [i18n] } })
+  mount(CapacityIndicator, {
+    props: props as { booked: number; capacity: number | null },
+    global: { plugins: [i18n] },
+  })
 
 describe('CapacityIndicator', () => {
   it('shows the capacity states in colour and in words (US-03.15)', () => {
