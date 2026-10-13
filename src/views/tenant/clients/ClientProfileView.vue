@@ -30,6 +30,7 @@ import BookingDetailsDrawer from '@/components/bookings/BookingDetailsDrawer.vue
 import ClientFamilyTab from '@/components/clients/ClientFamilyTab.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
 import ClientNotesTab from '@/components/clients/ClientNotesTab.vue'
+import MergeClientsDialog from '@/components/clients/MergeClientsDialog.vue'
 import ClientTimeline from '@/components/clients/ClientTimeline.vue'
 import ClientWaiversTab from '@/components/clients/ClientWaiversTab.vue'
 import NewClientDrawer from '@/components/clients/NewClientDrawer.vue'
@@ -88,6 +89,12 @@ const canManage = computed(() => auth.can('clients.delete') && !client.value?.an
 const statusMenu = ref<InstanceType<typeof Menu>>()
 const statusAction = ref<'deactivate' | 'reactivate' | 'block' | 'unblock' | null>(null)
 const anonymizeOpen = ref(false)
+const mergeOpen = ref(false)
+function onMerged(merged: Client) {
+  client.value = merged
+  toast.add({ severity: 'success', summary: t('merge.done'), life: 4000 })
+  loadOverview()
+}
 const anonymizeReason = ref('')
 const anonymizeName = ref('')
 const statusBusy = ref(false)
@@ -105,6 +112,7 @@ const statusItems = computed(() => {
       : s !== 'Blocked'
         ? [item('deactivate', 'pi-pause')]
         : []),
+    { label: t('merge.title'), icon: 'pi pi-clone', command: () => (mergeOpen.value = true) },
     { separator: true },
     {
       label: t('clientStatus.actions.anonymize'),
@@ -645,6 +653,12 @@ const LATER = ['memberships'] as const
       </Tabs>
     </template>
 
+    <MergeClientsDialog
+      v-if="client"
+      v-model:visible="mergeOpen"
+      :client="client"
+      @merged="onMerged"
+    />
     <OverrideDialog
       :visible="statusAction === 'block' || statusAction === 'deactivate'"
       :title="statusAction ? t(`clientStatus.titles.${statusAction}`, { name: client?.name }) : ''"

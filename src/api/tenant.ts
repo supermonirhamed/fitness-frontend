@@ -751,6 +751,14 @@ export interface FamilyPage {
   owed: number
 }
 
+/** Merging duplicate clients (US-05.14). */
+export interface MergePreview {
+  primary: Client
+  secondary: Client
+  fields: Record<string, { primary: string | null; secondary: string | null }>
+  moves: Record<string, number>
+}
+
 /** A manual label on clients (US-05.12). */
 export interface Tag {
   id: number
@@ -1671,6 +1679,28 @@ export const tenantApi = {
     /** A privacy deletion request: the personal data is anonymized, history is kept. */
     async anonymize(id: number, reason: string): Promise<Client> {
       return (await http.post(`/api/clients/${id}/anonymize`, { reason, confirm: true })).data.data
+    },
+    /** Both profiles side by side and what would move (US-05.14). */
+    async mergePreview(id: number, secondaryId: number): Promise<MergePreview> {
+      return (
+        await http.get(`/api/clients/${id}/merge-preview`, {
+          params: { secondary_id: secondaryId },
+        })
+      ).data.data
+    },
+    /** Merges `secondaryId` into `id`; irreversible. */
+    async merge(
+      id: number,
+      secondaryId: number,
+      fields: Record<string, 'primary' | 'secondary'>,
+    ): Promise<Client> {
+      return (
+        await http.post(`/api/clients/${id}/merge`, {
+          secondary_id: secondaryId,
+          fields,
+          confirm: true,
+        })
+      ).data.data
     },
     async notes(id: number): Promise<ClientNote[]> {
       return (await http.get(`/api/clients/${id}/notes`)).data.data
