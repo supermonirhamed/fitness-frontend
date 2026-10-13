@@ -672,7 +672,7 @@ export type EligibilityCheck =
 export type OverridableCheck = 'capacity' | 'window' | 'entitlement'
 
 export type EntitlementSource =
-  'membership' | 'package' | 'drop_in' | 'complimentary' | 'pay_at_desk'
+  'membership' | 'package' | 'drop_in' | 'complimentary' | 'pay_at_desk' | 'guest_pass'
 
 /** A booking (EP-04) as the roster shows it. */
 export interface Booking {
@@ -687,6 +687,8 @@ export interface Booking {
     | 'NoShow'
     | 'CancelledByBusiness'
     | 'Rescheduled'
+  /** The member who brought this guest (US-04.07). */
+  host: { id: number; name: string | null } | null
   /** Moved here from another session (US-04.05). */
   rescheduled_from: { session_id: number; starts_at: string | null; timezone: string | null } | null
   channel: 'staff' | 'web' | 'app' | 'waitlist'
@@ -1331,6 +1333,25 @@ export const tenantApi = {
       input: { reason?: string | null; waive_penalty?: boolean; waive_reason?: string | null },
     ): Promise<Booking> {
       return (await http.post(`/api/bookings/${id}/cancel`, input)).data.data
+    },
+    /** How a member's guest can be paid for in a session (US-04.07). */
+    async guestOptions(sessionId: number, hostId: number): Promise<EntitlementSource[]> {
+      return (
+        await http.get('/api/bookings/guest-options', {
+          params: { session_id: sessionId, host_client_id: hostId },
+        })
+      ).data.data.entitlements
+    },
+    /** Books a member's guest; 409 not_eligible / host_not_eligible, 422 validation. */
+    async createGuest(input: {
+      session_id: number
+      host_client_id: number
+      guest: { first_name: string; last_name: string; mobile: string | null; email: string | null }
+      entitlement_source: EntitlementSource
+      override?: OverridableCheck[]
+      override_reason?: string | null
+    }): Promise<Booking> {
+      return (await http.post('/api/bookings/guest', input)).data.data
     },
     /** 409 not_eligible carries `eligibility`; 422 entitlement_unavailable. */
     async create(input: {

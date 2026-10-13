@@ -133,3 +133,41 @@ describe('BookingDrawer', () => {
     expect(manager.findAll('button').some((b) => b.text() === 'Override capacity')).toBe(true)
   })
 })
+
+describe('BookingDrawer, guest of a member (US-04.07)', () => {
+  beforeEach(() => {
+    setLocale('en')
+    vi.clearAllMocks()
+  })
+
+  it('books the member’s guest with their name and contact, paid as a drop-in', async () => {
+    tenantApi.bookings.guestOptions = vi.fn().mockResolvedValue(['drop_in'])
+    tenantApi.bookings.createGuest = vi.fn().mockResolvedValue({ id: 5 })
+    const wrapper = render(['bookings.create'])
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Guest of a member')!
+      .trigger('click')
+    await wrapper.get('.pick').trigger('click') // the member: Sara
+    await flushPromises()
+    expect(tenantApi.bookings.eligibility).not.toHaveBeenCalled()
+
+    await wrapper.get('#guest-first').setValue('Noor')
+    await wrapper.get('#guest-last').setValue('Saleh')
+    expect(confirmButton(wrapper).attributes('disabled')).toBeDefined() // contact needed
+    await wrapper.get('#guest-mobile').setValue('0551234567')
+    await confirmButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(tenantApi.bookings.createGuest).toHaveBeenCalledWith({
+      session_id: 7,
+      host_client_id: 3,
+      guest: { first_name: 'Noor', last_name: 'Saleh', mobile: '0551234567', email: null },
+      entitlement_source: 'drop_in',
+      override: [],
+      override_reason: null,
+    })
+    expect(wrapper.emitted('booked')).toHaveLength(1)
+  })
+})

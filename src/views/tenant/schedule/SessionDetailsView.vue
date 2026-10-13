@@ -576,6 +576,10 @@ const moreItems = computed<MenuItem[]>(() => {
                     <span>
                       <span class="person__name">{{ data.client.name }}</span>
                       <small class="muted num">{{ data.client.member_id }}</small>
+                      <small v-if="data.host" class="muted"
+                        ><i class="pi pi-user-plus" aria-hidden="true" />
+                        {{ t('booking.guestOf', { name: data.host.name }) }}</small
+                      >
                       <small v-if="data.rescheduled_from" class="muted"
                         ><i class="pi pi-arrow-right-arrow-left" aria-hidden="true" />
                         {{

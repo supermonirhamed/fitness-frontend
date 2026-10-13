@@ -2,13 +2,15 @@
 // New booking (US-04.02), as the design's BookingDrawer (ui_kits/admin/BookingDrawer.jsx): find the
 // client by name, mobile, email or member ID (or create one inline), see the eligibility checks
 // (US-04.01) and the payment source that will be used, then confirm. Permitted staff can override
-// capacity, the booking window or payment with a reason.
+// capacity, the booking window or payment with a reason. "Guest of a member" (US-04.07) books a
+// member's guest instead: the member, the guest's name and contact, and a guest pass or drop-in.
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AxiosError } from 'axios'
 import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
@@ -28,6 +30,7 @@ import {
   type OverridableCheck,
 } from '@/api/tenant'
 import { apiMessage, errorCode } from '@/lib/apiErrors'
+import { validationErrors } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ session: CalendarSession | null }>()
@@ -37,6 +40,10 @@ const { t, locale } = useI18n()
 const auth = useStaffAuth()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
 
+const mode = ref<'client' | 'guest'>('client')
+const guest = ref({ first_name: '', last_name: '', mobile: '', email: '' })
+const guestSources = ref<EntitlementSource[]>([])
+const errors = ref<Record<string, string[]>>({})
 const query = ref<string | Client>('')
 const suggestions = ref<Client[]>([])
 const client = ref<Client | null>(null)
@@ -53,10 +60,18 @@ const error = ref<string | null>(null)
 
 watch(visible, (open) => {
   if (!open) return
-  query.value = ''
-  client.value = null
-  reset()
+  mode.value = 'client'
+  change()
 })
+watch(mode, change)
+// A refusal was about the guest as entered: editing them clears it.
+watch(
+  guest,
+  () => {
+    if (mode.value === 'guest') result.value = null
+  },
+  { deep: true },
+)
 
 function reset() {
   result.value = null
@@ -64,6 +79,8 @@ function reset() {
   overrideReason.value = null
   payment.value = null
   error.value = null
+  errors.value = {}
+  guestSources.value = []
 }
 
 async function search(event: AutoCompleteCompleteEvent) {
@@ -77,14 +94,32 @@ async function search(event: AutoCompleteCompleteEvent) {
 function choose(picked: Client) {
   client.value = picked
   reset()
-  check()
+  if (mode.value === 'guest') loadGuestSources()
+  else check()
 }
 
 function change() {
   client.value = null
   query.value = ''
+  guest.value = { first_name: '', last_name: '', mobile: '', email: '' }
   reset()
 }
+
+async function loadGuestSources() {
+  if (!props.session || !client.value) return
+  try {
+    guestSources.value = await tenantApi.bookings.guestOptions(props.session.id, client.value.id)
+    payment.value = guestSources.value[0] ?? null
+  } catch (e) {
+    error.value = apiMessage(e) ?? t('common.genericError')
+  }
+}
+const guestReady = computed(
+  () =>
+    !!guest.value.first_name.trim() &&
+    !!guest.value.last_name.trim() &&
+    !!(guest.value.mobile.trim() || guest.value.email.trim()),
+)
 
 function onClientCreated(created: Client) {
   choose(created)
@@ -130,13 +165,21 @@ function applyOverride(reason: string) {
   ]
   overrideReason.value = reason
   overrideOpen.value = false
-  check()
+  // A guest is checked again when booking; a client right away.
+  if (mode.value === 'guest') result.value = null
+  else check()
 }
 
 // What the server offers (US-04.03), best first; the staff options always show, and memberships
 // are marked as coming until EP-06 resolves them.
 const STAFF_PAYMENTS: EntitlementSource[] = ['complimentary', 'pay_at_desk']
 const paymentOptions = computed(() => {
+  if (mode.value === 'guest')
+    return (['guest_pass', 'drop_in'] as EntitlementSource[]).map((value) => ({
+      value,
+      label: t(`booking.payments.${value}`),
+      disabled: !guestSources.value.includes(value),
+    }))
   const offered = result.value?.entitlements ?? []
   const shown = [...new Set<EntitlementSource>([...offered, ...STAFF_PAYMENTS])]
   const options = shown.map((value) => ({
@@ -157,21 +200,40 @@ async function confirm() {
   if (!props.session || !client.value || !payment.value) return
   saving.value = true
   error.value = null
+  errors.value = {}
   try {
-    const booking = await tenantApi.bookings.create({
-      session_id: props.session.id,
-      client_id: client.value.id,
-      entitlement_source: payment.value,
-      override: override.value,
-      override_reason: overrideReason.value,
-    })
+    const booking =
+      mode.value === 'guest'
+        ? await tenantApi.bookings.createGuest({
+            session_id: props.session.id,
+            host_client_id: client.value.id,
+            guest: {
+              first_name: guest.value.first_name,
+              last_name: guest.value.last_name,
+              mobile: guest.value.mobile.trim() || null,
+              email: guest.value.email.trim() || null,
+            },
+            entitlement_source: payment.value,
+            override: override.value,
+            override_reason: overrideReason.value,
+          })
+        : await tenantApi.bookings.create({
+            session_id: props.session.id,
+            client_id: client.value.id,
+            entitlement_source: payment.value,
+            override: override.value,
+            override_reason: overrideReason.value,
+          })
     emit('booked', booking)
     visible.value = false
   } catch (e) {
     // Something changed meanwhile (e.g. the last place went): show the fresh checks.
     if (errorCode(e) === 'not_eligible' && e instanceof AxiosError)
       result.value = e.response?.data?.eligibility ?? result.value
-    error.value = apiMessage(e) ?? t('common.genericError')
+    errors.value = validationErrors(e)
+    error.value =
+      apiMessage(e) ??
+      (Object.keys(errors.value).length ? t('booking.guestContact') : t('common.genericError'))
   } finally {
     saving.value = false
   }
@@ -198,9 +260,22 @@ async function confirm() {
     <div class="body">
       <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
 
+      <SelectButton
+        v-model="mode"
+        :options="[
+          { value: 'client', label: t('booking.modes.client') },
+          { value: 'guest', label: t('booking.modes.guest') },
+        ]"
+        option-label="label"
+        option-value="value"
+        :allow-empty="false"
+        :aria-label="t('booking.title')"
+      />
+
       <div class="field">
         <label for="booking-client" class="field__label"
-          >{{ t('booking.client') }} <span aria-hidden="true">*</span></label
+          >{{ mode === 'guest' ? t('booking.member') : t('booking.client') }}
+          <span aria-hidden="true">*</span></label
         >
         <div v-if="client" class="picked">
           <PersonAvatar :name="client.name" :image="client.photo_url" />
@@ -248,7 +323,7 @@ async function confirm() {
             </div>
           </template>
           <template #empty>{{ t('booking.noResults') }}</template>
-          <template v-if="auth.can('clients.create')" #footer>
+          <template v-if="mode === 'client' && auth.can('clients.create')" #footer>
             <div class="option-footer">
               <Button
                 size="small"
@@ -261,6 +336,53 @@ async function confirm() {
           </template>
         </AutoComplete>
       </div>
+
+      <fieldset v-if="mode === 'guest' && client" class="guest">
+        <legend class="field__label">{{ t('booking.guest') }}</legend>
+        <div class="guest__row">
+          <div class="field">
+            <label for="guest-first" class="field__label">{{ t('booking.guestFirst') }} *</label>
+            <InputText
+              id="guest-first"
+              v-model="guest.first_name"
+              maxlength="60"
+              :invalid="!!errors['guest.first_name']"
+            />
+          </div>
+          <div class="field">
+            <label for="guest-last" class="field__label">{{ t('booking.guestLast') }} *</label>
+            <InputText
+              id="guest-last"
+              v-model="guest.last_name"
+              maxlength="60"
+              :invalid="!!errors['guest.last_name']"
+            />
+          </div>
+        </div>
+        <div class="guest__row">
+          <div class="field">
+            <label for="guest-mobile" class="field__label">{{ t('booking.guestMobile') }}</label>
+            <InputText
+              id="guest-mobile"
+              v-model="guest.mobile"
+              dir="ltr"
+              inputmode="tel"
+              :invalid="!!errors['guest.mobile']"
+            />
+          </div>
+          <div class="field">
+            <label for="guest-email" class="field__label">{{ t('booking.guestEmail') }}</label>
+            <InputText
+              id="guest-email"
+              v-model="guest.email"
+              dir="ltr"
+              type="email"
+              :invalid="!!errors['guest.email']"
+            />
+          </div>
+        </div>
+        <small class="field__hint">{{ t('booking.guestChecked') }}</small>
+      </fieldset>
 
       <div v-if="checking && !result" class="stack" aria-busy="true">
         <Skeleton height="200px" />
@@ -298,7 +420,7 @@ async function confirm() {
           {{ t('booking.overriding', { reason: overrideReason }) }}
         </Message>
 
-        <div v-if="result.ok" class="field">
+        <div v-if="result.ok && mode === 'client'" class="field">
           <span id="booking-payment" class="field__label">{{ t('booking.payment') }}</span>
           <SelectButton
             v-model="payment"
@@ -308,6 +430,31 @@ async function confirm() {
             option-disabled="disabled"
             :allow-empty="false"
             aria-labelledby="booking-payment"
+          />
+          <small v-if="payment" class="field__hint">{{
+            t(`booking.paymentHints.${payment}`)
+          }}</small>
+        </div>
+      </template>
+      <template v-if="mode === 'guest' && client">
+        <Message
+          v-if="override.length && !result"
+          severity="warn"
+          :closable="false"
+          icon="pi pi-exclamation-circle"
+        >
+          {{ t('booking.overriding', { reason: overrideReason }) }}
+        </Message>
+        <div class="field">
+          <span id="booking-guest-payment" class="field__label">{{ t('booking.payment') }}</span>
+          <SelectButton
+            v-model="payment"
+            :options="paymentOptions"
+            option-label="label"
+            option-value="value"
+            option-disabled="disabled"
+            :allow-empty="false"
+            aria-labelledby="booking-guest-payment"
           />
           <small v-if="payment" class="field__hint">{{
             t(`booking.paymentHints.${payment}`)
@@ -328,7 +475,11 @@ async function confirm() {
         <Button
           :label="t('booking.confirm')"
           :loading="saving"
-          :disabled="!result?.ok || !payment || checking"
+          :disabled="
+            mode === 'guest'
+              ? !client || !guestReady || !payment || (!!result && !result.ok)
+              : !result?.ok || !payment || checking
+          "
           @click="confirm"
         />
       </div>
@@ -370,6 +521,19 @@ async function confirm() {
 .field__hint {
   font: var(--text-small);
   color: var(--text-secondary);
+}
+.guest {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.guest__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
 }
 .picked {
   display: flex;
