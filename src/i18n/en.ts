@@ -1725,6 +1725,42 @@ export default {
     done: 'Done',
     tag: 'Recurring',
   },
+  clientStatus: {
+    more: 'More actions',
+    actions: {
+      block: 'Block',
+      unblock: 'Unblock',
+      deactivate: 'Deactivate',
+      reactivate: 'Reactivate',
+      anonymize: 'Delete personal data',
+    },
+    titles: {
+      block: 'Block {name}?',
+      unblock: 'Unblock {name}?',
+      deactivate: 'Deactivate {name}?',
+      reactivate: 'Reactivate {name}?',
+      anonymize: 'Delete the personal data of {name}?',
+    },
+    descriptions: {
+      block: 'They can’t book or check in until unblocked. Staff see your reason.',
+      deactivate: 'They are hidden from the clients list until reactivated.',
+      anonymize:
+        'Name, contact, birth date, ID, photo, health notes, emergency contacts, notes, tags, family links and signatures are erased for good. Bookings, payments and the audit trail stay, under an anonymous client.',
+    },
+    done: {
+      block: 'Client blocked',
+      unblock: 'Client unblocked',
+      deactivate: 'Client deactivated',
+      reactivate: 'Client reactivated',
+      anonymize: 'Personal data deleted',
+    },
+    anonymizeReason: 'Reason (e.g. the request reference)',
+    typeName: 'Type “{name}” to confirm',
+    blockedBanner: 'Blocked: {reason} — can’t book or check in.',
+    inactiveBanner: 'Inactive: {reason}. Hidden from the clients list.',
+    anonymizedBanner:
+      'This client’s personal data was deleted on request. Their history is kept anonymously.',
+  },
   clientProfile: {
     tabs: {
       overview: 'Overview',

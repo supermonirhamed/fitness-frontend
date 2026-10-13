@@ -642,6 +642,9 @@ export interface Client {
   upcoming_bookings?: number
   /** Manual labels (US-05.12). */
   tags?: Tag[]
+  /** Why blocked or inactive, and whether the personal data was deleted (US-05.13). */
+  status_reason: string | null
+  anonymized: boolean
   /** A health note exists (US-05.03); reading it needs clients.health_view. */
   has_health_notes: boolean
   photo_url: string | null
@@ -1656,6 +1659,18 @@ export const tenantApi = {
     /** Guardians and children (US-05.08). */
     async family(id: number): Promise<ClientFamily> {
       return (await http.get(`/api/clients/${id}/family`)).data.data
+    },
+    /** Deactivate, reactivate, block (reason needed) or unblock (US-05.13). */
+    async setStatus(
+      id: number,
+      action: 'deactivate' | 'reactivate' | 'block' | 'unblock',
+      reason?: string | null,
+    ): Promise<Client> {
+      return (await http.post(`/api/clients/${id}/status`, { action, reason })).data.data
+    },
+    /** A privacy deletion request: the personal data is anonymized, history is kept. */
+    async anonymize(id: number, reason: string): Promise<Client> {
+      return (await http.post(`/api/clients/${id}/anonymize`, { reason, confirm: true })).data.data
     },
     async notes(id: number): Promise<ClientNote[]> {
       return (await http.get(`/api/clients/${id}/notes`)).data.data

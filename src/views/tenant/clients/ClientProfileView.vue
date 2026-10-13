@@ -12,6 +12,11 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
+import Message from 'primevue/message'
+import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
+import OverrideDialog from '@/components/patterns/OverrideDialog.vue'
 import MultiSelect from 'primevue/multiselect'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
@@ -77,6 +82,77 @@ watch(id, () => {
 })
 const qrUrl = computed(() => (client.value ? `/api/clients/${client.value.id}/qr` : null))
 const blocked = computed(() => client.value?.status === 'Blocked')
+
+// Status (US-05.13): block, deactivate, reactivate, delete personal data.
+const canManage = computed(() => auth.can('clients.delete') && !client.value?.anonymized)
+const statusMenu = ref<InstanceType<typeof Menu>>()
+const statusAction = ref<'deactivate' | 'reactivate' | 'block' | 'unblock' | null>(null)
+const anonymizeOpen = ref(false)
+const anonymizeReason = ref('')
+const anonymizeName = ref('')
+const statusBusy = ref(false)
+const statusItems = computed(() => {
+  const s = client.value?.status
+  const item = (action: NonNullable<typeof statusAction.value>, icon: string) => ({
+    label: t(`clientStatus.actions.${action}`),
+    icon: `pi ${icon}`,
+    command: () => (statusAction.value = action),
+  })
+  return [
+    ...(s === 'Blocked' ? [item('unblock', 'pi-unlock')] : [item('block', 'pi-ban')]),
+    ...(s === 'Inactive'
+      ? [item('reactivate', 'pi-replay')]
+      : s !== 'Blocked'
+        ? [item('deactivate', 'pi-pause')]
+        : []),
+    { separator: true },
+    {
+      label: t('clientStatus.actions.anonymize'),
+      icon: 'pi pi-eraser',
+      class: 'menu-danger',
+      command: () => {
+        anonymizeReason.value = ''
+        anonymizeName.value = ''
+        anonymizeOpen.value = true
+      },
+    },
+  ]
+})
+async function applyStatus(reason?: string) {
+  if (!client.value || !statusAction.value) return
+  statusBusy.value = true
+  try {
+    client.value = await tenantApi.clients.setStatus(
+      client.value.id,
+      statusAction.value,
+      reason ?? null,
+    )
+    toast.add({
+      severity: 'success',
+      summary: t(`clientStatus.done.${statusAction.value}`),
+      life: 3000,
+    })
+    statusAction.value = null
+    loadOverview()
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  } finally {
+    statusBusy.value = false
+  }
+}
+async function anonymize() {
+  if (!client.value) return
+  statusBusy.value = true
+  try {
+    client.value = await tenantApi.clients.anonymize(client.value.id, anonymizeReason.value.trim())
+    anonymizeOpen.value = false
+    toast.add({ severity: 'success', summary: t('clientStatus.done.anonymize'), life: 4000 })
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  } finally {
+    statusBusy.value = false
+  }
+}
 
 // Tags (US-05.12)
 const tagsOpen = ref(false)
@@ -293,6 +369,16 @@ const LATER = ['memberships'] as const
               disabled
             />
           </span>
+          <template v-if="canManage">
+            <Button
+              icon="pi pi-ellipsis-v"
+              severity="secondary"
+              variant="outlined"
+              :aria-label="t('clientStatus.more')"
+              @click="statusMenu?.toggle($event)"
+            />
+            <Menu ref="statusMenu" :model="statusItems" popup />
+          </template>
           <Button
             v-if="auth.can('bookings.create')"
             icon="pi pi-plus"
@@ -302,6 +388,24 @@ const LATER = ['memberships'] as const
           />
         </div>
       </div>
+
+      <Message
+        v-if="client.anonymized"
+        severity="secondary"
+        :closable="false"
+        icon="pi pi-eraser"
+        >{{ t('clientStatus.anonymizedBanner') }}</Message
+      >
+      <Message v-else-if="blocked" severity="error" :closable="false" icon="pi pi-ban">{{
+        t('clientStatus.blockedBanner', { reason: client.status_reason ?? '—' })
+      }}</Message>
+      <Message
+        v-else-if="client.status === 'Inactive'"
+        severity="secondary"
+        :closable="false"
+        icon="pi pi-pause"
+        >{{ t('clientStatus.inactiveBanner', { reason: client.status_reason ?? '—' }) }}</Message
+      >
 
       <Tabs v-model:value="tab" scrollable>
         <TabList>
@@ -541,6 +645,55 @@ const LATER = ['memberships'] as const
       </Tabs>
     </template>
 
+    <OverrideDialog
+      :visible="statusAction === 'block' || statusAction === 'deactivate'"
+      :title="statusAction ? t(`clientStatus.titles.${statusAction}`, { name: client?.name }) : ''"
+      :description="statusAction ? t(`clientStatus.descriptions.${statusAction}`) : ''"
+      :confirm-label="statusAction ? t(`clientStatus.actions.${statusAction}`) : ''"
+      :loading="statusBusy"
+      destructive
+      @update:visible="(v: boolean) => !v && (statusAction = null)"
+      @confirm="applyStatus"
+    />
+    <ConfirmActionDialog
+      :visible="statusAction === 'reactivate' || statusAction === 'unblock'"
+      :title="statusAction ? t(`clientStatus.titles.${statusAction}`, { name: client?.name }) : ''"
+      :confirm-label="statusAction ? t(`clientStatus.actions.${statusAction}`) : ''"
+      :loading="statusBusy"
+      @update:visible="(v: boolean) => !v && (statusAction = null)"
+      @confirm="applyStatus()"
+    />
+    <Dialog
+      v-model:visible="anonymizeOpen"
+      modal
+      :header="t('clientStatus.titles.anonymize', { name: client?.name })"
+      :style="{ width: '480px', maxWidth: 'calc(100vw - 32px)' }"
+    >
+      <div class="anon">
+        <Message severity="error" :closable="false" icon="pi pi-exclamation-triangle">{{
+          t('clientStatus.descriptions.anonymize')
+        }}</Message>
+        <label for="anon-reason">{{ t('clientStatus.anonymizeReason') }} *</label>
+        <InputText id="anon-reason" v-model="anonymizeReason" maxlength="500" />
+        <label for="anon-name">{{ t('clientStatus.typeName', { name: client?.name }) }}</label>
+        <InputText id="anon-name" v-model="anonymizeName" />
+      </div>
+      <template #footer>
+        <Button
+          :label="t('common.cancel')"
+          severity="secondary"
+          variant="text"
+          @click="anonymizeOpen = false"
+        />
+        <Button
+          :label="t('clientStatus.actions.anonymize')"
+          severity="danger"
+          :loading="statusBusy"
+          :disabled="anonymizeReason.trim().length < 3 || anonymizeName.trim() !== client?.name"
+          @click="anonymize"
+        />
+      </template>
+    </Dialog>
     <Dialog
       v-model:visible="tagsOpen"
       modal
@@ -652,6 +805,11 @@ const LATER = ['memberships'] as const
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+.anon {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .mono {
   font-family: var(--font-mono);
