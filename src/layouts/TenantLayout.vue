@@ -26,6 +26,7 @@ const nav = computed<NavItem[]>(() => [
   ...(auth.can('schedule.view') && auth.user?.roles.some((r) => COACHING_ROLES.includes(r))
     ? [{ key: 'mySchedule', icon: 'pi-clock', to: '/my-schedule' }]
     : []),
+  ...(auth.can('bookings.view') ? [{ key: 'bookings', icon: 'pi-bookmark', to: '/bookings' }] : []),
   ...(auth.can('clients.view') ? [{ key: 'clients', icon: 'pi-users', to: '/clients' }] : []),
   ...(auth.can('services.view') ? [{ key: 'services', icon: 'pi-th-large', to: '/services' }] : []),
   ...(allowedPages(STAFF_PAGES, (p) => auth.can(p)).length

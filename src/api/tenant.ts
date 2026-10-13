@@ -684,6 +684,31 @@ export interface GuestOptions {
   }
 }
 
+/** A booking with its policy terms and timeline (US-04.09). */
+export interface BookingDetails extends Booking {
+  policy: Partial<BookingPolicy> | null
+  terms: Omit<CancellationTerms, 'can_waive'> | null
+  timeline: {
+    action: string
+    at: string | null
+    user: string | null
+    values: Record<string, unknown>
+  }[]
+}
+
+export interface BookingFilters {
+  client_id?: number
+  location_id?: number
+  service_id?: number
+  coach_id?: number
+  status?: Booking['status'][]
+  channel?: Booking['channel']
+  entitlement_source?: EntitlementSource
+  from?: string
+  to?: string
+  q?: string
+}
+
 /** A recurring booking (US-04.08) and what booking each occurrence did. */
 export interface RecurringBooking {
   id: number
@@ -716,6 +741,18 @@ export interface Booking {
     | 'NoShow'
     | 'CancelledByBusiness'
     | 'Rescheduled'
+  /** In the bookings list and details (US-04.09). */
+  session?: {
+    id: number
+    service: string | null
+    color: string | null
+    location: { id: number; name: string | null; timezone: string }
+    coach: string | null
+    starts_at: string
+    local: { date: string; start: string; end: string }
+    status: string
+  } | null
+  attended_at: string | null
   /** Made by a recurring booking (US-04.08); `active` until it ends or is cancelled. */
   standing: { id: number; active: boolean } | null
   /** The member who brought this guest (US-04.07). */
@@ -1326,6 +1363,42 @@ export const tenantApi = {
     },
   },
   bookings: {
+    async list(
+      params: BookingFilters & { page?: number; per_page?: number },
+    ): Promise<{
+      data: Booking[]
+      meta: { total: number; current_page: number; last_page: number }
+    }> {
+      return (await http.get('/api/bookings', { params })).data
+    },
+    async filterOptions(): Promise<{
+      services: { id: number; name: string }[]
+      coaches: { id: number; name: string }[]
+      locations: { id: number; name: string }[]
+    }> {
+      return (await http.get('/api/bookings/filters')).data.data
+    },
+    async get(id: number): Promise<BookingDetails> {
+      return (await http.get(`/api/bookings/${id}`)).data.data
+    },
+    /** Cancel (with a reason) or mark attended; refused ones come back with why. */
+    async bulk(input: {
+      action: 'cancel' | 'attend'
+      ids: number[]
+      reason?: string
+    }): Promise<{ done: number; failed: { id: number; code: string; message: string }[] }> {
+      return (await http.post('/api/bookings/bulk', input)).data.data
+    },
+    /** The filtered list as CSV (reports.export); opened as a download link. */
+    exportUrl(filters: BookingFilters): string {
+      const params = new URLSearchParams()
+      for (const [key, value] of Object.entries(filters)) {
+        if (value === undefined || value === null || value === '') continue
+        if (Array.isArray(value)) value.forEach((v) => params.append(`${key}[]`, String(v)))
+        else params.append(key, String(value))
+      }
+      return `/api/bookings/export?${params}`
+    },
     async eligibility(
       sessionId: number,
       input: { client_id: number; override?: OverridableCheck[]; override_reason?: string | null },
