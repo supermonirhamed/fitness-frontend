@@ -29,6 +29,9 @@ const nav = computed<NavItem[]>(() => [
   ...(auth.can('bookings.view') ? [{ key: 'bookings', icon: 'pi-bookmark', to: '/bookings' }] : []),
   ...(auth.can('clients.view') ? [{ key: 'clients', icon: 'pi-users', to: '/clients' }] : []),
   ...(auth.can('services.view') ? [{ key: 'services', icon: 'pi-th-large', to: '/services' }] : []),
+  ...(auth.can('memberships.view')
+    ? [{ key: 'memberships', icon: 'pi-id-card', to: '/memberships' }]
+    : []),
   ...(allowedPages(STAFF_PAGES, (p) => auth.can(p)).length
     ? [{ key: 'staff', icon: 'pi-id-card', to: '/staff' }]
     : []),

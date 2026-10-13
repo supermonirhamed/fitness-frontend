@@ -751,6 +751,46 @@ export interface FamilyPage {
   owed: number
 }
 
+/** A membership plan (US-06.01). */
+export interface MembershipPlan {
+  id: number
+  name: Translated
+  description: Translated | null
+  display_name: string
+  status: 'Draft' | 'Published' | 'Archived'
+  type: 'Unlimited' | 'Limited'
+  visit_limit: number | null
+  visit_period: 'week' | 'month' | null
+  billing: 'one_time' | 'recurring'
+  duration_value: number | null
+  duration_unit: 'days' | 'weeks' | 'months' | 'years' | null
+  billing_interval: 'month' | 'year' | null
+  min_commitment_months: number | null
+  joining_fee: number | null
+  rules: {
+    services: {
+      mode: 'all' | 'categories' | 'services'
+      category_ids: number[]
+      service_ids: number[]
+    }
+    locations: { mode: 'all' | 'home' | 'selected'; location_ids: number[] }
+    limits: {
+      per_day: number | null
+      per_week: number | null
+      hours: { from: string; to: string } | null
+    }
+  }
+  prices: { location_id: number; location: string; price: number }[]
+  currency: string
+}
+
+export type MembershipPlanInput = Omit<
+  MembershipPlan,
+  'id' | 'display_name' | 'prices' | 'currency'
+> & {
+  prices: { location_id: number; price: number }[]
+}
+
 /** A client import (US-05.15): file, column mapping and result report. */
 export interface ClientImport {
   id: number
@@ -1812,6 +1852,18 @@ export const tenantApi = {
       const body = new FormData()
       body.append('photo', file)
       return (await http.post(`/api/clients/${id}/photo`, body)).data.data
+    },
+  },
+  /** Membership plans (US-06.01); managing them needs memberships.update. */
+  membershipPlans: {
+    async list(): Promise<MembershipPlan[]> {
+      return (await http.get('/api/membership-plans')).data.data
+    },
+    async create(input: MembershipPlanInput): Promise<MembershipPlan> {
+      return (await http.post('/api/membership-plans', input)).data.data
+    },
+    async update(id: number, input: MembershipPlanInput): Promise<MembershipPlan> {
+      return (await http.put(`/api/membership-plans/${id}`, input)).data.data
     },
   },
   /** Import clients from CSV or Excel (US-05.15). */
