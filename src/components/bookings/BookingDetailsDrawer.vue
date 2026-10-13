@@ -8,6 +8,7 @@ import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import BookingPaymentsPanel from '@/components/bookings/BookingPaymentsPanel.vue'
 import CancelBookingDialog from '@/components/bookings/CancelBookingDialog.vue'
 import RescheduleBookingDialog from '@/components/bookings/RescheduleBookingDialog.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
@@ -179,6 +180,13 @@ async function noShow(reason?: string) {
           >
         </dd>
       </dl>
+
+      <BookingPaymentsPanel
+        v-if="auth.can('payments.view') && booking.entitlement_source"
+        :booking-id="booking.id"
+        :timezone="timezone"
+        @changed="changed"
+      />
 
       <section>
         <h3 class="section-title">{{ t('bookingDetails.timeline') }}</h3>

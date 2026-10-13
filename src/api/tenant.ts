@@ -691,6 +691,60 @@ export interface GuestOptions {
   }
 }
 
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'card_terminal' | 'other'
+export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'not_required'
+
+/** A payment recorded at the desk (US-04.15); amounts in major units. */
+export interface Payment {
+  id: number
+  receipt_number: string
+  booking_id: number | null
+  client_id: number
+  currency: string
+  amount: number
+  net: number
+  vat: number
+  vat_rate: string | null
+  method: PaymentMethod
+  reference: string | null
+  note: string | null
+  status: 'Recorded' | 'Voided'
+  recorded_by: string | null
+  recorded_at: string | null
+  void_reason: string | null
+  voided_by: string | null
+  voided_at: string | null
+}
+
+/** What a booking costs at the desk and what was paid (US-04.15). */
+export interface BookingPayments {
+  currency: string
+  required: boolean
+  price: number | null
+  net: number | null
+  vat: number | null
+  rate: string | null
+  due: number | null
+  paid: number
+  balance: number | null
+  status: PaymentStatus
+  payments: Payment[]
+}
+
+/** Everything a printed receipt shows. */
+export interface Receipt extends Payment {
+  organization: { name: string; logo_url: string | null }
+  branch: {
+    name: string | null
+    address: string | null
+    legal_name: string | null
+    tax_number: string | null
+  }
+  client: { name: string | null; member_id: string | null }
+  item: { service: string | null; session: string | null }
+  recorded_local: string | null
+}
+
 /** A client waiting for a place in a full session (US-04.10). */
 export interface WaitlistEntry {
   id: number
@@ -730,6 +784,7 @@ export interface BookingFilters {
   from?: string
   to?: string
   q?: string
+  payment_status?: 'unpaid' | 'paid'
 }
 
 /** A recurring booking (US-04.08) and what booking each occurrence did. */
@@ -784,6 +839,8 @@ export interface Booking {
   rescheduled_from: { session_id: number; starts_at: string | null; timezone: string | null } | null
   channel: 'staff' | 'web' | 'app' | 'waitlist'
   entitlement_source: EntitlementSource | null
+  /** Desk payment status, in lists and details (US-04.15). */
+  payment_status?: PaymentStatus
   overridden: (OverridableCheck | 'cancellation_window')[]
   booked_by: string | null
   created_at: string | null
@@ -1383,6 +1440,30 @@ export const tenantApi = {
       const body = new FormData()
       body.append('photo', file)
       return (await http.post(`/api/clients/${id}/photo`, body)).data.data
+    },
+  },
+  /** Desk payments (US-04.15): never edited or deleted, only voided with a reason. */
+  payments: {
+    async forBooking(bookingId: number): Promise<BookingPayments> {
+      return (await http.get(`/api/bookings/${bookingId}/payments`)).data.data
+    },
+    /** `amount` is what the client paid, VAT included; a reference is needed for transfers and card terminals. */
+    async record(
+      bookingId: number,
+      input: {
+        amount: number
+        method: PaymentMethod
+        reference?: string | null
+        note?: string | null
+      },
+    ): Promise<Payment> {
+      return (await http.post(`/api/bookings/${bookingId}/payments`, input)).data.data
+    },
+    async void(id: number, reason: string): Promise<Payment> {
+      return (await http.post(`/api/payments/${id}/void`, { reason })).data.data
+    },
+    async receipt(id: number): Promise<Receipt> {
+      return (await http.get(`/api/payments/${id}/receipt`)).data.data
     },
   },
   /** Staff manage a session's waitlist (US-04.13). */

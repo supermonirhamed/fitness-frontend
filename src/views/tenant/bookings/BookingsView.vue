@@ -13,6 +13,7 @@ import DatePicker from 'primevue/datepicker'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
+import Tag from 'primevue/tag'
 import BookingDetailsDrawer from '@/components/bookings/BookingDetailsDrawer.vue'
 import BulkActionBar from '@/components/patterns/BulkActionBar.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -55,6 +56,7 @@ const serviceId = ref<number | null>(null)
 const coachId = ref<number | null>(null)
 const locationId = ref<number | null>(null)
 const source = ref<EntitlementSource | null>(null)
+const paymentStatus = ref<'unpaid' | 'paid' | null>(null)
 const options = ref<Awaited<ReturnType<typeof tenantApi.bookings.filterOptions>>>({
   services: [],
   coaches: [],
@@ -74,6 +76,7 @@ const filters = computed<BookingFilters>(() => ({
   coach_id: coachId.value ?? undefined,
   location_id: locationId.value ?? undefined,
   entitlement_source: source.value ?? undefined,
+  payment_status: paymentStatus.value ?? undefined,
 }))
 
 let request = 0
@@ -126,7 +129,8 @@ const filtered = computed(
     !!serviceId.value ||
     !!coachId.value ||
     !!locationId.value ||
-    !!source.value,
+    !!source.value ||
+    !!paymentStatus.value,
 )
 function clearFilters() {
   search.value = ''
@@ -135,7 +139,15 @@ function clearFilters() {
   coachId.value = null
   locationId.value = null
   source.value = null
+  paymentStatus.value = null
 }
+// The desk's follow-up: today's bookings still unpaid (US-04.15).
+function unpaidToday() {
+  clearFilters()
+  range.value = [new Date(), new Date()]
+  paymentStatus.value = 'unpaid'
+}
+const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } as const
 
 const statusOptions = computed(() => STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) })))
 const sourceOptions = computed(() =>
@@ -269,7 +281,27 @@ function exportCsv() {
           show-clear
           class="filter"
         />
+        <Select
+          v-if="auth.can('payments.view')"
+          v-model="paymentStatus"
+          :options="[
+            { value: 'unpaid', label: t('payments.status.unpaid') },
+            { value: 'paid', label: t('payments.status.paid') },
+          ]"
+          option-label="label"
+          option-value="value"
+          :placeholder="t('payments.title')"
+          show-clear
+          class="filter"
+        />
         <template #end>
+          <Button
+            v-if="auth.can('payments.view')"
+            :label="t('bookings.unpaidToday')"
+            icon="pi pi-wallet"
+            variant="text"
+            @click="unpaidToday"
+          />
           <Button
             v-if="filtered"
             :label="t('bookings.clear')"
@@ -384,6 +416,12 @@ function exportCsv() {
         <Column :header="t('booking.payment')">
           <template #body="{ data }">
             {{ data.entitlement_source ? t(`booking.payments.${data.entitlement_source}`) : '—' }}
+            <Tag
+              v-if="data.payment_status && data.payment_status !== 'not_required'"
+              class="tag-sm"
+              :severity="PAYMENT_SEVERITY[data.payment_status as 'unpaid' | 'partial' | 'paid']"
+              :value="t(`payments.status.${data.payment_status}`)"
+            />
           </template>
         </Column>
         <Column :header="t('sessionPage.roster.bookedBy')">

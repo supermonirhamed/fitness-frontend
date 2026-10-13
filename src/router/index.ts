@@ -42,6 +42,13 @@ const tenantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/tenant/TenantSignInView.vue'),
     meta: { guest: true },
   },
+  // A payment's receipt, outside the app shell so it prints cleanly (US-04.15).
+  {
+    path: '/receipts/:id(\\d+)',
+    name: 'tenant.receipt',
+    component: () => import('@/views/tenant/ReceiptView.vue'),
+    meta: { permission: 'payments.view' },
+  },
   {
     path: '/forgot-password',
     name: 'tenant.forgot',
