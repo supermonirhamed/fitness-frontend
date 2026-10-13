@@ -48,6 +48,7 @@ const NUMBER_LIMITS: Partial<Record<PolicyField, { max: number; unit: string }>>
   booking_closes_minutes: { max: 10080, unit: 'minutes' },
   cancellation_window_hours: { max: 720, unit: 'hours' },
   waitlist_closes_minutes: { max: 10080, unit: 'minutes' },
+  waitlist_max_size: { max: 500, unit: 'people' },
 }
 
 const penaltyOptions = computed(() =>
@@ -84,6 +85,7 @@ function describe(field: PolicyField, values: BookingPolicy | BookingPolicyOverr
       ? `${t('bookingPolicy.penalties.fixed_fee')} · ${fmt.money(fee)}`
       : t(`bookingPolicy.penalties.${value}`)
   }
+  if (typeof value === 'boolean') return t(`bookingPolicy.onOff.${value}`)
   return t(`bookingPolicy.modes.${value}`)
 }
 
@@ -150,6 +152,14 @@ const numberOf = (field: PolicyField) => model.value[field] as number | null
             :invalid="!!errorOf(field)"
             show-buttons
             class="number"
+            @update:model-value="setValue(field, $event)"
+          />
+          <ToggleSwitch
+            v-else-if="typeof model[field] === 'boolean'"
+            :model-value="model[field] as boolean"
+            :input-id="`policy-${field}`"
+            :disabled="disabled"
+            :aria-label="t(`bookingPolicy.fields.${field}`)"
             @update:model-value="setValue(field, $event)"
           />
           <SelectButton

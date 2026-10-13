@@ -24,6 +24,11 @@ const ar: typeof en = {
     refresh: 'تحديث',
   },
   status: {
+    Waiting: 'بالانتظار',
+    Promoted: 'تمت الترقية',
+    Skipped: 'تم تخطيه',
+    Expired: 'انتهى',
+    Removed: 'أُزيل',
     Rescheduled: 'أعيدت جدولته',
     Confirmed: 'مؤكد',
     Attended: 'حضر',
@@ -810,6 +815,8 @@ const ar: typeof en = {
       no_show_fee: 'رسوم عدم الحضور',
       waitlist_closes_minutes: 'إغلاق قائمة الانتظار (دقائق قبل)',
       waitlist_mode: 'وضع قائمة الانتظار',
+      waitlist_enabled: 'تفعيل قائمة الانتظار',
+      waitlist_max_size: 'سعة قائمة الانتظار',
     },
   },
   archive: {
@@ -1611,6 +1618,10 @@ const ar: typeof en = {
     guestChecked:
       'تُتحقق أهلية الضيف عند التأكيد. يُستخدم العميل الموجود بنفس الجوال أو البريد بدلًا من سجل جديد.',
     guestOf: 'ضيف {name}',
+    addToWaitlist: 'إضافة لقائمة الانتظار',
+    waitlistPlace: 'سيكون {name} رقم {n} في قائمة الانتظار، ويُحجز له إذا توفر مكان.',
+    waitlisted: 'أُضيف إلى قائمة الانتظار',
+    waitlistedDetail: '{client} رقم {n}',
     soon: 'قريبًا',
     override: 'تجاوز',
     overrideCapacity: 'تجاوز السعة',
@@ -1664,6 +1675,9 @@ const ar: typeof en = {
     waitlisted: 'في الانتظار: {n} حصص',
     done: 'تم',
     tag: 'متكرر',
+  },
+  waitlist: {
+    joined: 'انضم في {date}',
   },
   cancelBooking: {
     title: 'إلغاء الحجز',
@@ -1754,6 +1768,8 @@ const ar: typeof en = {
       no_show_penalty: 'ما يتحمله العميل عند عدم الحضور.',
       waitlist_mode: '',
       waitlist_closes_minutes: 'دقائق قبل البدء.',
+      waitlist_enabled: 'تقبل الحصص الممتلئة قائمة انتظار.',
+      waitlist_max_size: '0 = بلا حد.',
     },
     fields: {
       booking_opens_days: 'يفتح الحجز',
@@ -1763,14 +1779,18 @@ const ar: typeof en = {
       no_show_penalty: 'غرامة عدم الحضور',
       waitlist_mode: 'وضع قائمة الانتظار',
       waitlist_closes_minutes: 'تُغلق قائمة الانتظار',
+      waitlist_enabled: 'قائمة الانتظار',
+      waitlist_max_size: 'سعة قائمة الانتظار',
     },
+    onOff: { true: 'مفعّلة', false: 'متوقفة' },
     penalties: { none: 'لا شيء', consume_credit: 'خصم رصيد', fixed_fee: 'رسوم ثابتة' },
     modes: { manual: 'يدوي', automatic: 'تلقائي' },
-    unitNames: { days: 'يوم قبل', minutes: 'دقيقة قبل', hours: 'ساعة قبل' },
+    unitNames: { days: 'يوم قبل', minutes: 'دقيقة قبل', hours: 'ساعة قبل', people: 'أشخاص' },
     units: {
       days: 'يوم الحصة | قبل يوم واحد | قبل {n} يوم',
       minutes: 'عند البدء | قبل دقيقة واحدة | قبل {n} دقيقة',
       hours: 'عند البدء | قبل ساعة واحدة | قبل {n} ساعة',
+      people: 'بلا حد | شخص واحد | {n} أشخاص',
     },
     examples: {
       booking_opens_days:
@@ -1781,6 +1801,12 @@ const ar: typeof en = {
         'الإلغاء مجاني حتى بدء الحصة. | الإلغاء مجاني حتى ساعة واحدة قبل البدء، وبعدها يُعد إلغاءً متأخرًا. | الإلغاء مجاني حتى {n} ساعة قبل البدء، وبعدها يُعد إلغاءً متأخرًا.',
       waitlist_closes_minutes:
         'يمكن الانضمام لقائمة الانتظار حتى بدء الحصة. | تُغلق قائمة الانتظار قبل البدء بدقيقة واحدة. | تُغلق قائمة الانتظار قبل البدء بـ {n} دقيقة.',
+      waitlist_max_size:
+        'يمكن لأي عدد الانتظار. | يمكن لشخص واحد الانتظار. | يمكن لما يصل إلى {n} أشخاص الانتظار.',
+      waitlist_enabled: {
+        true: 'عند امتلاء الحصة يمكن للعملاء الانضمام إلى قائمة الانتظار.',
+        false: 'لا تقبل الحصص الممتلئة قائمة انتظار.',
+      },
       late_cancel_penalty: {
         none: 'لا يتحمل العميل أي شيء عند الإلغاء المتأخر.',
         consume_credit: 'يُخصم رصيد الحجز أو الزيارة عند الإلغاء المتأخر.',

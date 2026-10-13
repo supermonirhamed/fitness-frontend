@@ -12,18 +12,20 @@ const org: BookingPolicy = {
   no_show_fee: null,
   waitlist_closes_minutes: 60,
   waitlist_mode: 'automatic',
+  waitlist_enabled: true,
+  waitlist_max_size: 0,
 }
 
 describe('booking policy helpers', () => {
-  it('lists the seven overridable settings', () => {
-    expect(POLICY_FIELDS).toHaveLength(7)
+  it('lists the nine overridable settings', () => {
+    expect(POLICY_FIELDS).toHaveLength(9)
   })
 
   it('fills missing overrides with null (inherit)', () => {
     const overrides = toOverrides({ waitlist_mode: 'manual' })
     expect(overrides.waitlist_mode).toBe('manual')
     expect(overrides.cancellation_window_hours).toBeNull()
-    expect(Object.keys(overrides)).toHaveLength(9)
+    expect(Object.keys(overrides)).toHaveLength(11)
   })
 
   it('starts an override from the inherited value, fee included, and clears it again', () => {

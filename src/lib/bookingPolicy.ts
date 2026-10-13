@@ -5,7 +5,7 @@ import type { BookingPolicy, BookingPolicyOverrides, Penalty } from '@/api/tenan
 export const POLICY_GROUPS = {
   booking: ['booking_opens_days', 'booking_closes_minutes'],
   cancellation: ['cancellation_window_hours', 'late_cancel_penalty', 'no_show_penalty'],
-  waitlist: ['waitlist_mode', 'waitlist_closes_minutes'],
+  waitlist: ['waitlist_enabled', 'waitlist_mode', 'waitlist_closes_minutes', 'waitlist_max_size'],
 } as const
 
 export type PolicyField = (typeof POLICY_GROUPS)[keyof typeof POLICY_GROUPS][number]
@@ -31,6 +31,8 @@ export function toOverrides(set: Partial<BookingPolicy> = {}): BookingPolicyOver
     no_show_fee: set.no_show_fee ?? null,
     waitlist_closes_minutes: set.waitlist_closes_minutes ?? null,
     waitlist_mode: set.waitlist_mode ?? null,
+    waitlist_enabled: set.waitlist_enabled ?? null,
+    waitlist_max_size: set.waitlist_max_size ?? null,
   }
 }
 

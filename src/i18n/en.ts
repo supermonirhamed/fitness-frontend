@@ -22,6 +22,11 @@ export default {
     refresh: 'Refresh',
   },
   status: {
+    Waiting: 'Waiting',
+    Promoted: 'Promoted',
+    Skipped: 'Skipped',
+    Expired: 'Expired',
+    Removed: 'Removed',
     Rescheduled: 'Rescheduled',
     Confirmed: 'Confirmed',
     Attended: 'Attended',
@@ -807,6 +812,8 @@ export default {
       no_show_fee: 'No-show fee',
       waitlist_closes_minutes: 'Waitlist closes (minutes before)',
       waitlist_mode: 'Waitlist mode',
+      waitlist_enabled: 'Waitlist on',
+      waitlist_max_size: 'Waitlist size',
     },
   },
   archive: {
@@ -1633,6 +1640,10 @@ export default {
     guestChecked:
       'The guest’s eligibility is checked when you confirm. An existing client with this mobile or email is used instead of a new record.',
     guestOf: 'Guest of {name}',
+    addToWaitlist: 'Add to waitlist',
+    waitlistPlace: '{name} will be #{n} on the waitlist, and booked if a place opens.',
+    waitlisted: 'Added to the waitlist',
+    waitlistedDetail: '{client} is #{n}',
     soon: 'Soon',
     override: 'Override',
     overrideCapacity: 'Override capacity',
@@ -1687,6 +1698,9 @@ export default {
     waitlisted: 'Waitlisted: {n} sessions',
     done: 'Done',
     tag: 'Recurring',
+  },
+  waitlist: {
+    joined: 'Joined {date}',
   },
   cancelBooking: {
     title: 'Cancel booking',
@@ -1778,6 +1792,8 @@ export default {
       no_show_penalty: 'What missing a session costs the client.',
       waitlist_mode: '',
       waitlist_closes_minutes: 'Minutes before start.',
+      waitlist_enabled: 'Full sessions take a waitlist.',
+      waitlist_max_size: '0 = no limit.',
     },
     fields: {
       booking_opens_days: 'Booking opens',
@@ -1787,14 +1803,23 @@ export default {
       no_show_penalty: 'No-show penalty',
       waitlist_mode: 'Waitlist mode',
       waitlist_closes_minutes: 'Waitlist closes',
+      waitlist_enabled: 'Waitlist',
+      waitlist_max_size: 'Waitlist size',
     },
+    onOff: { true: 'On', false: 'Off' },
     penalties: { none: 'None', consume_credit: 'Consume credit', fixed_fee: 'Fixed fee' },
     modes: { manual: 'Manual', automatic: 'Automatic' },
-    unitNames: { days: 'days before', minutes: 'min before', hours: 'hours before' },
+    unitNames: {
+      days: 'days before',
+      minutes: 'min before',
+      hours: 'hours before',
+      people: 'people',
+    },
     units: {
       days: '0 days before | 1 day before | {n} days before',
       minutes: 'At the start | 1 minute before | {n} minutes before',
       hours: 'At the start | 1 hour before | {n} hours before',
+      people: 'No limit | 1 person | {n} people',
     },
     examples: {
       booking_opens_days:
@@ -1805,6 +1830,12 @@ export default {
         'Cancelling is free until the session starts. | Cancelling is free until 1 hour before the start; later is a late cancellation. | Cancelling is free until {n} hours before the start; later is a late cancellation.',
       waitlist_closes_minutes:
         'People can join the waitlist until the session starts. | The waitlist closes 1 minute before the start. | The waitlist closes {n} minutes before the start.',
+      waitlist_max_size:
+        'Any number of people can wait. | Up to 1 person can wait. | Up to {n} people can wait.',
+      waitlist_enabled: {
+        true: 'When a session is full, clients can join its waitlist.',
+        false: 'Full sessions don’t take a waitlist.',
+      },
       late_cancel_penalty: {
         none: 'A late cancellation costs the client nothing.',
         consume_credit: 'A late cancellation uses up the credit or visit of the booking.',

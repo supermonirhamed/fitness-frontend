@@ -34,6 +34,7 @@ import {
   type GuestOptions,
   type OverridableCheck,
   type RecurringBooking,
+  type WaitlistEntry,
 } from '@/api/tenant'
 import { apiMessage, errorCode } from '@/lib/apiErrors'
 import { validationErrors } from '@/lib/http'
@@ -41,7 +42,11 @@ import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ session: CalendarSession | null }>()
 const visible = defineModel<boolean>('visible', { required: true })
-const emit = defineEmits<{ booked: [booking: Booking]; recurring: [recurring: RecurringBooking] }>()
+const emit = defineEmits<{
+  booked: [booking: Booking]
+  recurring: [recurring: RecurringBooking]
+  waitlisted: [entry: WaitlistEntry]
+}>()
 const { t, locale } = useI18n()
 const auth = useStaffAuth()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
@@ -251,7 +256,35 @@ async function confirmRecurring() {
   }
 }
 
+// Full, and the waitlist takes them: "Add to waitlist" is the main action (US-04.10).
+const waitlisting = computed(
+  () =>
+    mode.value === 'client' &&
+    !repeat.value &&
+    !!result.value &&
+    !result.value.ok &&
+    result.value.can_waitlist,
+)
+async function joinWaitlist() {
+  if (!props.session || !client.value || !payment.value) return
+  saving.value = true
+  error.value = null
+  try {
+    const entry = await tenantApi.bookings.joinWaitlist(props.session.id, {
+      client_id: client.value.id,
+      entitlement_source: payment.value,
+    })
+    emit('waitlisted', entry)
+    visible.value = false
+  } catch (e) {
+    error.value = apiMessage(e) ?? t('common.genericError')
+  } finally {
+    saving.value = false
+  }
+}
+
 const confirmDisabled = computed(() => {
+  if (waitlisting.value) return !payment.value || checking.value
   if (mode.value === 'guest')
     return (
       !client.value || !guestReady.value || !payment.value || (!!result.value && !result.value.ok)
@@ -293,6 +326,7 @@ const paymentOptions = computed(() => {
 
 async function confirm() {
   if (!props.session || !client.value || !payment.value) return
+  if (waitlisting.value) return joinWaitlist()
   if (repeat.value && canRepeat.value) return confirmRecurring()
   saving.value = true
   error.value = null
@@ -552,6 +586,12 @@ async function confirm() {
           "
           :severity="full ? 'warn' : 'error'"
         >
+          <template v-if="waitlisting">{{
+            t('booking.waitlistPlace', {
+              name: client.first_name,
+              n: (session?.waitlist ?? 0) + 1,
+            })
+          }}</template>
           <Button
             v-if="canOverride"
             size="small"
@@ -570,7 +610,7 @@ async function confirm() {
           {{ t('booking.overriding', { reason: overrideReason }) }}
         </Message>
 
-        <div v-if="result.ok && mode === 'client'" class="field">
+        <div v-if="(result.ok || waitlisting) && mode === 'client'" class="field">
           <span id="booking-payment" class="field__label">{{ t('booking.payment') }}</span>
           <SelectButton
             v-model="payment"
@@ -673,7 +713,13 @@ async function confirm() {
             @click="visible = false"
           />
           <Button
-            :label="repeat && canRepeat ? t('recurring.confirm') : t('booking.confirm')"
+            :label="
+              waitlisting
+                ? t('booking.addToWaitlist')
+                : repeat && canRepeat
+                  ? t('recurring.confirm')
+                  : t('booking.confirm')
+            "
             :loading="saving"
             :disabled="confirmDisabled"
             @click="confirm"

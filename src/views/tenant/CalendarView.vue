@@ -1090,6 +1090,7 @@ const zoneOf = (s: CalendarSession) =>
       :session="booking"
       @booked="onBooked"
       @recurring="load()"
+      @waitlisted="load()"
     />
     <SessionDrawer
       v-model:visible="drawerOpen"

@@ -45,6 +45,10 @@ export interface BookingPolicy {
   no_show_fee: number | null
   waitlist_closes_minutes: number
   waitlist_mode: 'manual' | 'automatic'
+  /** US-04.10: the session takes a waitlist when full… */
+  waitlist_enabled: boolean
+  /** …of at most this many people (0 = no limit). */
+  waitlist_max_size: number
 }
 
 /** The organization's policy: the defaults plus organization-wide settings (US-04.01). */
@@ -528,7 +532,7 @@ export interface SessionDetails extends CalendarSession {
   created_by: string | null
   created_at: string | null
   roster: Booking[]
-  waitlist_entries: unknown[]
+  waitlist_entries: WaitlistEntry[]
   activity: {
     action: string
     user: string | null
@@ -682,6 +686,22 @@ export interface GuestOptions {
     age_min: number | null
     age_max: number | null
   }
+}
+
+/** A client waiting for a place in a full session (US-04.10). */
+export interface WaitlistEntry {
+  id: number
+  session_id: number
+  client: { id: number; name: string | null; member_id: string | null; photo_url: string | null }
+  status: 'Waiting' | 'Promoted' | 'Skipped' | 'Expired' | 'Removed'
+  /** 1 = next in line, while Waiting. */
+  place: number | null
+  entitlement_source: EntitlementSource
+  booking_id: number | null
+  reason: string | null
+  added_by: string | null
+  joined_at: string
+  closed_at: string | null
 }
 
 /** A booking with its policy terms and timeline (US-04.09). */
@@ -1363,9 +1383,7 @@ export const tenantApi = {
     },
   },
   bookings: {
-    async list(
-      params: BookingFilters & { page?: number; per_page?: number },
-    ): Promise<{
+    async list(params: BookingFilters & { page?: number; per_page?: number }): Promise<{
       data: Booking[]
       meta: { total: number; current_page: number; last_page: number }
     }> {
@@ -1452,6 +1470,13 @@ export const tenantApi = {
     /** "Cancel all future": ends the recurring booking and cancels its upcoming bookings. */
     async cancelRecurring(id: number): Promise<{ cancelled: number }> {
       return (await http.post(`/api/bookings/recurring/${id}/cancel`)).data.data
+    },
+    /** 409 waitlist_disabled / waitlist_not_needed / waitlist_closed / waitlist_full / already_waitlisted / not_eligible. */
+    async joinWaitlist(
+      sessionId: number,
+      input: { client_id: number; entitlement_source: EntitlementSource },
+    ): Promise<WaitlistEntry> {
+      return (await http.post(`/api/sessions/${sessionId}/waitlist`, input)).data.data
     },
     /** How a member's guest can be paid for in a session, and what the service restricts (US-04.07). */
     async guestOptions(sessionId: number, hostId: number): Promise<GuestOptions> {

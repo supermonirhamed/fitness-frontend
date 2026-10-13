@@ -11,7 +11,7 @@ import { useStaffAuth } from '@/stores/staffAuth'
 vi.mock('@/api/tenant', () => ({
   tenantApi: {
     clients: { list: vi.fn() },
-    bookings: { eligibility: vi.fn(), create: vi.fn() },
+    bookings: { eligibility: vi.fn(), create: vi.fn(), joinWaitlist: vi.fn() },
   },
 }))
 
@@ -31,9 +31,9 @@ const session = {
   series_id: 31,
 } as unknown as CalendarSession
 
-const sara = { id: 3, name: 'Sara Ali', member_id: 'M-10001', photo_url: null }
+const sara = { id: 3, name: 'Sara Ali', first_name: 'Sara', member_id: 'M-10001', photo_url: null }
 
-const eligibility = (ok: boolean): BookingEligibility => ({
+const eligibility = (ok: boolean, canWaitlist = false): BookingEligibility => ({
   ok,
   reasons: ok
     ? []
@@ -55,7 +55,7 @@ const eligibility = (ok: boolean): BookingEligibility => ({
       params: {},
     },
   ],
-  can_waitlist: !ok,
+  can_waitlist: canWaitlist,
   entitlements: ['pay_at_desk', 'complimentary'],
 })
 
@@ -246,5 +246,33 @@ describe('BookingDrawer, every session of the series (US-04.08)', () => {
     expect(wrapper.text()).toContain('Booked: 1 sessions')
     expect(wrapper.text()).toContain('This session is full (10/10).')
     expect(wrapper.emitted('recurring')).toHaveLength(1)
+  })
+})
+
+describe('BookingDrawer, full session (US-04.10)', () => {
+  beforeEach(() => {
+    setLocale('en')
+    vi.clearAllMocks()
+  })
+
+  it('offers the waitlist as the main action and says the client’s place', async () => {
+    vi.mocked(tenantApi.bookings.eligibility).mockResolvedValue(eligibility(false, true))
+    vi.mocked(tenantApi.bookings.joinWaitlist).mockResolvedValue({ id: 2, place: 1 } as never)
+    const wrapper = render(['bookings.create'])
+    await wrapper.get('.pick').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sara will be #1 on the waitlist')
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Add to waitlist')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(tenantApi.bookings.joinWaitlist).toHaveBeenCalledWith(7, {
+      client_id: 3,
+      entitlement_source: 'pay_at_desk',
+    })
+    expect(wrapper.emitted('waitlisted')).toHaveLength(1)
   })
 })
