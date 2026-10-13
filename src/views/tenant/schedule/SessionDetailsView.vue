@@ -20,6 +20,7 @@ import Tabs from 'primevue/tabs'
 import type { MenuItem } from 'primevue/menuitem'
 import BookingDrawer from '@/components/bookings/BookingDrawer.vue'
 import CancelBookingDialog from '@/components/bookings/CancelBookingDialog.vue'
+import WaitlistPanel from '@/components/bookings/WaitlistPanel.vue'
 import RescheduleBookingDialog from '@/components/bookings/RescheduleBookingDialog.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import OverrideDialog from '@/components/patterns/OverrideDialog.vue'
@@ -712,38 +713,7 @@ const moreItems = computed<MenuItem[]>(() => {
             </DataTable>
           </TabPanel>
           <TabPanel value="waitlist">
-            <EmptyState
-              v-if="!session.waitlist_entries.length"
-              class="panel"
-              icon="pi-list"
-              :title="t('sessionPage.noWaitlist')"
-              :body="t('sessionPage.noWaitlistHint')"
-            />
-            <ol v-else class="panel waitlist">
-              <li
-                v-for="e in session.waitlist_entries"
-                :key="e.id"
-                :class="['waitlist__row', { 'waitlist__row--closed': e.status !== 'Waiting' }]"
-              >
-                <span class="waitlist__place num">{{ e.place ? `#${e.place}` : '' }}</span>
-                <RouterLink
-                  :to="{ name: 'tenant.client', params: { id: e.client.id } }"
-                  class="person waitlist__who"
-                >
-                  <PersonAvatar :name="e.client.name ?? ''" :image="e.client.photo_url" />
-                  <span>
-                    <span class="person__name">{{ e.client.name }}</span>
-                    <small class="muted">{{
-                      e.reason ??
-                      t('waitlist.joined', {
-                        date: format.dateTime(e.joined_at, session.location.timezone),
-                      })
-                    }}</small>
-                  </span>
-                </RouterLink>
-                <StatusTag :status="e.status" size="sm" />
-              </li>
-            </ol>
+            <WaitlistPanel :session="session" @changed="load" />
           </TabPanel>
           <TabPanel value="attendance">
             <EmptyState
@@ -1007,35 +977,6 @@ const moreItems = computed<MenuItem[]>(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-}
-.waitlist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.waitlist__row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.waitlist__row--closed {
-  opacity: 0.7;
-}
-.waitlist__place {
-  width: 32px;
-  font: 600 14px var(--font-sans);
-  color: var(--text-secondary);
-}
-.waitlist__who {
-  flex: 1;
-  color: inherit;
-  text-decoration: none;
-}
-.waitlist__who > span {
-  display: flex;
-  flex-direction: column;
 }
 .roster .person {
   color: inherit;

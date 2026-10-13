@@ -533,6 +533,9 @@ export interface SessionDetails extends CalendarSession {
   created_at: string | null
   roster: Booking[]
   waitlist_entries: WaitlistEntry[]
+  policy_sources: Record<string, PolicySource>
+  /** What this session sets itself; the rest is inherited. */
+  session_policy: Partial<BookingPolicy>
   activity: {
     action: string
     user: string | null
@@ -1380,6 +1383,34 @@ export const tenantApi = {
       const body = new FormData()
       body.append('photo', file)
       return (await http.post(`/api/clients/${id}/photo`, body)).data.data
+    },
+  },
+  /** Staff manage a session's waitlist (US-04.13). */
+  waitlist: {
+    /** Books a waiting client; a full session needs `override` with bookings.override and a reason. */
+    async promote(
+      entryId: number,
+      input: { override?: boolean; override_reason?: string | null } = {},
+    ): Promise<Booking> {
+      return (await http.post(`/api/waitlist/${entryId}/promote`, input)).data.data
+    },
+    async remove(entryId: number, reason: string): Promise<void> {
+      await http.post(`/api/waitlist/${entryId}/remove`, { reason })
+    },
+    /** Every Waiting entry, first in line first; 409 waitlist_changed when out of date. */
+    async reorder(sessionId: number, entryIds: number[]): Promise<void> {
+      await http.put(`/api/sessions/${sessionId}/waitlist/order`, { entry_ids: entryIds })
+    },
+    async settings(
+      sessionId: number,
+      values: Partial<
+        Record<
+          'waitlist_enabled' | 'waitlist_max_size' | 'waitlist_mode' | 'waitlist_closes_minutes',
+          boolean | number | string | null
+        >
+      >,
+    ): Promise<void> {
+      await http.put(`/api/sessions/${sessionId}/waitlist/settings`, values)
     },
   },
   bookings: {

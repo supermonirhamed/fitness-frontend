@@ -1700,6 +1700,24 @@ export default {
     tag: 'Recurring',
   },
   waitlist: {
+    title: 'Waitlist',
+    settings: 'Waitlist settings',
+    settingsHint:
+      'For this session only. "Inherit" uses the service, branch or organization setting.',
+    inherit: 'Inherit',
+    inheritValue: 'Inherit ({value})',
+    noCredit: 'No credit held',
+    up: 'Move {name} up',
+    down: 'Move {name} down',
+    promote: 'Promote now',
+    promoted: '{name} booked from the waitlist',
+    promoteOver: 'Promote {name} over capacity?',
+    promoteOverBody:
+      'The session is full. Booking them goes over capacity; the reason is recorded.',
+    fullNoOverride: 'The session is full: a manager can promote over capacity.',
+    remove: 'Remove {name}',
+    removeTitle: 'Remove {name} from the waitlist?',
+    removeConfirm: 'Remove',
     joined: 'Joined {date}',
   },
   cancelBooking: {
