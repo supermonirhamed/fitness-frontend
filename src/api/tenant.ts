@@ -525,7 +525,7 @@ export interface SessionDetails extends CalendarSession {
   issues: SessionConflictItem[]
   created_by: string | null
   created_at: string | null
-  roster: unknown[]
+  roster: Booking[]
   waitlist_entries: unknown[]
   activity: {
     action: string
@@ -671,6 +671,19 @@ export type OverridableCheck = 'capacity' | 'window' | 'entitlement'
 
 export type EntitlementSource =
   'membership' | 'package' | 'drop_in' | 'complimentary' | 'pay_at_desk'
+
+/** A booking (EP-04) as the roster shows it. */
+export interface Booking {
+  id: number
+  session_id: number
+  client: { id: number; name: string | null; member_id: string | null; photo_url: string | null }
+  status: 'Confirmed' | 'Attended' | 'Cancelled' | 'LateCancel' | 'NoShow' | 'CancelledByBusiness'
+  channel: 'staff' | 'web' | 'app' | 'waitlist'
+  entitlement_source: EntitlementSource | null
+  overridden: OverridableCheck[]
+  booked_by: string | null
+  created_at: string | null
+}
 
 /** Whether a client can book a session (US-04.01): every check in order, and why not. */
 export interface BookingEligibility {
@@ -1241,6 +1254,16 @@ export const tenantApi = {
       input: { client_id: number; override?: OverridableCheck[]; override_reason?: string | null },
     ): Promise<BookingEligibility> {
       return (await http.post(`/api/sessions/${sessionId}/eligibility`, input)).data.data
+    },
+    /** 409 not_eligible carries `eligibility`; 422 entitlement_unavailable. */
+    async create(input: {
+      session_id: number
+      client_id: number
+      entitlement_source: EntitlementSource
+      override?: OverridableCheck[]
+      override_reason?: string | null
+    }): Promise<Booking> {
+      return (await http.post('/api/bookings', input)).data.data
     },
   },
   mySchedule: {

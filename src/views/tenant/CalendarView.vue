@@ -22,6 +22,7 @@ import AppointmentDrawer from '@/components/schedule/AppointmentDrawer.vue'
 import CancelSessionDialog from '@/components/schedule/CancelSessionDialog.vue'
 import EventDrawer from '@/components/schedule/EventDrawer.vue'
 import SessionDrawer, { type SessionPrefill } from '@/components/schedule/SessionDrawer.vue'
+import BookingDrawer from '@/components/bookings/BookingDrawer.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
@@ -32,6 +33,7 @@ import {
   tenantApi,
   type ActivityType,
   type CalendarBranch,
+  type Booking,
   type CalendarSession,
   type Facility,
   type ScheduledEventDetails,
@@ -507,6 +509,29 @@ function onAppointment(session: CalendarSession) {
     life: 5000,
   })
   anchor.value = session.local.date
+  load()
+}
+// Add booking (US-04.02): sessions still ahead and not cancelled.
+const bookingOpen = ref(false)
+const booking = ref<CalendarSession | null>(null)
+const canBook = (s: CalendarSession) =>
+  auth.can('bookings.create') && !['Cancelled', 'Completed'].includes(s.status)
+function addBooking(s: CalendarSession) {
+  popover.value?.hide()
+  booking.value = s
+  bookingOpen.value = true
+}
+function onBooked(created: Booking) {
+  toast.add({
+    severity: 'success',
+    summary: t('booking.confirmed'),
+    detail: t('booking.confirmedDetail', {
+      client: created.client.name,
+      session: booking.value?.service.name,
+      time: booking.value?.local.start,
+    }),
+    life: 5000,
+  })
   load()
 }
 // Edit (US-03.04)
@@ -1060,6 +1085,7 @@ const zoneOf = (s: CalendarSession) =>
       :date="anchor"
       @saved="onAppointment"
     />
+    <BookingDrawer v-model:visible="bookingOpen" :session="booking" @booked="onBooked" />
     <SessionDrawer
       v-model:visible="drawerOpen"
       :prefill="prefill"
@@ -1117,6 +1143,14 @@ const zoneOf = (s: CalendarSession) =>
             variant="text"
             size="small"
             @click="router.push({ name: 'tenant.session', params: { id: selected.id } })"
+          />
+          <Button
+            v-if="canBook(selected)"
+            :label="t('sessionPage.addBooking')"
+            icon="pi pi-plus"
+            severity="secondary"
+            size="small"
+            @click="addBooking(selected)"
           />
           <Button
             v-if="canEdit(selected)"
@@ -1427,6 +1461,7 @@ const zoneOf = (s: CalendarSession) =>
 .pop__actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   padding-top: 4px;
   border-top: 1px solid var(--border-subtle);

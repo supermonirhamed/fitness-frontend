@@ -1,20 +1,24 @@
 <script setup lang="ts">
 // Session details (US-03.08), as the design's SessionScreen (ui_kits/admin/SessionScreen.jsx): the
 // header with time, facility, coach and capacity; actions by permission (edit, substitute coach,
-// duplicate, cancel; add booking, check-in and messages come with EP-04/08/12); tabs for roster,
+// duplicate, cancel, add booking (US-04.02); check-in and messages come with EP-08/12); tabs for roster,
 // waitlist, attendance, details and activity.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import Skeleton from 'primevue/skeleton'
 import Tab from 'primevue/tab'
+import Tag from 'primevue/tag'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import type { MenuItem } from 'primevue/menuitem'
+import BookingDrawer from '@/components/bookings/BookingDrawer.vue'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
 import ConflictList from '@/components/patterns/ConflictList.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -30,6 +34,7 @@ import SessionDrawer, { type SessionPrefill } from '@/components/schedule/Sessio
 import SubstituteCoachDrawer from '@/components/schedule/SubstituteCoachDrawer.vue'
 import {
   tenantApi,
+  type Booking,
   type CalendarSession,
   type SeriesUpdateResult,
   type SessionDetails,
@@ -84,6 +89,28 @@ const canCancel = computed(
 )
 const canCreate = computed(() => auth.can('schedule.create'))
 const cancelled = computed(() => session.value?.status === 'Cancelled')
+// Staff may still book a draft; the eligibility checks say what else stands in the way.
+const canBook = computed(
+  () =>
+    !!session.value &&
+    auth.can('bookings.create') &&
+    !['cancelled', 'completed', 'started'].includes(session.value.booking.reason ?? ''),
+)
+const bookingOpen = ref(false)
+function onBooked(booking: Booking) {
+  toast.add({
+    severity: 'success',
+    summary: t('booking.confirmed'),
+    detail: t('booking.confirmedDetail', {
+      client: booking.client.name,
+      session: session.value?.service.name,
+      time: session.value?.local.start,
+    }),
+    life: 5000,
+  })
+  tab.value = 'roster'
+  load()
+}
 
 // Why it can't take a booking now, in the booking rules' words (US-03.15).
 const whyNot = computed(() => {
@@ -386,13 +413,15 @@ const moreItems = computed<MenuItem[]>(() => {
           />
         </template>
         <template #primary>
-          <span
-            v-tooltip.bottom="
-              whyNot && !session.booking.can_book ? whyNot.reason : t('sessionPage.bookingsLater')
-            "
-          >
+          <span v-if="!canBook && whyNot" v-tooltip.bottom="whyNot.reason">
             <Button icon="pi pi-plus" :label="t('sessionPage.addBooking')" disabled />
           </span>
+          <Button
+            v-else-if="canBook"
+            icon="pi pi-plus"
+            :label="t('sessionPage.addBooking')"
+            @click="bookingOpen = true"
+          />
         </template>
       </PageHeader>
 
@@ -438,11 +467,60 @@ const moreItems = computed<MenuItem[]>(() => {
         <TabPanels>
           <TabPanel value="roster">
             <EmptyState
+              v-if="!session.roster.length"
               class="panel"
               icon="pi-users"
               :title="t('sessionPage.noRoster')"
               :body="t('sessionPage.noRosterHint')"
-            />
+            >
+              <Button
+                v-if="canBook"
+                icon="pi pi-plus"
+                :label="t('sessionPage.addBooking')"
+                @click="bookingOpen = true"
+              />
+            </EmptyState>
+            <DataTable v-else :value="session.roster" data-key="id" class="panel roster">
+              <Column :header="t('sessionPage.roster.client')">
+                <template #body="{ data }">
+                  <RouterLink
+                    :to="{ name: 'tenant.client', params: { id: data.client.id } }"
+                    class="person"
+                  >
+                    <PersonAvatar :name="data.client.name ?? ''" :image="data.client.photo_url" />
+                    <span>
+                      <span class="person__name">{{ data.client.name }}</span>
+                      <small class="muted num">{{ data.client.member_id }}</small>
+                    </span>
+                  </RouterLink>
+                </template>
+              </Column>
+              <Column :header="t('sessionPage.roster.status')">
+                <template #body="{ data }"><StatusTag :status="data.status" size="sm" /></template>
+              </Column>
+              <Column :header="t('sessionPage.roster.payment')">
+                <template #body="{ data }">
+                  {{
+                    data.entitlement_source ? t(`booking.payments.${data.entitlement_source}`) : '—'
+                  }}
+                  <Tag
+                    v-if="data.overridden.length"
+                    v-tooltip.top="
+                      data.overridden.map((c: string) => t(`eligibility.checks.${c}`)).join(', ')
+                    "
+                    severity="warn"
+                    class="tag-sm"
+                    icon="pi pi-exclamation-circle"
+                    :value="t('sessionPage.roster.overridden')"
+                  />
+                </template>
+              </Column>
+              <Column :header="t('sessionPage.roster.bookedBy')">
+                <template #body="{ data }">
+                  <span class="muted">{{ data.booked_by ?? '—' }}</span>
+                </template>
+              </Column>
+            </DataTable>
           </TabPanel>
           <TabPanel value="waitlist">
             <EmptyState
@@ -584,6 +662,7 @@ const moreItems = computed<MenuItem[]>(() => {
         @series-updated="onSeriesUpdated"
         @saved="onCreated"
       />
+      <BookingDrawer v-model:visible="bookingOpen" :session="session" @booked="onBooked" />
       <SubstituteCoachDrawer
         v-model:visible="substituteOpen"
         :session="session"
@@ -673,6 +752,17 @@ const moreItems = computed<MenuItem[]>(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.roster .person {
+  color: inherit;
+  text-decoration: none;
+}
+.roster .person > span {
+  display: flex;
+  flex-direction: column;
+}
+.person__name {
+  font: 500 14px/1.4 var(--font-sans);
 }
 .muted {
   font: var(--text-caption);
