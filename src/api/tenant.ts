@@ -660,6 +660,16 @@ export interface ClientInput {
   marketing_consent: boolean
 }
 
+/** The client profile's alerts and overview (US-05.05). */
+export interface ClientOverview {
+  alerts: { blocked: boolean; health_note: boolean; unpaid_bookings: number }
+  upcoming: Booking[]
+  attendance: Record<
+    'last_30' | 'last_90',
+    { attended: number; no_shows: number; rate: number | null }
+  >
+}
+
 /** The clients list filters (US-05.04). Dates are Y-m-d. */
 export interface ClientFilters {
   q?: string
@@ -814,6 +824,8 @@ export interface BookingFilters {
   to?: string
   q?: string
   payment_status?: 'unpaid' | 'paid'
+  /** desc: latest first (past bookings). */
+  order?: 'asc' | 'desc'
 }
 
 /** A recurring booking (US-04.08) and what booking each occurrence did. */
@@ -1469,9 +1481,21 @@ export const tenantApi = {
     async create(input: ClientInput): Promise<Client> {
       return (await http.post('/api/clients', input)).data.data
     },
+    /** Edits the details (US-05.05); 409 client_duplicate when the mobile or email is another client's. */
+    async update(id: number, input: ClientInput): Promise<Client> {
+      return (await http.put(`/api/clients/${id}`, input)).data.data
+    },
+    /** Header alerts and the Overview tab (US-05.05). */
+    async overview(id: number): Promise<ClientOverview> {
+      return (await http.get(`/api/clients/${id}/overview`)).data.data
+    },
+    async payments(id: number): Promise<Payment[]> {
+      return (await http.get(`/api/clients/${id}/payments`)).data.data
+    },
     async duplicates(params: {
       mobile?: string | null
       email?: string | null
+      ignore?: number | null
     }): Promise<ClientMatch[]> {
       return (await http.get('/api/clients/duplicates', { params })).data.data
     },

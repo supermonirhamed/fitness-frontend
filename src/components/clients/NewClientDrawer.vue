@@ -24,7 +24,10 @@ import { validationErrors, type ValidationErrors } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const visible = defineModel<boolean>('visible', { required: true })
+/** Editing an existing client (US-05.05); without it the drawer creates one. */
+const props = defineProps<{ client?: Client | null }>()
 const emit = defineEmits<{ saved: [client: Client] }>()
+const editing = computed(() => !!props.client)
 const { t, locale } = useI18n()
 const auth = useStaffAuth()
 const router = useRouter()
@@ -58,7 +61,22 @@ watch(visible, (open) => {
   if (!open) return
   Object.assign(form, blank())
   form.home_location_id = auth.currentLocation?.id ?? auth.user?.switchable_locations[0]?.id ?? null
-  more.value = false
+  const c = props.client
+  if (c)
+    Object.assign(form, {
+      first_name: c.first_name,
+      last_name: c.last_name,
+      mobile: c.mobile ?? '',
+      email: c.email ?? '',
+      dob: c.date_of_birth ? new Date(`${c.date_of_birth}T00:00:00`) : null,
+      gender: c.gender,
+      address: c.address ?? '',
+      national_id: c.national_id ?? '',
+      preferred_language: c.preferred_language,
+      home_location_id: c.home_location?.id ?? null,
+      marketing_consent: c.marketing_consent,
+    })
+  more.value = !!c
   photo.value = null
   errors.value = {}
   formError.value = null
@@ -97,6 +115,7 @@ watch(
         .duplicates({
           mobile: m.length >= 8 ? mobile : null,
           email: /.+@.+\..+/.test(e) ? e : null,
+          ignore: props.client?.id ?? null,
         })
         .catch(() => [])
     }, 400)
@@ -123,7 +142,7 @@ async function save() {
   formError.value = null
   const blankToNull = (v: string | null) => (v && v.trim() ? v.trim() : null)
   try {
-    let client = await tenantApi.clients.create({
+    const input = {
       first_name: form.first_name,
       last_name: form.last_name,
       mobile: blankToNull(form.mobile),
@@ -135,7 +154,10 @@ async function save() {
       preferred_language: form.preferred_language,
       home_location_id: form.home_location_id,
       marketing_consent: form.marketing_consent,
-    })
+    }
+    let client = props.client
+      ? await tenantApi.clients.update(props.client.id, input)
+      : await tenantApi.clients.create(input)
     if (photo.value)
       client = await tenantApi.clients.uploadPhoto(client.id, photo.value).catch(() => client)
     emit('saved', client)
@@ -166,7 +188,7 @@ const maxDob = new Date()
   <Drawer v-model:visible="visible" :position="position" :block-scroll="true">
     <template #header>
       <div>
-        <div class="head__title">{{ t('clients.new') }}</div>
+        <div class="head__title">{{ editing ? t('clients.edit') : t('clients.new') }}</div>
         <div class="head__sub">{{ t('clients.homeBranchIs', { name: branchName }) }}</div>
       </div>
     </template>
