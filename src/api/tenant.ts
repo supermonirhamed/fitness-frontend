@@ -660,6 +660,19 @@ export interface ClientInput {
   marketing_consent: boolean
 }
 
+export type TimelineType =
+  'bookings' | 'cancellations' | 'attendance' | 'waitlist' | 'payments' | 'profile'
+
+/** One thing that happened with a client (US-05.06). */
+export interface TimelineEvent {
+  id: number
+  action: string
+  type: TimelineType | 'other'
+  at: string | null
+  user: string | null
+  values: Record<string, unknown>
+}
+
 /** The client profile's alerts and overview (US-05.05). */
 export interface ClientOverview {
   alerts: { blocked: boolean; health_note: boolean; unpaid_bookings: number }
@@ -1491,6 +1504,12 @@ export const tenantApi = {
     },
     async payments(id: number): Promise<Payment[]> {
       return (await http.get(`/api/clients/${id}/payments`)).data.data
+    },
+    async timeline(
+      id: number,
+      params: { type?: TimelineType; page?: number } = {},
+    ): Promise<{ data: TimelineEvent[]; meta: { current_page: number; last_page: number } }> {
+      return (await http.get(`/api/clients/${id}/timeline`, { params })).data
     },
     async duplicates(params: {
       mobile?: string | null
