@@ -133,17 +133,25 @@ function applyOverride(reason: string) {
   check()
 }
 
-const PAYMENTS: EntitlementSource[] = ['complimentary', 'pay_at_desk', 'membership']
-const paymentOptions = computed(() =>
-  PAYMENTS.map((value) => ({
+// What the server offers (US-04.03), best first; the staff options always show, and memberships
+// are marked as coming until EP-06 resolves them.
+const STAFF_PAYMENTS: EntitlementSource[] = ['complimentary', 'pay_at_desk']
+const paymentOptions = computed(() => {
+  const offered = result.value?.entitlements ?? []
+  const shown = [...new Set<EntitlementSource>([...offered, ...STAFF_PAYMENTS])]
+  const options = shown.map((value) => ({
     value,
-    label:
-      value === 'membership'
-        ? `${t('booking.payments.membership')} · ${t('booking.soon')}`
-        : t(`booking.payments.${value}`),
-    disabled: !result.value?.entitlements.includes(value),
-  })),
-)
+    label: t(`booking.payments.${value}`),
+    disabled: !offered.includes(value),
+  }))
+  if (!shown.includes('membership'))
+    options.push({
+      value: 'membership',
+      label: `${t('booking.payments.membership')} · ${t('booking.soon')}`,
+      disabled: true,
+    })
+  return options
+})
 
 async function confirm() {
   if (!props.session || !client.value || !payment.value) return
