@@ -50,6 +50,8 @@ export interface BookingPolicy {
 /** The organization's policy: the defaults plus organization-wide settings (US-04.01). */
 export interface OrganizationBookingPolicy extends BookingPolicy {
   allow_overlapping_bookings: boolean
+  /** Unattended bookings become No-show this long after the session ends (US-04.06). */
+  no_show_after_minutes: number
 }
 
 /** Overrides: null inherits from the level above. */
@@ -696,6 +698,11 @@ export interface Booking {
   penalty: Penalty | null
   penalty_fee: number | null
   penalty_waived: boolean
+  no_show_at: string | null
+  /** Marked by the scheduled job, not by staff. */
+  no_show_automatic: boolean
+  /** Marked less than 24 hours ago. */
+  no_show_reversible: boolean
 }
 
 /** Where a booking can move (US-04.05), and whether it is past the free window. */
@@ -1306,6 +1313,14 @@ export const tenantApi = {
       },
     ): Promise<Booking> {
       return (await http.post(`/api/bookings/${id}/reschedule`, input)).data.data
+    },
+    /** 409 no_show_not_allowed unless Confirmed and the session started. */
+    async markNoShow(id: number): Promise<Booking> {
+      return (await http.post(`/api/bookings/${id}/no-show`)).data.data
+    },
+    /** 409 no_show_not_reversible after 24 hours. */
+    async reverseNoShow(id: number, reason: string): Promise<Booking> {
+      return (await http.post(`/api/bookings/${id}/no-show/reverse`, { reason })).data.data
     },
     async cancelTerms(id: number): Promise<CancellationTerms> {
       return (await http.get(`/api/bookings/${id}/cancel-terms`)).data.data

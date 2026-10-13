@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import InputNumber from 'primevue/inputnumber'
 import ToggleSwitch from 'primevue/toggleswitch'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
@@ -27,21 +28,27 @@ const auth = useStaffAuth()
 const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
 const form = ref<BookingPolicyOverrides | null>(null)
 const saved = ref<OrganizationBookingPolicy | null>(null)
-// Organization-wide only (US-04.01), so it sits apart from the overridable settings.
+// Organization-wide only (US-04.01, US-04.06), so they sit apart from the overridable settings.
 const allowOverlap = ref(false)
+const noShowAfter = ref(30)
 const options = ref<BookingPolicyOptions>({ penalties: [], waitlist_modes: [] })
 const saving = ref(false)
 const error = ref<string | null>(null)
 const errors = ref<Record<string, string[]>>({})
 const canEdit = computed(() => auth.can('settings.update'))
-const current = computed(() => ({ ...form.value, allow_overlapping_bookings: allowOverlap.value }))
+const current = computed(() => ({
+  ...form.value,
+  allow_overlapping_bookings: allowOverlap.value,
+  no_show_after_minutes: noShowAfter.value,
+}))
 const dirty = computed(() => JSON.stringify(current.value) !== JSON.stringify(saved.value))
 
 function fill(policy: OrganizationBookingPolicy) {
   saved.value = policy
-  const { allow_overlapping_bookings, ...overridable } = policy
+  const { allow_overlapping_bookings, no_show_after_minutes, ...overridable } = policy
   form.value = overridable
   allowOverlap.value = allow_overlapping_bookings
+  noShowAfter.value = no_show_after_minutes
 }
 
 async function load() {
@@ -116,6 +123,26 @@ async function save() {
       >
         <ToggleSwitch v-model="allowOverlap" input-id="policy-overlap" :disabled="!canEdit" />
       </SettingRow>
+      <SettingRow
+        :label="t('bookingPolicy.overlap.noShowLabel')"
+        :help="t('bookingPolicy.overlap.noShowHelp')"
+        :example="t('bookingPolicy.overlap.noShowExample', { n: noShowAfter })"
+        label-for="policy-no-show"
+      >
+        <InputNumber
+          v-model="noShowAfter"
+          input-id="policy-no-show"
+          :min="0"
+          :max="1440"
+          :step="15"
+          :allow-empty="false"
+          :suffix="` ${t('bookingPolicy.overlap.noShowUnit')}`"
+          :disabled="!canEdit"
+          :invalid="!!errors.no_show_after_minutes"
+          show-buttons
+          class="number"
+        />
+      </SettingRow>
     </SettingsCard>
 
     <UnsavedBar v-if="canEdit && dirty" :saving="saving" @discard="discard" @save="save" />
@@ -123,6 +150,9 @@ async function save() {
 </template>
 
 <style scoped>
+.number {
+  max-width: 220px;
+}
 .stack {
   display: flex;
   flex-direction: column;

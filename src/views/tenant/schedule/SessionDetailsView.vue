@@ -21,6 +21,8 @@ import type { MenuItem } from 'primevue/menuitem'
 import BookingDrawer from '@/components/bookings/BookingDrawer.vue'
 import CancelBookingDialog from '@/components/bookings/CancelBookingDialog.vue'
 import RescheduleBookingDialog from '@/components/bookings/RescheduleBookingDialog.vue'
+import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
+import OverrideDialog from '@/components/patterns/OverrideDialog.vue'
 import CapacityIndicator from '@/components/patterns/CapacityIndicator.vue'
 import ConflictList from '@/components/patterns/ConflictList.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -44,6 +46,7 @@ import {
 import { addDays } from '@/lib/calendar'
 import { DAY_KEYS } from '@/lib/businessHours'
 import { zoneAbbreviation } from '@/lib/datetime'
+import { apiMessage } from '@/lib/apiErrors'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
 import { useOrganization } from '@/stores/organization'
@@ -129,6 +132,47 @@ function onMoved(booking: Booking, label: string) {
 }
 const movedFrom = (from: NonNullable<Booking['rescheduled_from']>) =>
   from.starts_at ? format.dateTime(from.starts_at, from.timezone ?? undefined) : ''
+// No-shows (US-04.06): once the session started; reversed within 24 hours with a reason.
+const canMarkNoShow = computed(
+  () =>
+    auth.can('attendance.update') &&
+    !!session.value &&
+    !cancelled.value &&
+    Date.parse(session.value.starts_at) <= Date.now(),
+)
+const noShowOpen = ref(false)
+const reverseOpen = ref(false)
+const noShowBusy = ref(false)
+const noShowError = ref<string | null>(null)
+function openNoShow(booking: Booking, reverse: boolean) {
+  cancelling.value = booking
+  noShowError.value = null
+  if (reverse) reverseOpen.value = true
+  else noShowOpen.value = true
+}
+async function markNoShow(reason?: string) {
+  const booking = cancelling.value
+  if (!booking) return
+  noShowBusy.value = true
+  noShowError.value = null
+  try {
+    if (reason === undefined) await tenantApi.bookings.markNoShow(booking.id)
+    else await tenantApi.bookings.reverseNoShow(booking.id, reason)
+    toast.add({
+      severity: 'success',
+      summary: t(reason === undefined ? 'noShow.marked' : 'noShow.reversed'),
+      detail: booking.client.name ?? undefined,
+      life: 4000,
+    })
+    noShowOpen.value = false
+    reverseOpen.value = false
+    load()
+  } catch (e) {
+    noShowError.value = apiMessage(e) ?? t('common.genericError')
+  } finally {
+    noShowBusy.value = false
+  }
+}
 function onBookingCancelled(booking: Booking) {
   toast.add({
     severity: booking.status === 'LateCancel' ? 'warn' : 'success',
@@ -543,7 +587,12 @@ const moreItems = computed<MenuItem[]>(() => {
                 </template>
               </Column>
               <Column :header="t('sessionPage.roster.status')">
-                <template #body="{ data }"><StatusTag :status="data.status" size="sm" /></template>
+                <template #body="{ data }">
+                  <StatusTag :status="data.status" size="sm" />
+                  <small v-if="data.no_show_automatic" class="muted">
+                    {{ t('noShow.automatic') }}</small
+                  >
+                </template>
               </Column>
               <Column :header="t('sessionPage.roster.payment')">
                 <template #body="{ data }">
@@ -568,11 +617,31 @@ const moreItems = computed<MenuItem[]>(() => {
                 </template>
               </Column>
               <Column
-                v-if="canCancelBookings || canReschedule"
+                v-if="canCancelBookings || canReschedule || auth.can('attendance.update')"
                 header-class="row-end"
                 body-class="row-end"
               >
                 <template #body="{ data }">
+                  <Button
+                    v-if="canMarkNoShow && data.status === 'Confirmed'"
+                    v-tooltip.top="t('noShow.mark')"
+                    icon="pi pi-user-minus"
+                    severity="secondary"
+                    variant="text"
+                    size="small"
+                    :aria-label="`${t('noShow.mark')}: ${data.client.name}`"
+                    @click="openNoShow(data, false)"
+                  />
+                  <Button
+                    v-if="auth.can('attendance.update') && data.no_show_reversible"
+                    v-tooltip.top="t('noShow.reverse')"
+                    icon="pi pi-undo"
+                    severity="secondary"
+                    variant="text"
+                    size="small"
+                    :aria-label="`${t('noShow.reverse')}: ${data.client.name}`"
+                    @click="openNoShow(data, true)"
+                  />
                   <Button
                     v-if="canReschedule && data.status === 'Confirmed'"
                     v-tooltip.top="t('reschedule.action')"
@@ -738,6 +807,25 @@ const moreItems = computed<MenuItem[]>(() => {
         @saved="onCreated"
       />
       <BookingDrawer v-model:visible="bookingOpen" :session="session" @booked="onBooked" />
+      <ConfirmActionDialog
+        v-model:visible="noShowOpen"
+        :title="t('noShow.markTitle', { client: cancelling?.client.name })"
+        :description="t('noShow.markBody')"
+        :confirm-label="t('noShow.mark')"
+        :loading="noShowBusy"
+        :error="noShowError"
+        destructive
+        @confirm="markNoShow()"
+      />
+      <OverrideDialog
+        v-model:visible="reverseOpen"
+        :title="t('noShow.reverseTitle', { client: cancelling?.client.name })"
+        :description="t('noShow.reverseBody')"
+        :confirm-label="t('noShow.reverse')"
+        :loading="noShowBusy"
+        :error="noShowError"
+        @confirm="markNoShow"
+      />
       <RescheduleBookingDialog
         v-model:visible="rescheduleOpen"
         :booking="cancelling"

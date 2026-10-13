@@ -1574,6 +1574,17 @@ const ar: typeof en = {
     action: 'إعادة جدولة',
     from: 'منقول من {date}',
   },
+  noShow: {
+    mark: 'تسجيل غياب',
+    markTitle: 'تسجيل {client} كغائب؟',
+    markBody: 'تُطبَّق غرامة الغياب الخاصة بالحجز. يمكنك التراجع خلال 24 ساعة.',
+    marked: 'تم تسجيل الغياب',
+    reverse: 'التراجع عن الغياب',
+    reverseTitle: 'التراجع عن غياب {client}؟',
+    reverseBody: 'يعود الحجز مؤكدًا وتُلغى الغرامة.',
+    reversed: 'تم التراجع عن الغياب',
+    automatic: 'سُجّل تلقائيًا',
+  },
   cancelBooking: {
     title: 'إلغاء الحجز',
     subtitle: '{client} · {session}',
@@ -1641,6 +1652,10 @@ const ar: typeof en = {
       help: 'على مستوى المنشأة كلها.',
       on: 'يمكن للعميل حجز حصص متداخلة في الوقت.',
       off: 'لا يمكن للعميل حجز حصتين في نفس الوقت.',
+      noShowLabel: 'تسجيل الغياب بعد',
+      noShowUnit: 'دقيقة بعد',
+      noShowHelp: 'دقائق بعد انتهاء الحصة.',
+      noShowExample: 'يُسجَّل غياب العملاء غير المسجّل حضورهم بعد {n} دقيقة من انتهاء الحصة.',
     },
     groups: {
       booking: 'فترة الحجز',

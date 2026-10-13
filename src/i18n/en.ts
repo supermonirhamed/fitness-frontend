@@ -1596,6 +1596,17 @@ export default {
     action: 'Reschedule',
     from: 'Moved from {date}',
   },
+  noShow: {
+    mark: 'Mark no-show',
+    markTitle: 'Mark {client} as a no-show?',
+    markBody: 'The no-show penalty of their booking applies. You can reverse it within 24 hours.',
+    marked: 'Marked as no-show',
+    reverse: 'Reverse no-show',
+    reverseTitle: 'Reverse the no-show of {client}?',
+    reverseBody: 'The booking goes back to confirmed and the penalty is undone.',
+    reversed: 'No-show reversed',
+    automatic: 'Marked automatically',
+  },
   cancelBooking: {
     title: 'Cancel booking',
     subtitle: '{client} · {session}',
@@ -1663,6 +1674,11 @@ export default {
       help: 'For the whole organization.',
       on: 'A client can hold bookings that overlap in time.',
       off: "A client can't book two sessions at the same time.",
+      noShowLabel: 'Mark no-shows after',
+      noShowUnit: 'min after',
+      noShowHelp: 'Minutes after a session ends.',
+      noShowExample:
+        'Clients not checked in {n} minutes after a session ends are marked as no-shows.',
     },
     groups: {
       booking: 'Booking window',
