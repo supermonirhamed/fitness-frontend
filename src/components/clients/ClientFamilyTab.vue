@@ -164,6 +164,12 @@ const maxDob = new Date()
       <Message v-if="family.is_child" severity="info" :closable="false" icon="pi pi-info-circle">{{
         t('family.childInfo')
       }}</Message>
+      <RouterLink
+        v-if="family.guardians.length || family.dependents.length"
+        :to="{ name: 'tenant.client.family', params: { id: client.id } }"
+        class="open-family"
+        ><i class="pi pi-users" aria-hidden="true" /> {{ t('familyPage.open') }}</RouterLink
+      >
 
       <section v-for="side in ['guardians', 'dependents'] as const" :key="side" class="card">
         <div class="head">
@@ -336,6 +342,12 @@ const maxDob = new Date()
 </template>
 
 <style scoped>
+.open-family {
+  align-self: flex-start;
+  color: var(--text-link);
+  text-decoration: none;
+  font: 500 14px var(--font-sans);
+}
 .stack {
   display: flex;
   flex-direction: column;

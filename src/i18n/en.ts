@@ -1756,6 +1756,18 @@ export default {
     noPayments: 'No payments recorded.',
     payment: { Recorded: 'Recorded', Voided: 'Voided' },
   },
+  familyPage: {
+    title: 'Family',
+    titleOf: 'Family of {name}',
+    open: 'Open the family page',
+    owed: 'Family owes at the desk',
+    nothingOwed: 'Nothing owed',
+    memberOwes: 'Owes at the desk',
+    guardiansOf: 'Guardians: {names}',
+    alone: 'This client has no family linked yet.',
+    later:
+      'Programs and groups (Academy) and membership balances join this page in later releases.',
+  },
   family: {
     loadError: "The family couldn't be loaded.",
     guardians: 'Guardians',

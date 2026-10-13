@@ -99,6 +99,12 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'clients.view' },
       },
       {
+        path: 'clients/:id(\\d+)/family',
+        name: 'tenant.client.family',
+        component: () => import('@/views/tenant/clients/FamilyView.vue'),
+        meta: { permission: 'clients.view' },
+      },
+      {
         path: 'clients/:id(\\d+)',
         name: 'tenant.client',
         component: () => import('@/views/tenant/clients/ClientProfileView.vue'),

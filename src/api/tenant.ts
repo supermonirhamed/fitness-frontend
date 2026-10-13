@@ -724,6 +724,26 @@ export interface ClientFamily {
   dependents: FamilyLink[]
 }
 
+/** The family page (US-05.10): each member, their upcoming bookings and what they owe at the desk. */
+export interface FamilyPage {
+  members: {
+    client: {
+      id: number
+      name: string
+      member_id: string | null
+      age: number | null
+      status: Client['status']
+      photo_url: string | null
+    }
+    role: 'guardian' | 'child'
+    guardians: number[]
+    upcoming: Booking[]
+    owed: number
+  }[]
+  currency: string
+  owed: number
+}
+
 /** A waiver template (US-05.07), with its latest text. */
 export interface WaiverTemplate {
   id: number
@@ -1589,6 +1609,9 @@ export const tenantApi = {
     /** Guardians and children (US-05.08). */
     async family(id: number): Promise<ClientFamily> {
       return (await http.get(`/api/clients/${id}/family`)).data.data
+    },
+    async familyPage(id: number): Promise<FamilyPage> {
+      return (await http.get(`/api/clients/${id}/family-page`)).data.data
     },
     async addChild(
       guardianId: number,
