@@ -23,6 +23,7 @@ const TYPES: TimelineType[] = [
   'waitlist',
   'payments',
   'profile',
+  'notes',
 ]
 const ICONS: Record<string, string> = {
   bookings: 'pi-calendar-plus',
@@ -31,6 +32,7 @@ const ICONS: Record<string, string> = {
   waitlist: 'pi-list',
   payments: 'pi-wallet',
   profile: 'pi-user-edit',
+  notes: 'pi-comment',
   other: 'pi-circle',
 }
 const type = ref<TimelineType | 'all'>('all')

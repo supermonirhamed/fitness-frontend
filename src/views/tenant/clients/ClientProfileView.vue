@@ -22,6 +22,7 @@ import Tag from 'primevue/tag'
 import BookingDetailsDrawer from '@/components/bookings/BookingDetailsDrawer.vue'
 import ClientFamilyTab from '@/components/clients/ClientFamilyTab.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
+import ClientNotesTab from '@/components/clients/ClientNotesTab.vue'
 import ClientTimeline from '@/components/clients/ClientTimeline.vue'
 import ClientWaiversTab from '@/components/clients/ClientWaiversTab.vue'
 import NewClientDrawer from '@/components/clients/NewClientDrawer.vue'
@@ -148,7 +149,7 @@ const whenOptions = computed(() => [
   { value: 'past', label: t('clientProfile.past') },
 ])
 const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } as const
-const LATER = ['notes', 'memberships'] as const
+const LATER = ['memberships'] as const
 </script>
 
 <template>
@@ -275,6 +276,7 @@ const LATER = ['notes', 'memberships'] as const
           }}</Tab>
           <Tab value="family">{{ t('clientProfile.tabs.family') }}</Tab>
           <Tab value="waivers">{{ t('clientProfile.tabs.waivers') }}</Tab>
+          <Tab value="notes">{{ t('clientProfile.tabs.notes') }}</Tab>
           <Tab value="timeline">{{ t('clientProfile.tabs.timeline') }}</Tab>
           <Tab v-for="later in LATER" :key="later" :value="later" disabled>
             <span v-tooltip.top="t('clientProfile.later')">{{
@@ -487,6 +489,9 @@ const LATER = ['notes', 'memberships'] as const
           </TabPanel>
           <TabPanel value="waivers">
             <ClientWaiversTab v-if="tab === 'waivers'" :client-id="client.id" />
+          </TabPanel>
+          <TabPanel value="notes">
+            <ClientNotesTab v-if="tab === 'notes'" :client-id="client.id" />
           </TabPanel>
           <TabPanel value="timeline">
             <ClientTimeline v-if="tab === 'timeline'" :client-id="client.id" />

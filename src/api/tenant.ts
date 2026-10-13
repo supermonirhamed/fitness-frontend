@@ -661,7 +661,7 @@ export interface ClientInput {
 }
 
 export type TimelineType =
-  'bookings' | 'cancellations' | 'attendance' | 'waitlist' | 'payments' | 'profile'
+  'bookings' | 'cancellations' | 'attendance' | 'waitlist' | 'payments' | 'profile' | 'notes'
 
 /** One thing that happened with a client (US-05.06). */
 export interface TimelineEvent {
@@ -742,6 +742,20 @@ export interface FamilyPage {
   }[]
   currency: string
   owed: number
+}
+
+/** An internal note on a client (US-05.11); never shown to the client. */
+export interface ClientNote {
+  id: number
+  body: string
+  visibility: 'all' | 'managers' | 'me'
+  pinned: boolean
+  author: string | null
+  created_at: string | null
+  updated_at: string | null
+  edited: boolean
+  can_edit: boolean
+  can_delete: boolean
 }
 
 /** A waiver template (US-05.07), with its latest text. */
@@ -1609,6 +1623,34 @@ export const tenantApi = {
     /** Guardians and children (US-05.08). */
     async family(id: number): Promise<ClientFamily> {
       return (await http.get(`/api/clients/${id}/family`)).data.data
+    },
+    async notes(id: number): Promise<ClientNote[]> {
+      return (await http.get(`/api/clients/${id}/notes`)).data.data
+    },
+    async addNote(
+      id: number,
+      input: Pick<ClientNote, 'body' | 'visibility' | 'pinned'>,
+    ): Promise<ClientNote> {
+      return (await http.post(`/api/clients/${id}/notes`, input)).data.data
+    },
+    async updateNote(
+      noteId: number,
+      input: Pick<ClientNote, 'body' | 'visibility' | 'pinned'>,
+    ): Promise<ClientNote> {
+      return (await http.put(`/api/notes/${noteId}`, input)).data.data
+    },
+    async deleteNote(noteId: number): Promise<void> {
+      await http.delete(`/api/notes/${noteId}`)
+    },
+    async noteHistory(noteId: number): Promise<
+      {
+        body: string
+        visibility: ClientNote['visibility']
+        edited_by: string | null
+        edited_at: string
+      }[]
+    > {
+      return (await http.get(`/api/notes/${noteId}/history`)).data.data
     },
     async familyPage(id: number): Promise<FamilyPage> {
       return (await http.get(`/api/clients/${id}/family-page`)).data.data
