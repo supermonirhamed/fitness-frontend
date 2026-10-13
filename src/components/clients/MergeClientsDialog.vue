@@ -5,10 +5,10 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete'
-import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
-import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
+import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormField from '@/components/patterns/FormField.vue'
 import { tenantApi, type Client, type MergePreview } from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
 
@@ -80,95 +80,83 @@ async function merge() {
 </script>
 
 <template>
-  <Dialog
+  <FormDialog
     v-model:visible="visible"
-    modal
-    :header="t('merge.title')"
-    :style="{ width: '720px', maxWidth: 'calc(100vw - 32px)' }"
+    :title="t('merge.title')"
+    :subtitle="t('merge.subtitle', { name: client.name })"
+    icon="pi-clone"
+    size="lg"
+    danger
+    :error="error"
+    :saving="saving"
+    :save-label="t('merge.action')"
+    :save-disabled="!preview || !confirmed"
+    @save="merge"
   >
-    <div class="merge">
-      <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
-      <div class="field">
-        <label for="merge-search">{{ t('merge.duplicate') }}</label>
-        <AutoComplete
-          v-model="query"
-          input-id="merge-search"
-          :suggestions="options"
-          option-label="name"
-          :placeholder="t('booking.search')"
-          :min-length="2"
-          fluid
-          @complete="search"
-          @option-select="pick($event.value)"
-        />
-      </div>
+    <FormField :label="t('merge.duplicate')" for="merge-search" required>
+      <AutoComplete
+        v-model="query"
+        input-id="merge-search"
+        :suggestions="options"
+        option-label="name"
+        :placeholder="t('booking.search')"
+        :min-length="2"
+        fluid
+        @complete="search"
+        @option-select="pick($event.value)"
+      />
+    </FormField>
 
-      <template v-if="preview">
-        <table class="compare">
-          <thead>
-            <tr>
-              <th />
-              <th>
-                {{ t('merge.keep', { name: preview.primary.name, id: preview.primary.member_id }) }}
-              </th>
-              <th>
-                {{
-                  t('merge.remove', {
-                    name: preview.secondary.name,
-                    id: preview.secondary.member_id,
-                  })
-                }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="[field, v] in differing" :key="field">
-              <th scope="row">{{ t(`merge.fields.${field}`) }}</th>
-              <td v-for="side in ['primary', 'secondary'] as const" :key="side">
-                <label class="choice">
-                  <input
-                    v-model="choices[field]"
-                    type="radio"
-                    :name="`merge-${field}`"
-                    :value="side"
-                  />
-                  <span :class="{ empty: v[side] === null }">{{ v[side] ?? '—' }}</span>
-                </label>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="moves">
-          <strong>{{ t('merge.moves') }}</strong>
-          <span v-if="!moves.length" class="muted">{{ t('merge.nothing') }}</span>
-          <span v-for="[what, n] in moves" :key="what" class="chip">{{
-            t(`merge.what.${what}`, { n })
-          }}</span>
-        </div>
-        <Message severity="warn" :closable="false" icon="pi pi-exclamation-triangle">{{
-          t('merge.irreversible')
-        }}</Message>
-        <label class="confirm"
-          ><Checkbox v-model="confirmed" binary /> {{ t('merge.confirm') }}</label
-        >
-      </template>
-    </div>
-    <template #footer>
-      <Button
-        :label="t('common.cancel')"
-        severity="secondary"
-        variant="text"
-        @click="visible = false"
-      />
-      <Button
-        :label="t('merge.action')"
-        severity="danger"
-        :loading="saving"
-        :disabled="!preview || !confirmed"
-        @click="merge"
-      />
+    <template v-if="preview">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th />
+            <th>
+              {{ t('merge.keep', { name: preview.primary.name, id: preview.primary.member_id }) }}
+            </th>
+            <th>
+              {{
+                t('merge.remove', {
+                  name: preview.secondary.name,
+                  id: preview.secondary.member_id,
+                })
+              }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="[field, v] in differing" :key="field">
+            <th scope="row">{{ t(`merge.fields.${field}`) }}</th>
+            <td v-for="side in ['primary', 'secondary'] as const" :key="side">
+              <label class="choice">
+                <input
+                  v-model="choices[field]"
+                  type="radio"
+                  :name="`merge-${field}`"
+                  :value="side"
+                />
+                <span :class="{ empty: v[side] === null }">{{ v[side] ?? '—' }}</span>
+              </label>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="moves">
+        <strong>{{ t('merge.moves') }}</strong>
+        <span v-if="!moves.length" class="muted">{{ t('merge.nothing') }}</span>
+        <span v-for="[what, n] in moves" :key="what" class="chip">{{
+          t(`merge.what.${what}`, { n })
+        }}</span>
+      </div>
+      <Message severity="warn" :closable="false" icon="pi pi-exclamation-triangle">{{
+        t('merge.irreversible')
+      }}</Message>
+      <label class="confirm"
+        ><Checkbox v-model="confirmed" binary /> {{ t('merge.confirm') }}</label
+      >
     </template>
-  </Dialog>
+  </FormDialog>
 </template>
 
 <style scoped>

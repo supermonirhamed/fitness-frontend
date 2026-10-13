@@ -1,24 +1,26 @@
 <script setup lang="ts">
 // Memberships → Plans (US-06.01): every plan with what it gives, how it is billed, its prices per
-// branch and status. Only Published plans can be sold (selling arrives with the next EP-06 stories).
+// branch and status, filtered by status and searched by name. Only Published plans can be sold
+// (selling arrives with the next EP-06 stories). New and edit open the plan's own page.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
+import FilterBar from '@/components/patterns/FilterBar.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
-import PlanDrawer from '@/components/memberships/PlanDrawer.vue'
 import { tenantApi, type MembershipPlan } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const { t } = useI18n()
-const toast = useToast()
+const router = useRouter()
 const auth = useStaffAuth()
 const format = useFormat()
 const canManage = computed(() => auth.can('memberships.update'))
@@ -36,20 +38,44 @@ async function load() {
 }
 onMounted(load)
 
-const drawerOpen = ref(false)
-const editing = ref<MembershipPlan | null>(null)
-function open(plan: MembershipPlan | null) {
-  editing.value = plan
-  drawerOpen.value = true
-}
-function onSaved(plan: MembershipPlan) {
-  toast.add({
-    severity: 'success',
-    summary: t('plans.saved', { name: plan.display_name }),
-    life: 3000,
-  })
-  load()
-}
+const search = ref('')
+const status = ref<'all' | MembershipPlan['status']>('all')
+const count = (s: MembershipPlan['status']) => plans.value.filter((p) => p.status === s).length
+const statusOptions = computed(() => [
+  { value: 'all', label: t('plans.filters.all', { n: plans.value.length }) },
+  ...(['Published', 'Draft', 'Archived'] as const).map((s) => ({
+    value: s,
+    label: t(`plans.filters.${s}`, { n: count(s) }),
+  })),
+])
+const shown = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  return plans.value.filter(
+    (p) =>
+      (status.value === 'all' || p.status === status.value) &&
+      (!q ||
+        [p.display_name, p.name.ar, p.name.en].some((n) => (n ?? '').toLowerCase().includes(q))),
+  )
+})
+
+const stats = computed(() => [
+  { icon: 'pi-shopping-cart', label: t('plans.stats.onSale'), value: count('Published') },
+  { icon: 'pi-pencil', label: t('plans.stats.drafts'), value: count('Draft') },
+  {
+    icon: 'pi-refresh',
+    label: t('plans.stats.recurring'),
+    value: plans.value.filter((p) => p.billing === 'recurring' && p.status !== 'Archived').length,
+  },
+  {
+    icon: 'pi-ticket',
+    label: t('plans.stats.limited'),
+    value: plans.value.filter((p) => p.type === 'Limited' && p.status !== 'Archived').length,
+  },
+])
+
+const create = () => router.push({ name: 'tenant.memberships.new' })
+const edit = (p: MembershipPlan) =>
+  canManage.value && router.push({ name: 'tenant.memberships.edit', params: { id: p.id } })
 
 const access = (p: MembershipPlan) =>
   p.type === 'Unlimited'
@@ -66,24 +92,32 @@ const billing = (p: MembershipPlan) =>
         .filter(Boolean)
         .join(' · ')
     : t('plans.durationSummary', { n: p.duration_value, unit: t(`plans.units.${p.duration_unit}`) })
+const covers = (p: MembershipPlan) => {
+  const s = p.rules.services
+  if (s.mode === 'categories') return t('plans.coversCategories', { n: s.category_ids.length })
+  if (s.mode === 'services') return t('plans.coversServices', { n: s.service_ids.length })
+  return t('plans.coverModes.all')
+}
 const priceRange = (p: MembershipPlan) => {
   const prices = p.prices.map((x) => x.price)
-  if (!prices.length) return '—'
+  if (!prices.length) return null
   const min = Math.min(...prices)
   const max = Math.max(...prices)
-  return min === max ? format.money(min) : `${format.money(min)} – ${format.money(max)}`
+  return min === max ? format.money(min) : t('plans.fromPrice', { price: format.money(min) })
 }
 </script>
 
 <template>
   <div class="page">
-    <PageHeader :title="t('plans.title')">
+    <PageHeader :title="t('plans.title')" :subtitle="t('plans.subtitle')">
       <template v-if="canManage" #primary>
-        <Button icon="pi pi-plus" :label="t('plans.new')" @click="open(null)" />
+        <Button icon="pi pi-plus" :label="t('plans.new')" @click="create" />
       </template>
     </PageHeader>
 
-    <Skeleton v-if="state === 'loading'" height="200px" />
+    <div v-if="state === 'loading'" class="grid">
+      <Skeleton v-for="n in 3" :key="n" height="240px" />
+    </div>
     <NoPermission v-else-if="state === 'forbidden'" class="card" />
     <ErrorState
       v-else-if="state === 'error'"
@@ -98,47 +132,108 @@ const priceRange = (p: MembershipPlan) => {
       :title="t('plans.empty')"
       :body="t('plans.emptyHint')"
     >
-      <Button v-if="canManage" icon="pi pi-plus" :label="t('plans.new')" @click="open(null)" />
+      <Button v-if="canManage" icon="pi pi-plus" :label="t('plans.new')" @click="create" />
     </EmptyState>
-    <div v-else class="grid">
-      <article
-        v-for="p in plans"
-        :key="p.id"
-        :class="['card', 'plan', { archived: p.status === 'Archived' }]"
-      >
-        <div class="plan__head">
-          <h3>{{ p.display_name }}</h3>
-          <StatusTag :status="p.status" size="sm" />
-        </div>
-        <div class="plan__price num">{{ priceRange(p) }}</div>
-        <ul class="facts">
-          <li><i class="pi pi-ticket" aria-hidden="true" /> {{ access(p) }}</li>
-          <li><i class="pi pi-refresh" aria-hidden="true" /> {{ billing(p) }}</li>
-          <li v-if="p.joining_fee">
-            <i class="pi pi-plus-circle" aria-hidden="true" />
-            {{ t('plans.feeSummary', { fee: format.money(p.joining_fee) }) }}
-          </li>
-          <li v-if="p.rules.limits.hours">
-            <i class="pi pi-clock" aria-hidden="true" />
-            {{ t('plans.hoursSummary', p.rules.limits.hours) }}
-          </li>
-          <li>
-            <i class="pi pi-building" aria-hidden="true" />
-            {{ p.prices.map((x) => x.location).join(', ') }}
-          </li>
-        </ul>
-        <Button
-          v-if="canManage"
-          size="small"
-          variant="text"
-          icon="pi pi-pencil"
-          :label="t('common.edit')"
-          @click="open(p)"
-        />
-      </article>
-    </div>
 
-    <PlanDrawer v-model:visible="drawerOpen" :plan="editing" @saved="onSaved" />
+    <template v-else>
+      <div class="stats">
+        <div v-for="s in stats" :key="s.label" class="card stat">
+          <span class="stat__icon"><i :class="['pi', s.icon]" aria-hidden="true" /></span>
+          <div>
+            <div class="stat__value num">{{ s.value }}</div>
+            <div class="stat__label">{{ s.label }}</div>
+          </div>
+        </div>
+      </div>
+
+      <FilterBar v-model:search="search" :placeholder="t('plans.search')">
+        <SelectButton
+          v-model="status"
+          :options="statusOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          :aria-label="t('plans.status')"
+        />
+      </FilterBar>
+
+      <EmptyState
+        v-if="!shown.length"
+        class="card"
+        compact
+        icon="pi-search"
+        :title="t('plans.noMatch')"
+      />
+      <div v-else class="grid">
+        <article
+          v-for="p in shown"
+          :key="p.id"
+          :class="[
+            'card',
+            'plan',
+            { 'plan--archived': p.status === 'Archived', 'plan--link': canManage },
+          ]"
+          :tabindex="canManage ? 0 : undefined"
+          :role="canManage ? 'link' : undefined"
+          :aria-label="canManage ? t('plans.editNamed', { name: p.display_name }) : undefined"
+          @click="edit(p)"
+          @keydown.enter="edit(p)"
+        >
+          <div class="plan__top">
+            <span :class="['type', `type--${p.type.toLowerCase()}`]">
+              <i
+                :class="['pi', p.type === 'Unlimited' ? 'pi-star' : 'pi-ticket']"
+                aria-hidden="true"
+              />
+              {{ t(`plans.types.${p.type}`) }}
+            </span>
+            <StatusTag :status="p.status" size="sm" />
+          </div>
+          <h3 class="plan__name">{{ p.display_name }}</h3>
+          <p v-if="p.description?.en || p.description?.ar" class="plan__desc">
+            {{
+              $i18n.locale === 'ar'
+                ? p.description?.ar || p.description?.en
+                : p.description?.en || p.description?.ar
+            }}
+          </p>
+          <div class="plan__price">
+            <span class="num">{{ priceRange(p) ?? t('plans.noPriceYet') }}</span>
+            <small v-if="priceRange(p) && p.billing === 'recurring'">{{
+              t(`plans.perInterval.${p.billing_interval ?? 'month'}`)
+            }}</small>
+          </div>
+          <ul class="facts">
+            <li><i class="pi pi-ticket" aria-hidden="true" />{{ access(p) }}</li>
+            <li><i class="pi pi-refresh" aria-hidden="true" />{{ billing(p) }}</li>
+            <li><i class="pi pi-th-large" aria-hidden="true" />{{ covers(p) }}</li>
+            <li v-if="p.joining_fee">
+              <i class="pi pi-plus-circle" aria-hidden="true" />{{
+                t('plans.feeSummary', { fee: format.money(p.joining_fee) })
+              }}
+            </li>
+            <li v-if="p.rules.limits.hours">
+              <i class="pi pi-clock" aria-hidden="true" />{{
+                t('plans.hoursSummary', p.rules.limits.hours)
+              }}
+            </li>
+          </ul>
+          <footer class="plan__foot">
+            <span class="branches">
+              <i class="pi pi-building" aria-hidden="true" />
+              {{
+                p.prices.length === 1
+                  ? p.prices[0]!.location
+                  : t('plans.branchCount', { n: p.prices.length })
+              }}
+            </span>
+            <span v-if="canManage" class="open">
+              {{ t('common.edit') }} <i class="pi pi-arrow-right pi-dir" aria-hidden="true" />
+            </span>
+          </footer>
+        </article>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -153,32 +248,110 @@ const priceRange = (p: MembershipPlan) => {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
 }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.stat {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+}
+.stat__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--primary-50);
+  color: var(--primary-700);
+}
+.stat__value {
+  font: 600 20px var(--font-sans);
+}
+.stat__label {
+  font: var(--text-small);
+  color: var(--text-muted);
+}
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
 .plan {
-  padding: 16px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
-.plan.archived {
+.plan--link {
+  cursor: pointer;
+}
+.plan--link:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-1);
+}
+.plan--link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.plan--archived {
   opacity: 0.6;
 }
-.plan__head {
+.plan__top {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  align-items: flex-start;
 }
-.plan__head h3 {
-  margin: 0;
+.type {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font: var(--text-caption);
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+.type--unlimited {
+  background: var(--primary-50);
+  color: var(--primary-700);
+}
+.type .pi {
+  font-size: 11px;
+}
+.plan__name {
+  margin: 4px 0 0;
   font: var(--text-h4);
 }
+.plan__desc {
+  margin: 0;
+  font: var(--text-small);
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .plan__price {
-  font: 600 20px var(--font-sans);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.plan__price .num {
+  font: 600 22px var(--font-sans);
+}
+.plan__price small {
+  font: var(--text-small);
+  color: var(--text-muted);
 }
 .facts {
   list-style: none;
@@ -186,11 +359,40 @@ const priceRange = (p: MembershipPlan) => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
   font: var(--text-small);
   color: var(--text-secondary);
+  flex: 1;
 }
 .facts .pi {
+  margin-inline-end: 8px;
+  color: var(--text-muted);
+}
+.plan__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+  font: var(--text-small);
+  color: var(--text-muted);
+}
+.branches .pi {
   margin-inline-end: 6px;
+}
+.open {
+  color: var(--primary-600);
+  font-weight: 500;
+}
+.open .pi {
+  font-size: 11px;
+  margin-inline-start: 4px;
+}
+@media (max-width: 900px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

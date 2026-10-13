@@ -569,21 +569,39 @@
   background: var(--surface-overlay);
   box-shadow: var(--shadow-3);
 }
+.p-dialog {
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+}
 .p-dialog .p-dialog-header {
-  padding: 16px 20px 8px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-default);
 }
 .p-dialog .p-dialog-title {
   font: var(--text-h3);
   color: var(--text-primary);
 }
 .p-dialog .p-dialog-content {
-  padding: 8px 20px 16px;
+  padding: 20px;
   font: var(--text-body);
   color: var(--text-primary);
 }
 .p-dialog .p-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
-  padding: 12px 20px 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-sunken);
+  border-radius: 0 0 var(--radius-dialog) var(--radius-dialog);
+}
+@media (max-width: 640px) {
+  .p-dialog .p-dialog-footer {
+    flex-wrap: wrap;
+  }
 }
 
 /* Avatar / Badge */

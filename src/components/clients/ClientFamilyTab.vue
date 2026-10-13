@@ -9,7 +9,6 @@ import { useToast } from 'primevue/usetoast'
 import AutoComplete, { type AutoCompleteCompleteEvent } from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
-import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
@@ -17,6 +16,8 @@ import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import ErrorState from '@/components/patterns/ErrorState.vue'
+import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormField from '@/components/patterns/FormField.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import {
   tenantApi,
@@ -254,56 +255,58 @@ const maxDob = new Date()
     </template>
   </div>
 
-  <Dialog
+  <FormDialog
     :visible="dialog !== null"
-    modal
-    :header="dialog ? t(`family.dialogs.${dialog}`) : ''"
-    :style="{ width: '480px', maxWidth: 'calc(100vw - 32px)' }"
+    :title="dialog ? t(`family.dialogs.${dialog}`) : ''"
+    :subtitle="dialog ? t(`family.dialogHints.${dialog}`, { name: client.first_name }) : ''"
+    :icon="dialog === 'child' ? 'pi-user-plus' : 'pi-link'"
+    :saving="saving"
+    :save-disabled="!ready"
+    :save-label="dialog === 'child' ? t('family.addChildSave') : t('family.link')"
     @update:visible="(v: boolean) => !v && (dialog = null)"
+    @save="save"
   >
-    <div class="form">
-      <template v-if="dialog === 'child'">
-        <div class="row">
-          <div class="field">
-            <label for="child-first">{{ t('clients.firstName') }} *</label>
-            <InputText id="child-first" v-model="child.first_name" maxlength="60" />
-          </div>
-          <div class="field">
-            <label for="child-last">{{ t('clients.lastName') }} *</label>
-            <InputText id="child-last" v-model="child.last_name" maxlength="60" />
-          </div>
+    <template v-if="dialog === 'child'">
+      <div class="row">
+        <FormField :label="t('clients.firstName')" for="child-first" required>
+          <InputText id="child-first" v-model="child.first_name" maxlength="60" fluid />
+        </FormField>
+        <FormField :label="t('clients.lastName')" for="child-last" required>
+          <InputText id="child-last" v-model="child.last_name" maxlength="60" fluid />
+        </FormField>
+      </div>
+      <div class="row">
+        <FormField :label="t('clients.dob')" for="child-dob">
+          <DatePicker
+            v-model="child.dob"
+            input-id="child-dob"
+            date-format="yy-mm-dd"
+            :max-date="maxDob"
+            show-icon
+            icon-display="input"
+            fluid
+          />
+        </FormField>
+        <div class="field">
+          <span id="child-gender" class="field__label">{{ t('clients.genderLabel') }}</span>
+          <SelectButton
+            v-model="child.gender"
+            :options="[
+              { value: 'female', label: t('clients.gender.female') },
+              { value: 'male', label: t('clients.gender.male') },
+            ]"
+            option-label="label"
+            option-value="value"
+            aria-labelledby="child-gender"
+          />
         </div>
-        <div class="row">
-          <div class="field">
-            <label for="child-dob">{{ t('clients.dob') }}</label>
-            <DatePicker
-              v-model="child.dob"
-              input-id="child-dob"
-              date-format="yy-mm-dd"
-              :max-date="maxDob"
-              show-icon
-              icon-display="input"
-              fluid
-            />
-          </div>
-          <div class="field">
-            <span id="child-gender">{{ t('clients.genderLabel') }}</span>
-            <SelectButton
-              v-model="child.gender"
-              :options="[
-                { value: 'female', label: t('clients.gender.female') },
-                { value: 'male', label: t('clients.gender.male') },
-              ]"
-              option-label="label"
-              option-value="value"
-              aria-labelledby="child-gender"
-            />
-          </div>
-        </div>
-        <small class="muted">{{ t('family.noContactNeeded') }}</small>
-      </template>
-      <div v-else class="field">
-        <label for="family-search">{{ t('booking.client') }} *</label>
+      </div>
+      <Message severity="secondary" :closable="false" icon="pi pi-info-circle" size="small">{{
+        t('family.noContactNeeded')
+      }}</Message>
+    </template>
+    <template v-else>
+      <FormField :label="t('booking.client')" for="family-search" required>
         <AutoComplete
           v-model="query"
           input-id="family-search"
@@ -314,34 +317,71 @@ const maxDob = new Date()
           fluid
           @complete="search"
           @option-select="picked = $event.value"
-        />
+        >
+          <template #option="{ option }">
+            <div class="pick">
+              <PersonAvatar :name="option.name" size="sm" />
+              <span class="pick__text">
+                <span>{{ option.name }}</span>
+                <small class="muted">{{ option.mobile ?? option.email ?? '' }}</small>
+              </span>
+            </div>
+          </template>
+        </AutoComplete>
+      </FormField>
+      <div v-if="picked" class="picked">
+        <PersonAvatar :name="picked.name" />
+        <span class="pick__text">
+          <strong>{{ picked.name }}</strong>
+          <small class="muted">{{ picked.mobile ?? picked.email ?? '' }}</small>
+        </span>
+        <i class="pi pi-check-circle" aria-hidden="true" />
       </div>
-      <div class="field">
-        <label for="family-relation">{{
-          t('family.relationOf', { name: dialog === 'linkGuardian' ? '' : client.first_name })
-        }}</label>
-        <Select
-          v-model="relation"
-          input-id="family-relation"
-          :options="relationOptions"
-          option-label="label"
-          option-value="value"
-        />
-      </div>
-    </div>
-    <template #footer>
-      <Button
-        :label="t('common.cancel')"
-        severity="secondary"
-        variant="text"
-        @click="dialog = null"
-      />
-      <Button :label="t('common.save')" :loading="saving" :disabled="!ready" @click="save" />
     </template>
-  </Dialog>
+    <FormField
+      :label="t('family.relationOf', { name: dialog === 'linkGuardian' ? '' : client.first_name })"
+      for="family-relation"
+    >
+      <Select
+        v-model="relation"
+        input-id="family-relation"
+        :options="relationOptions"
+        option-label="label"
+        option-value="value"
+        fluid
+      />
+    </FormField>
+  </FormDialog>
 </template>
 
 <style scoped>
+.field__label {
+  font: var(--text-small);
+  font-weight: 500;
+}
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pick__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.picked {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--primary-200);
+  background: var(--primary-50);
+  border-radius: 8px;
+}
+.picked .pi {
+  margin-inline-start: auto;
+  color: var(--primary-600);
+}
 .open-family {
   align-self: flex-start;
   color: var(--text-link);

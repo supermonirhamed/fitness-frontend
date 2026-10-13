@@ -6,11 +6,13 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import Textarea from 'primevue/textarea'
+import EmptyState from '@/components/patterns/EmptyState.vue'
+import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormField from '@/components/patterns/FormField.vue'
 import { tenantApi, type ClientHealth } from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
 import { validationErrors } from '@/lib/http'
@@ -156,97 +158,98 @@ async function saveNotes() {
     </template>
   </div>
 
-  <Dialog
+  <FormDialog
     v-model:visible="contactsOpen"
-    modal
-    :header="t('clientHealth.contacts')"
-    :style="{ width: '560px', maxWidth: 'calc(100vw - 32px)' }"
+    :title="t('clientHealth.contacts')"
+    :subtitle="t('clientHealth.contactsHint')"
+    icon="pi-phone"
+    size="lg"
+    :saving="saving"
+    :save-disabled="!contactsReady"
+    @save="saveContacts"
   >
-    <div class="rows">
-      <div v-for="(r, i) in rows" :key="i" class="row">
-        <InputText
-          v-model="r.name"
-          :placeholder="t('clientHealth.name')"
-          :aria-label="t('clientHealth.name')"
-          :invalid="!!errors[`contacts.${i}.name`]"
-        />
-        <InputText
-          v-model="r.relation"
-          :placeholder="t('clientHealth.relation')"
-          :aria-label="t('clientHealth.relation')"
-          :invalid="!!errors[`contacts.${i}.relation`]"
-        />
-        <InputText
-          v-model="r.phone"
-          dir="ltr"
-          inputmode="tel"
-          :placeholder="t('clientHealth.phone')"
-          :aria-label="t('clientHealth.phone')"
-          :invalid="!!errors[`contacts.${i}.phone`]"
-        />
+    <EmptyState v-if="!rows.length" compact icon="pi-phone" :title="t('clientHealth.noContacts')" />
+    <div v-for="(r, i) in rows" :key="i" class="contact">
+      <div class="contact__head">
+        <span class="contact__n">{{ t('clientHealth.contactN', { n: i + 1 }) }}</span>
         <Button
           icon="pi pi-trash"
           variant="text"
           severity="secondary"
+          size="small"
           :aria-label="t('clientHealth.removeContact')"
           @click="rows.splice(i, 1)"
         />
-        <small v-if="errors[`contacts.${i}.phone`]" class="error">{{
-          errors[`contacts.${i}.phone`]![0]
-        }}</small>
       </div>
-      <Button
-        v-if="rows.length < 5"
-        size="small"
-        variant="text"
-        icon="pi pi-plus"
-        :label="t('clientHealth.addContact')"
-        @click="rows.push({ name: '', relation: '', phone: '' })"
-      />
+      <div class="contact__grid">
+        <FormField
+          :label="t('clientHealth.name')"
+          :for="`ec-name-${i}`"
+          required
+          :error="errors[`contacts.${i}.name`]?.[0]"
+        >
+          <InputText
+            :id="`ec-name-${i}`"
+            v-model="r.name"
+            fluid
+            :invalid="!!errors[`contacts.${i}.name`]"
+          />
+        </FormField>
+        <FormField
+          :label="t('clientHealth.relation')"
+          :for="`ec-rel-${i}`"
+          required
+          :error="errors[`contacts.${i}.relation`]?.[0]"
+        >
+          <InputText
+            :id="`ec-rel-${i}`"
+            v-model="r.relation"
+            fluid
+            :invalid="!!errors[`contacts.${i}.relation`]"
+          />
+        </FormField>
+        <FormField
+          :label="t('clientHealth.phone')"
+          :for="`ec-phone-${i}`"
+          required
+          :error="errors[`contacts.${i}.phone`]?.[0]"
+        >
+          <InputText
+            :id="`ec-phone-${i}`"
+            v-model="r.phone"
+            dir="ltr"
+            inputmode="tel"
+            fluid
+            :invalid="!!errors[`contacts.${i}.phone`]"
+          />
+        </FormField>
+      </div>
     </div>
-    <template #footer>
-      <Button
-        :label="t('common.cancel')"
-        severity="secondary"
-        variant="text"
-        @click="contactsOpen = false"
-      />
-      <Button
-        :label="t('common.save')"
-        :loading="saving"
-        :disabled="!contactsReady"
-        @click="saveContacts"
-      />
-    </template>
-  </Dialog>
+    <Button
+      v-if="rows.length < 5"
+      class="add-contact"
+      severity="secondary"
+      variant="outlined"
+      icon="pi pi-plus"
+      :label="t('clientHealth.addContact')"
+      @click="rows.push({ name: '', relation: '', phone: '' })"
+    />
+  </FormDialog>
 
-  <Dialog
+  <FormDialog
     v-model:visible="notesOpen"
-    modal
-    :header="t('clientHealth.notes')"
-    :style="{ width: '520px', maxWidth: 'calc(100vw - 32px)' }"
+    :title="t('clientHealth.notes')"
+    icon="pi-heart"
+    :saving="saving"
+    @save="saveNotes"
   >
-    <Message severity="secondary" :closable="false" icon="pi pi-lock">{{
+    <Message severity="secondary" :closable="false" icon="pi pi-lock" size="small">{{
       t('clientHealth.notesPrivacy')
     }}</Message>
-    <Textarea
-      v-model="notes"
-      rows="6"
-      auto-resize
-      maxlength="5000"
-      class="notes-input"
-      :aria-label="t('clientHealth.notes')"
-    />
-    <template #footer>
-      <Button
-        :label="t('common.cancel')"
-        severity="secondary"
-        variant="text"
-        @click="notesOpen = false"
-      />
-      <Button :label="t('common.save')" :loading="saving" @click="saveNotes" />
-    </template>
-  </Dialog>
+    <FormField :label="t('clientHealth.notes')" for="health-notes" :help="`${notes.length} / 5000`">
+      <Textarea id="health-notes" v-model="notes" rows="6" auto-resize maxlength="5000" fluid />
+    </FormField>
+  </FormDialog>
 </template>
 
 <style scoped>
@@ -301,27 +304,36 @@ async function saveNotes() {
   margin: 0;
   white-space: pre-wrap;
 }
-.rows {
+.contact {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-.row {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr 1.2fr auto;
   gap: 8px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+}
+.contact__head {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
 }
-.row .error {
-  grid-column: 1 / -1;
-  color: var(--sev-danger-fg);
+.contact__n {
+  font: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
-.notes-input {
-  width: 100%;
-  margin-top: 12px;
+.contact__grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.2fr;
+  gap: 12px;
 }
-@media (max-width: 560px) {
-  .row {
+.add-contact {
+  align-self: flex-start;
+}
+@media (max-width: 640px) {
+  .contact__grid {
     grid-template-columns: 1fr;
   }
 }

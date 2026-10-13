@@ -105,6 +105,18 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'memberships.view' },
       },
       {
+        path: 'memberships/plans/new',
+        name: 'tenant.memberships.new',
+        component: () => import('@/views/tenant/memberships/PlanFormView.vue'),
+        meta: { permission: 'memberships.update' },
+      },
+      {
+        path: 'memberships/plans/:id(\\d+)',
+        name: 'tenant.memberships.edit',
+        component: () => import('@/views/tenant/memberships/PlanFormView.vue'),
+        meta: { permission: 'memberships.update' },
+      },
+      {
         path: 'clients/import',
         name: 'tenant.clients.import',
         component: () => import('@/views/tenant/clients/ImportClientsView.vue'),

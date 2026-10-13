@@ -1859,6 +1859,9 @@ export const tenantApi = {
     async list(): Promise<MembershipPlan[]> {
       return (await http.get('/api/membership-plans')).data.data
     },
+    async get(id: number): Promise<MembershipPlan> {
+      return (await http.get(`/api/membership-plans/${id}`)).data.data
+    },
     async create(input: MembershipPlanInput): Promise<MembershipPlan> {
       return (await http.post('/api/membership-plans', input)).data.data
     },

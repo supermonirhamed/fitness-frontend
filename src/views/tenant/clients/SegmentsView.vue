@@ -9,7 +9,6 @@ import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import ColorPicker from 'primevue/colorpicker'
-import Dialog from 'primevue/dialog'
 import Drawer from 'primevue/drawer'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -19,6 +18,8 @@ import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormField from '@/components/patterns/FormField.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import { tenantApi, type Segment, type SegmentRules, type Tag as TagItem } from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
@@ -51,12 +52,25 @@ onMounted(load)
 const tagOpen = ref(false)
 const tagEditing = ref<TagItem | null>(null)
 const tagForm = ref({ name: '', color: '7c3aed' })
+const tagSaving = ref(false)
+const TAG_COLORS = [
+  '7c3aed',
+  '2563eb',
+  '0891b2',
+  '059669',
+  '65a30d',
+  'd97706',
+  'dc2626',
+  'db2777',
+  '475569',
+]
 function openTag(tag: TagItem | null) {
   tagEditing.value = tag
   tagForm.value = { name: tag?.name ?? '', color: (tag?.color ?? '#7c3aed').replace('#', '') }
   tagOpen.value = true
 }
 async function saveTag() {
+  tagSaving.value = true
   try {
     const input = { name: tagForm.value.name.trim(), color: `#${tagForm.value.color}` }
     if (tagEditing.value) await tenantApi.tags.update(tagEditing.value.id, input)
@@ -65,6 +79,8 @@ async function saveTag() {
     load()
   } catch (e) {
     fail(e)
+  } finally {
+    tagSaving.value = false
   }
 }
 async function removeTag(tag: TagItem) {
@@ -257,29 +273,43 @@ const describe = (s: Segment) =>
       </section>
     </div>
 
-    <Dialog
+    <FormDialog
       v-model:visible="tagOpen"
-      modal
-      :header="tagEditing ? tagEditing.name : t('segments.newTag')"
-      :style="{ width: '380px' }"
+      :title="tagEditing ? t('segments.editTag') : t('segments.newTag')"
+      :subtitle="t('segments.tagHint')"
+      icon="pi-tag"
+      size="sm"
+      :saving="tagSaving"
+      :save-disabled="!tagForm.name.trim()"
+      @save="saveTag"
     >
-      <div class="form">
-        <label for="tag-name">{{ t('segments.tagName') }}</label>
-        <div class="tag-row">
-          <ColorPicker v-model="tagForm.color" />
-          <InputText id="tag-name" v-model="tagForm.name" maxlength="40" class="grow" />
+      <FormField :label="t('segments.tagName')" for="tag-name" required>
+        <InputText id="tag-name" v-model="tagForm.name" maxlength="40" fluid autofocus />
+      </FormField>
+      <div class="field">
+        <span id="tag-color" class="field__label">{{ t('segments.tagColor') }}</span>
+        <div class="swatches" role="radiogroup" aria-labelledby="tag-color">
+          <button
+            v-for="c in TAG_COLORS"
+            :key="c"
+            type="button"
+            role="radio"
+            :aria-checked="tagForm.color === c"
+            :aria-label="`#${c}`"
+            :class="['swatch', { 'swatch--on': tagForm.color === c }]"
+            :style="{ background: `#${c}` }"
+            @click="tagForm.color = c"
+          />
+          <ColorPicker v-model="tagForm.color" :aria-label="t('segments.customColor')" />
         </div>
       </div>
-      <template #footer>
-        <Button
-          :label="t('common.cancel')"
-          severity="secondary"
-          variant="text"
-          @click="tagOpen = false"
-        />
-        <Button :label="t('common.save')" :disabled="!tagForm.name.trim()" @click="saveTag" />
-      </template>
-    </Dialog>
+      <div class="tag-preview">
+        <span class="field__label">{{ t('segments.preview') }}</span>
+        <span class="chip" :style="{ background: `#${tagForm.color}` }">{{
+          tagForm.name.trim() || t('segments.tagName')
+        }}</span>
+      </div>
+    </FormDialog>
 
     <Drawer v-model:visible="segOpen" :position="position" :block-scroll="true">
       <template #header>
@@ -449,10 +479,47 @@ const describe = (s: Segment) =>
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-.tag-row {
+.field__label,
+.field > label {
+  font: var(--text-small);
+  font-weight: 500;
+}
+.swatches {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--surface-overlay);
+  box-shadow: 0 0 0 1px var(--border-default);
+  cursor: pointer;
+  padding: 0;
+}
+.swatch--on {
+  box-shadow: 0 0 0 2px var(--text-primary);
+}
+.swatch:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tag-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-sunken);
+}
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font: 600 12px/20px var(--font-sans);
 }
 .title {
   font: var(--text-h3);

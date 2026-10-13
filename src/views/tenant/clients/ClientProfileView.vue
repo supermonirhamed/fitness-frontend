@@ -11,7 +11,6 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
-import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import Message from 'primevue/message'
@@ -36,6 +35,8 @@ import ClientWaiversTab from '@/components/clients/ClientWaiversTab.vue'
 import NewClientDrawer from '@/components/clients/NewClientDrawer.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
+import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormField from '@/components/patterns/FormField.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import {
@@ -166,6 +167,7 @@ async function anonymize() {
 const tagsOpen = ref(false)
 const allTags = ref<TagItem[]>([])
 const tagSelection = ref<number[]>([])
+const tagsSaving = ref(false)
 async function openTags() {
   allTags.value = await tenantApi.tags.list().catch(() => [])
   tagSelection.value = (client.value?.tags ?? []).map((tag) => tag.id)
@@ -173,6 +175,7 @@ async function openTags() {
 }
 async function saveTags() {
   if (!client.value) return
+  tagsSaving.value = true
   try {
     client.value = {
       ...client.value,
@@ -181,6 +184,8 @@ async function saveTags() {
     tagsOpen.value = false
   } catch {
     toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  } finally {
+    tagsSaving.value = false
   }
 }
 
@@ -677,64 +682,70 @@ const LATER = ['memberships'] as const
       @update:visible="(v: boolean) => !v && (statusAction = null)"
       @confirm="applyStatus()"
     />
-    <Dialog
+    <FormDialog
       v-model:visible="anonymizeOpen"
-      modal
-      :header="t('clientStatus.titles.anonymize', { name: client?.name })"
-      :style="{ width: '480px', maxWidth: 'calc(100vw - 32px)' }"
+      :title="t('clientStatus.titles.anonymize', { name: client?.name })"
+      icon="pi-eraser"
+      danger
+      :saving="statusBusy"
+      :save-label="t('clientStatus.actions.anonymize')"
+      :save-disabled="anonymizeReason.trim().length < 3 || anonymizeName.trim() !== client?.name"
+      @save="anonymize"
     >
-      <div class="anon">
-        <Message severity="error" :closable="false" icon="pi pi-exclamation-triangle">{{
-          t('clientStatus.descriptions.anonymize')
-        }}</Message>
-        <label for="anon-reason">{{ t('clientStatus.anonymizeReason') }} *</label>
-        <InputText id="anon-reason" v-model="anonymizeReason" maxlength="500" />
-        <label for="anon-name">{{ t('clientStatus.typeName', { name: client?.name }) }}</label>
-        <InputText id="anon-name" v-model="anonymizeName" />
-      </div>
-      <template #footer>
-        <Button
-          :label="t('common.cancel')"
-          severity="secondary"
-          variant="text"
-          @click="anonymizeOpen = false"
+      <Message severity="error" :closable="false" icon="pi pi-exclamation-triangle">{{
+        t('clientStatus.descriptions.anonymize')
+      }}</Message>
+      <FormField
+        :label="t('clientStatus.anonymizeReason')"
+        for="anon-reason"
+        required
+        :help="t('clientStatus.reasonHelp')"
+      >
+        <InputText id="anon-reason" v-model="anonymizeReason" maxlength="500" fluid />
+      </FormField>
+      <FormField :label="t('clientStatus.typeName', { name: client?.name })" for="anon-name">
+        <InputText
+          id="anon-name"
+          v-model="anonymizeName"
+          fluid
+          autocomplete="off"
+          :invalid="!!anonymizeName.trim() && anonymizeName.trim() !== client?.name"
         />
-        <Button
-          :label="t('clientStatus.actions.anonymize')"
-          severity="danger"
-          :loading="statusBusy"
-          :disabled="anonymizeReason.trim().length < 3 || anonymizeName.trim() !== client?.name"
-          @click="anonymize"
-        />
-      </template>
-    </Dialog>
-    <Dialog
+      </FormField>
+    </FormDialog>
+    <FormDialog
       v-model:visible="tagsOpen"
-      modal
-      :header="t('clientProfile.editTags')"
-      :style="{ width: '420px' }"
+      :title="t('clientProfile.editTags')"
+      :subtitle="client?.name"
+      icon="pi-tags"
+      size="sm"
+      :saving="tagsSaving"
+      @save="saveTags"
     >
-      <MultiSelect
-        v-model="tagSelection"
-        :options="allTags"
-        option-label="name"
-        option-value="id"
-        display="chip"
-        filter
-        fluid
-        :aria-label="t('segments.tags')"
-      />
-      <small v-if="!allTags.length" class="muted">{{ t('clientProfile.noTagsYet') }}</small>
-      <template #footer>
-        <Button
-          :label="t('common.cancel')"
-          severity="secondary"
-          variant="text"
-          @click="tagsOpen = false"
-        />
-        <Button :label="t('common.save')" @click="saveTags" />
-      </template>
-    </Dialog>
+      <FormField
+        :label="t('segments.tags')"
+        for="client-tags"
+        :help="allTags.length ? undefined : t('clientProfile.noTagsYet')"
+      >
+        <MultiSelect
+          v-model="tagSelection"
+          input-id="client-tags"
+          :options="allTags"
+          option-label="name"
+          option-value="id"
+          display="chip"
+          filter
+          fluid
+          :placeholder="t('clientProfile.pickTags')"
+        >
+          <template #option="{ option }">
+            <span class="tag-opt"
+              ><span class="tag-dot" :style="{ background: option.color }" />{{ option.name }}</span
+            >
+          </template>
+        </MultiSelect>
+      </FormField>
+    </FormDialog>
     <NewClientDrawer v-model:visible="editOpen" :client="client" @saved="onEdited" />
     <BookingDetailsDrawer
       v-model:visible="detailsOpen"
@@ -745,6 +756,16 @@ const LATER = ['memberships'] as const
 </template>
 
 <style scoped>
+.tag-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tag-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
 .page {
   display: flex;
   flex-direction: column;

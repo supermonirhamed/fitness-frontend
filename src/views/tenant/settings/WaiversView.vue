@@ -6,16 +6,15 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
-import Drawer from 'primevue/drawer'
 import Message from 'primevue/message'
 import MultiSelect from 'primevue/multiselect'
-import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
+import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormField from '@/components/patterns/FormField.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
 import TranslatedField from '@/components/patterns/TranslatedField.vue'
 import { tenantApi, type Translated, type WaiverTemplate } from '@/api/tenant'
@@ -24,12 +23,11 @@ import { statusOf, validationErrors } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const toast = useToast()
 const auth = useStaffAuth()
 const format = useFormat()
 const canEdit = computed(() => auth.can('settings.update'))
-const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
 
 const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
 const templates = ref<WaiverTemplate[]>([])
@@ -51,10 +49,12 @@ onMounted(async () => {
   }))
 })
 
+const REQUIRED_ICONS = { all: 'pi-users', services: 'pi-th-large', minors: 'pi-user' } as const
 const requiredOptions = computed(() =>
   (['all', 'services', 'minors'] as const).map((v) => ({
     value: v,
     label: t(`waivers.requiredFor.${v}`),
+    icon: REQUIRED_ICONS[v],
   })),
 )
 
@@ -210,108 +210,108 @@ async function publish() {
     </ul>
   </div>
 
-  <Drawer
+  <FormDialog
     v-model:visible="drawerOpen"
-    :position="position"
-    :block-scroll="true"
-    class="wide-drawer"
+    :title="editing ? t('waivers.editTitle') : t('waivers.new')"
+    :subtitle="editing ? editing.display_name : t('waivers.newHint')"
+    icon="pi-file-edit"
+    :size="editing ? 'md' : 'lg'"
+    :saving="saving"
+    @save="save"
   >
-    <template #header>
-      <div class="head__title">{{ editing ? editing.display_name : t('waivers.new') }}</div>
-    </template>
-    <div class="form">
-      <TranslatedField
-        id="waiver-name"
-        v-model="form.name"
-        :label="t('waivers.name')"
-        required
-        :maxlength="120"
-        :errors="{ any: err('name') ?? err('name.en') ?? err('name.ar') }"
-      />
-      <div class="field">
-        <span id="waiver-for" class="field__label">{{ t('waivers.requiredForLabel') }}</span>
-        <SelectButton
-          v-model="form.required_for"
-          :options="requiredOptions"
-          option-label="label"
-          option-value="value"
-          :allow-empty="false"
-          aria-labelledby="waiver-for"
-        />
+    <TranslatedField
+      id="waiver-name"
+      v-model="form.name"
+      :label="t('waivers.name')"
+      required
+      :maxlength="120"
+      :errors="{ any: err('name') ?? err('name.en') ?? err('name.ar') }"
+    />
+    <div class="field">
+      <span id="waiver-for" class="field__label">{{ t('waivers.requiredForLabel') }}</span>
+      <div class="choices" role="radiogroup" aria-labelledby="waiver-for">
+        <button
+          v-for="o in requiredOptions"
+          :key="o.value"
+          type="button"
+          role="radio"
+          :aria-checked="form.required_for === o.value"
+          :class="['choice', { 'choice--on': form.required_for === o.value }]"
+          @click="form.required_for = o.value"
+        >
+          <i :class="['pi', o.icon]" aria-hidden="true" />
+          <span>{{ o.label }}</span>
+        </button>
       </div>
-      <div v-if="form.required_for === 'services'" class="field">
-        <label for="waiver-services" class="field__label">{{ t('waivers.services') }} *</label>
-        <MultiSelect
-          v-model="form.service_ids"
-          input-id="waiver-services"
-          :options="services"
-          option-label="name"
-          option-value="id"
-          filter
-          display="chip"
-          :invalid="!!err('service_ids')"
-        />
-      </div>
-      <TranslatedField
-        v-if="!editing"
-        id="waiver-content"
-        v-model="form.content"
-        :label="t('waivers.text')"
-        required
-        multiline
-        :maxlength="20000"
-        :errors="{ any: err('content') ?? err('content.en') ?? err('content.ar') }"
+    </div>
+    <FormField
+      v-if="form.required_for === 'services'"
+      :label="t('waivers.services')"
+      for="waiver-services"
+      required
+      :error="err('service_ids')"
+    >
+      <MultiSelect
+        v-model="form.service_ids"
+        input-id="waiver-services"
+        :options="services"
+        option-label="name"
+        option-value="id"
+        filter
+        display="chip"
+        fluid
+        :placeholder="t('waivers.pickServices')"
+        :invalid="!!err('service_ids')"
       />
-      <div v-else class="toggle">
+    </FormField>
+    <TranslatedField
+      v-if="!editing"
+      id="waiver-content"
+      v-model="form.content"
+      :label="t('waivers.text')"
+      required
+      multiline
+      :maxlength="20000"
+      :errors="{ any: err('content') ?? err('content.en') ?? err('content.ar') }"
+    />
+    <template v-else>
+      <Message severity="secondary" :closable="false" icon="pi pi-info-circle" size="small">{{
+        t('waivers.textByVersion')
+      }}</Message>
+      <div class="toggle">
         <ToggleSwitch v-model="form.archived" input-id="waiver-archived" />
         <label for="waiver-archived">{{ t('waivers.archive') }}</label>
       </div>
-    </div>
-    <template #footer>
-      <div class="footer">
-        <Button
-          :label="t('common.cancel')"
-          severity="secondary"
-          variant="text"
-          @click="drawerOpen = false"
-        />
-        <Button :label="t('common.save')" :loading="saving" @click="save" />
-      </div>
     </template>
-  </Drawer>
+  </FormDialog>
 
-  <Dialog
+  <FormDialog
     v-model:visible="publishOpen"
-    modal
-    :header="t('waivers.newVersionOf', { name: publishing?.display_name })"
-    :style="{ width: '640px', maxWidth: 'calc(100vw - 32px)' }"
+    :title="t('waivers.newVersionOf', { name: publishing?.display_name })"
+    :subtitle="publishing ? t('waivers.currentVersion', { n: publishing.version }) : ''"
+    icon="pi-send"
+    size="lg"
+    :saving="saving"
+    :save-label="t('waivers.publish')"
+    @save="publish"
   >
-    <div class="form">
-      <TranslatedField
-        id="waiver-new-content"
-        v-model="newContent"
-        :label="t('waivers.text')"
-        required
-        multiline
-        :maxlength="20000"
-        :errors="{ any: err('content') ?? err('content.en') ?? err('content.ar') }"
-      />
+    <TranslatedField
+      id="waiver-new-content"
+      v-model="newContent"
+      :label="t('waivers.text')"
+      required
+      multiline
+      :maxlength="20000"
+      :errors="{ any: err('content') ?? err('content.en') ?? err('content.ar') }"
+    />
+    <div :class="['resign', { 'resign--on': resign }]">
       <div class="toggle">
         <ToggleSwitch v-model="resign" input-id="waiver-resign" />
         <label for="waiver-resign">{{ t('waivers.requireResign') }}</label>
       </div>
       <small class="muted">{{ resign ? t('waivers.resignOn') : t('waivers.resignOff') }}</small>
     </div>
-    <template #footer>
-      <Button
-        :label="t('common.cancel')"
-        severity="secondary"
-        variant="text"
-        @click="publishOpen = false"
-      />
-      <Button :label="t('waivers.publish')" :loading="saving" @click="publish" />
-    </template>
-  </Dialog>
+  </FormDialog>
 </template>
 
 <style scoped>
@@ -368,31 +368,68 @@ async function publish() {
   font: var(--text-small);
   color: var(--text-muted);
 }
-.head__title {
-  font: var(--text-h3);
-}
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 .field__label {
+  font: var(--text-small);
+  font-weight: 500;
+}
+.choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-card);
+  color: var(--text-primary);
   font: 500 14px var(--font-sans);
+  cursor: pointer;
+  text-align: start;
+}
+.choice:hover {
+  border-color: var(--border-strong);
+}
+.choice:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.choice--on {
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 1px var(--primary-500);
+  background: var(--primary-50);
+}
+.choice .pi {
+  color: var(--primary-600);
+}
+.resign {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+}
+.resign--on {
+  border-color: var(--sev-warn-solid);
+  background: var(--sev-warn-bg);
+}
+@media (max-width: 640px) {
+  .choices {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .toggle {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  width: 100%;
 }
 </style>

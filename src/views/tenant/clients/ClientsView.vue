@@ -14,13 +14,14 @@ import DatePicker from 'primevue/datepicker'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import Dialog from 'primevue/dialog'
 import BulkActionBar from '@/components/patterns/BulkActionBar.vue'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FilterBar from '@/components/patterns/FilterBar.vue'
+import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormField from '@/components/patterns/FormField.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
@@ -155,10 +156,12 @@ const canTag = computed(() => auth.can('clients.update'))
 const canSegment = computed(() => auth.can('marketing.update'))
 const bulkDialog = ref<'tag' | 'segment' | null>(null)
 const bulkTarget = ref<number | null>(null)
+const bulkSaving = ref(false)
 const staticSegments = computed(() => segmentOptions.value.filter((s) => s.type === 'static'))
 async function applyBulk() {
   if (!bulkTarget.value) return
   const ids = selected.value.map((c) => c.id)
+  bulkSaving.value = true
   try {
     if (bulkDialog.value === 'tag') await tenantApi.tags.bulk(bulkTarget.value, ids)
     else await tenantApi.segments.addMembers(bulkTarget.value, ids)
@@ -174,6 +177,8 @@ async function applyBulk() {
     loadTaxonomy()
   } catch {
     toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  } finally {
+    bulkSaving.value = false
   }
 }
 async function loadTaxonomy() {
@@ -458,35 +463,62 @@ function onSaved(client: Client) {
     </template>
 
     <NewClientDrawer v-model:visible="drawerOpen" @saved="onSaved" />
-    <Dialog
+    <FormDialog
       :visible="bulkDialog !== null"
-      modal
-      :header="bulkDialog === 'tag' ? t('clients.bulk.addTag') : t('clients.bulk.addToSegment')"
-      :style="{ width: '380px' }"
+      :title="bulkDialog === 'tag' ? t('clients.bulk.addTag') : t('clients.bulk.addToSegment')"
+      :subtitle="t('clients.bulk.selectedCount', { n: selected.length })"
+      :icon="bulkDialog === 'tag' ? 'pi-tag' : 'pi-users'"
+      size="sm"
+      :saving="bulkSaving"
+      :save-disabled="!bulkTarget"
+      :save-label="t('clients.bulk.apply', { n: selected.length })"
       @update:visible="(v: boolean) => !v && (bulkDialog = null)"
+      @save="applyBulk"
     >
-      <Select
-        v-model="bulkTarget"
-        :options="bulkDialog === 'tag' ? tagOptions : staticSegments"
-        option-label="name"
-        option-value="id"
-        fluid
-        :aria-label="bulkDialog === 'tag' ? t('segments.tags') : t('segments.segment')"
-      />
-      <template #footer>
-        <Button
-          :label="t('common.cancel')"
-          severity="secondary"
-          variant="text"
-          @click="bulkDialog = null"
-        />
-        <Button :label="t('common.save')" :disabled="!bulkTarget" @click="applyBulk" />
-      </template>
-    </Dialog>
+      <FormField
+        :label="bulkDialog === 'tag' ? t('segments.tags') : t('segments.segment')"
+        for="bulk-target"
+        required
+      >
+        <Select
+          v-model="bulkTarget"
+          input-id="bulk-target"
+          :options="bulkDialog === 'tag' ? tagOptions : staticSegments"
+          option-label="name"
+          option-value="id"
+          filter
+          fluid
+          :placeholder="
+            bulkDialog === 'tag' ? t('clients.bulk.pickTag') : t('clients.bulk.pickSegment')
+          "
+          :empty-message="
+            bulkDialog === 'tag' ? t('clientProfile.noTagsYet') : t('clients.bulk.noStatic')
+          "
+        >
+          <template v-if="bulkDialog === 'tag'" #option="{ option }">
+            <span class="bulk-opt"
+              ><span class="bulk-dot" :style="{ background: option.color }" />{{
+                option.name
+              }}</span
+            >
+          </template>
+        </Select>
+      </FormField>
+    </FormDialog>
   </div>
 </template>
 
 <style scoped>
+.bulk-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.bulk-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
 .filter {
   min-width: 150px;
 }
