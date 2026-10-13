@@ -684,6 +684,25 @@ export interface GuestOptions {
   }
 }
 
+/** A recurring booking (US-04.08) and what booking each occurrence did. */
+export interface RecurringBooking {
+  id: number
+  status: 'Active' | 'Ended' | 'Cancelled'
+  starts_on: string
+  ends_on: string | null
+  until_entitlement_ends: boolean
+  summary: Record<
+    'booked' | 'skipped' | 'waitlisted',
+    {
+      session_id: number
+      date: string
+      start: string
+      booking_id?: number
+      reasons?: { code: string; message: string }[]
+    }[]
+  >
+}
+
 /** A booking (EP-04) as the roster shows it. */
 export interface Booking {
   id: number
@@ -697,6 +716,8 @@ export interface Booking {
     | 'NoShow'
     | 'CancelledByBusiness'
     | 'Rescheduled'
+  /** Made by a recurring booking (US-04.08); `active` until it ends or is cancelled. */
+  standing: { id: number; active: boolean } | null
   /** The member who brought this guest (US-04.07). */
   host: { id: number; name: string | null } | null
   /** Moved here from another session (US-04.05). */
@@ -1343,6 +1364,21 @@ export const tenantApi = {
       input: { reason?: string | null; waive_penalty?: boolean; waive_reason?: string | null },
     ): Promise<Booking> {
       return (await http.post(`/api/bookings/${id}/cancel`, input)).data.data
+    },
+    /** Books a client into every upcoming occurrence of a series (US-04.08). */
+    async createRecurring(input: {
+      client_id: number
+      series_id: number
+      starts_on: string
+      ends_on: string | null
+      until_entitlement_ends: boolean
+      entitlement_source: EntitlementSource
+    }): Promise<RecurringBooking> {
+      return (await http.post('/api/bookings/recurring', input)).data.data
+    },
+    /** "Cancel all future": ends the recurring booking and cancels its upcoming bookings. */
+    async cancelRecurring(id: number): Promise<{ cancelled: number }> {
+      return (await http.post(`/api/bookings/recurring/${id}/cancel`)).data.data
     },
     /** How a member's guest can be paid for in a session, and what the service restricts (US-04.07). */
     async guestOptions(sessionId: number, hostId: number): Promise<GuestOptions> {

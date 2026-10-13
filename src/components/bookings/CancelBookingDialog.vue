@@ -17,13 +17,20 @@ import { useFormat } from '@/composables/useFormat'
 
 const props = defineProps<{ booking: Booking | null; session: string; timezone: string }>()
 const visible = defineModel<boolean>('visible', { required: true })
-const emit = defineEmits<{ cancelled: [booking: Booking] }>()
+const emit = defineEmits<{ cancelled: [booking: Booking]; cancelledFuture: [count: number] }>()
 const { t } = useI18n()
 const format = useFormat()
 
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const terms = ref<CancellationTerms | null>(null)
 const reason = ref('')
+// A booking made by an active recurring booking can stop it: "cancel all future" (US-04.08).
+const scope = ref<'one' | 'future'>('one')
+const recurringActive = computed(() => !!props.booking?.standing?.active)
+const scopeOptions = computed(() => [
+  { value: 'one', label: t('cancelBooking.scopeOne') },
+  { value: 'future', label: t('cancelBooking.scopeFuture') },
+])
 const waive = ref(false)
 const waiveReason = ref('')
 const saving = ref(false)
@@ -34,6 +41,7 @@ watch(visible, async (open) => {
   if (!open || !props.booking) return
   reason.value = ''
   waive.value = false
+  scope.value = 'one'
   waiveReason.value = ''
   error.value = null
   errors.value = {}
@@ -60,6 +68,12 @@ async function confirm() {
   error.value = null
   errors.value = {}
   try {
+    if (scope.value === 'future' && props.booking.standing) {
+      const { cancelled } = await tenantApi.bookings.cancelRecurring(props.booking.standing.id)
+      emit('cancelledFuture', cancelled)
+      visible.value = false
+      return
+    }
     const booking = await tenantApi.bookings.cancel(props.booking.id, {
       reason: reason.value.trim() || null,
       waive_penalty: penalized.value && waive.value,
@@ -94,6 +108,17 @@ async function confirm() {
         t('cancelBooking.loadError')
       }}</Message>
       <template v-else-if="terms">
+        <div
+          v-if="recurringActive"
+          class="cancel__scope"
+          role="radiogroup"
+          :aria-label="t('cancelBooking.scope')"
+        >
+          <label v-for="o in scopeOptions" :key="o.value" class="cancel__option">
+            <input v-model="scope" type="radio" name="cancel-scope" :value="o.value" />
+            {{ o.label }}
+          </label>
+        </div>
         <Message v-if="!terms.late" severity="info" :closable="false" icon="pi pi-check-circle">
           {{ t('cancelBooking.onTime', { date: freeUntil }) }}
         </Message>
@@ -108,7 +133,7 @@ async function confirm() {
           </div>
         </Message>
 
-        <div v-if="penalized && terms.can_waive" class="cancel__waive">
+        <div v-if="penalized && terms.can_waive && scope === 'one'" class="cancel__waive">
           <div class="cancel__toggle">
             <ToggleSwitch v-model="waive" input-id="cancel-waive" />
             <label for="cancel-waive">{{ t('cancelBooking.waive') }}</label>
@@ -128,8 +153,10 @@ async function confirm() {
           </template>
         </div>
 
-        <label for="cancel-reason" class="cancel__label">{{ t('cancelBooking.reason') }}</label>
-        <Textarea id="cancel-reason" v-model="reason" rows="2" auto-resize maxlength="500" />
+        <template v-if="scope === 'one'">
+          <label for="cancel-reason" class="cancel__label">{{ t('cancelBooking.reason') }}</label>
+          <Textarea id="cancel-reason" v-model="reason" rows="2" auto-resize maxlength="500" />
+        </template>
       </template>
     </div>
     <template #footer>
@@ -177,6 +204,19 @@ async function confirm() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.cancel__scope {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cancel__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cancel__option input {
+  accent-color: var(--primary);
 }
 .cancel__label {
   font: 500 14px var(--font-sans);

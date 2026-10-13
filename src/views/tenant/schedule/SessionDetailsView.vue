@@ -39,6 +39,7 @@ import SubstituteCoachDrawer from '@/components/schedule/SubstituteCoachDrawer.v
 import {
   tenantApi,
   type Booking,
+  type RecurringBooking,
   type CalendarSession,
   type SeriesUpdateResult,
   type SessionDetails,
@@ -172,6 +173,31 @@ async function markNoShow(reason?: string) {
   } finally {
     noShowBusy.value = false
   }
+}
+function onFutureCancelled(count: number) {
+  toast.add({
+    severity: 'success',
+    summary: t('cancelBooking.doneFuture', { n: count }),
+    life: 4000,
+  })
+  load()
+}
+function onRecurring(recurring: RecurringBooking) {
+  toast.add({
+    severity: recurring.summary.skipped.length ? 'warn' : 'success',
+    summary: t('recurring.summaryTitle'),
+    detail: [
+      t('recurring.booked', { n: recurring.summary.booked.length }),
+      recurring.summary.skipped.length
+        ? t('recurring.skipped', { n: recurring.summary.skipped.length })
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    life: 5000,
+  })
+  tab.value = 'roster'
+  load()
 }
 function onBookingCancelled(booking: Booking) {
   toast.add({
@@ -576,6 +602,10 @@ const moreItems = computed<MenuItem[]>(() => {
                     <span>
                       <span class="person__name">{{ data.client.name }}</span>
                       <small class="muted num">{{ data.client.member_id }}</small>
+                      <small v-if="data.standing" class="muted"
+                        ><i class="pi pi-replay" aria-hidden="true" />
+                        {{ t('recurring.tag') }}</small
+                      >
                       <small v-if="data.host" class="muted"
                         ><i class="pi pi-user-plus" aria-hidden="true" />
                         {{ t('booking.guestOf', { name: data.host.name }) }}</small
@@ -810,7 +840,12 @@ const moreItems = computed<MenuItem[]>(() => {
         @series-updated="onSeriesUpdated"
         @saved="onCreated"
       />
-      <BookingDrawer v-model:visible="bookingOpen" :session="session" @booked="onBooked" />
+      <BookingDrawer
+        v-model:visible="bookingOpen"
+        :session="session"
+        @booked="onBooked"
+        @recurring="onRecurring"
+      />
       <ConfirmActionDialog
         v-model:visible="noShowOpen"
         :title="t('noShow.markTitle', { client: cancelling?.client.name })"
@@ -843,6 +878,7 @@ const moreItems = computed<MenuItem[]>(() => {
         :session="`${session.service.name} · ${dayLabel(session.local.date)} ${session.local.start}`"
         :timezone="session.location.timezone"
         @cancelled="onBookingCancelled"
+        @cancelled-future="onFutureCancelled"
       />
       <SubstituteCoachDrawer
         v-model:visible="substituteOpen"

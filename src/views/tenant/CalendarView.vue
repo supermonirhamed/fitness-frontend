@@ -1085,7 +1085,12 @@ const zoneOf = (s: CalendarSession) =>
       :date="anchor"
       @saved="onAppointment"
     />
-    <BookingDrawer v-model:visible="bookingOpen" :session="booking" @booked="onBooked" />
+    <BookingDrawer
+      v-model:visible="bookingOpen"
+      :session="booking"
+      @booked="onBooked"
+      @recurring="load()"
+    />
     <SessionDrawer
       v-model:visible="drawerOpen"
       :prefill="prefill"

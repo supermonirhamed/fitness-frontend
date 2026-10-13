@@ -4,6 +4,8 @@
 // (US-04.01) and the payment source that will be used, then confirm. Permitted staff can override
 // capacity, the booking window or payment with a reason. "Guest of a member" (US-04.07) books a
 // member's guest instead: the member, the guest's name and contact, and a guest pass or drop-in.
+// For a session in a series, "Book every session of this series" (US-04.08) makes a recurring
+// booking and shows what was booked and skipped.
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AxiosError } from 'axios'
@@ -16,6 +18,7 @@ import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import ToggleSwitch from 'primevue/toggleswitch'
 import EligibilityChecklist from '@/components/bookings/EligibilityChecklist.vue'
 import NewClientDrawer from '@/components/clients/NewClientDrawer.vue'
 import OverrideDialog from '@/components/patterns/OverrideDialog.vue'
@@ -30,6 +33,7 @@ import {
   type EntitlementSource,
   type GuestOptions,
   type OverridableCheck,
+  type RecurringBooking,
 } from '@/api/tenant'
 import { apiMessage, errorCode } from '@/lib/apiErrors'
 import { validationErrors } from '@/lib/http'
@@ -37,7 +41,7 @@ import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ session: CalendarSession | null }>()
 const visible = defineModel<boolean>('visible', { required: true })
-const emit = defineEmits<{ booked: [booking: Booking] }>()
+const emit = defineEmits<{ booked: [booking: Booking]; recurring: [recurring: RecurringBooking] }>()
 const { t, locale } = useI18n()
 const auth = useStaffAuth()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
@@ -71,6 +75,23 @@ const ymd = (d: Date | null) =>
     : null
 const guestSources = ref<EntitlementSource[]>([])
 const errors = ref<Record<string, string[]>>({})
+// Recurring booking (US-04.08)
+const repeat = ref(false)
+const repeatFrom = ref<Date | null>(null)
+const untilMode = ref<'entitlement' | 'date'>('entitlement')
+const repeatUntil = ref<Date | null>(null)
+const recurring = ref<RecurringBooking | null>(null)
+const canRepeat = computed(() => mode.value === 'client' && !!props.session?.series_id)
+const untilOptions = computed(() => [
+  { value: 'entitlement', label: t('recurring.untilEntitlement') },
+  { value: 'date', label: t('recurring.untilDate') },
+])
+const today = new Date()
+// Starts from the picked session's date unless another one was chosen.
+watch(repeat, (on) => {
+  if (on && !repeatFrom.value && props.session)
+    repeatFrom.value = new Date(`${props.session.local.date}T00:00:00`)
+})
 const query = ref<string | Client>('')
 const suggestions = ref<Client[]>([])
 const client = ref<Client | null>(null)
@@ -88,6 +109,11 @@ const error = ref<string | null>(null)
 watch(visible, (open) => {
   if (!open) return
   mode.value = 'client'
+  repeat.value = false
+  recurring.value = null
+  untilMode.value = 'entitlement'
+  repeatUntil.value = null
+  repeatFrom.value = null
   change()
 })
 watch(mode, change)
@@ -202,6 +228,43 @@ function applyOverride(reason: string) {
   else check()
 }
 
+async function confirmRecurring() {
+  if (!props.session?.series_id || !client.value || !payment.value || !repeatFrom.value) return
+  saving.value = true
+  error.value = null
+  errors.value = {}
+  try {
+    recurring.value = await tenantApi.bookings.createRecurring({
+      client_id: client.value.id,
+      series_id: props.session.series_id,
+      starts_on: ymd(repeatFrom.value)!,
+      ends_on: untilMode.value === 'date' ? ymd(repeatUntil.value) : null,
+      until_entitlement_ends: untilMode.value === 'entitlement',
+      entitlement_source: payment.value,
+    })
+    emit('recurring', recurring.value)
+  } catch (e) {
+    errors.value = validationErrors(e)
+    error.value = apiMessage(e) ?? t('common.genericError')
+  } finally {
+    saving.value = false
+  }
+}
+
+const confirmDisabled = computed(() => {
+  if (mode.value === 'guest')
+    return (
+      !client.value || !guestReady.value || !payment.value || (!!result.value && !result.value.ok)
+    )
+  if (
+    repeat.value &&
+    canRepeat.value &&
+    (!repeatFrom.value || (untilMode.value === 'date' && !repeatUntil.value))
+  )
+    return true
+  return !result.value?.ok || !payment.value || checking.value
+})
+
 // What the server offers (US-04.03), best first; the staff options always show, and memberships
 // are marked as coming until EP-06 resolves them.
 const STAFF_PAYMENTS: EntitlementSource[] = ['complimentary', 'pay_at_desk']
@@ -230,6 +293,7 @@ const paymentOptions = computed(() => {
 
 async function confirm() {
   if (!props.session || !client.value || !payment.value) return
+  if (repeat.value && canRepeat.value) return confirmRecurring()
   saving.value = true
   error.value = null
   errors.value = {}
@@ -291,7 +355,27 @@ async function confirm() {
       </div>
     </template>
 
-    <div class="body">
+    <div v-if="recurring" class="body">
+      <Message severity="success" :closable="false" icon="pi pi-check-circle">{{
+        t('recurring.summaryTitle')
+      }}</Message>
+      <div class="summary">
+        <strong>{{ t('recurring.booked', { n: recurring.summary.booked.length }) }}</strong>
+        <span v-if="recurring.summary.waitlisted.length">{{
+          t('recurring.waitlisted', { n: recurring.summary.waitlisted.length })
+        }}</span>
+        <template v-if="recurring.summary.skipped.length">
+          <strong>{{ t('recurring.skipped', { n: recurring.summary.skipped.length }) }}</strong>
+          <ul class="summary__skipped">
+            <li v-for="s in recurring.summary.skipped" :key="s.session_id">
+              <span dir="ltr" class="num">{{ s.date }} {{ s.start }}</span> ·
+              {{ s.reasons?.[0]?.message }}
+            </li>
+          </ul>
+        </template>
+      </div>
+    </div>
+    <div v-else class="body">
       <Message v-if="error" severity="error" :closable="false" role="alert">{{ error }}</Message>
 
       <SelectButton
@@ -501,6 +585,54 @@ async function confirm() {
             t(`booking.paymentHints.${payment}`)
           }}</small>
         </div>
+
+        <div v-if="result.ok && canRepeat" class="repeat">
+          <div class="repeat__toggle">
+            <ToggleSwitch v-model="repeat" input-id="booking-repeat" />
+            <label for="booking-repeat">{{ t('recurring.repeat') }}</label>
+          </div>
+          <template v-if="repeat">
+            <small class="field__hint">{{ t('recurring.repeatHint') }}</small>
+            <div class="guest__row">
+              <div class="field">
+                <label for="repeat-from" class="field__label">{{ t('recurring.from') }}</label>
+                <DatePicker
+                  v-model="repeatFrom"
+                  input-id="repeat-from"
+                  date-format="yy-mm-dd"
+                  :min-date="today"
+                  :invalid="!!errors.starts_on"
+                  show-icon
+                  icon-display="input"
+                  fluid
+                />
+              </div>
+              <div class="field">
+                <span id="repeat-until" class="field__label">{{ t('recurring.until') }}</span>
+                <SelectButton
+                  v-model="untilMode"
+                  :options="untilOptions"
+                  option-label="label"
+                  option-value="value"
+                  :allow-empty="false"
+                  aria-labelledby="repeat-until"
+                />
+                <DatePicker
+                  v-if="untilMode === 'date'"
+                  v-model="repeatUntil"
+                  input-id="repeat-until-date"
+                  date-format="yy-mm-dd"
+                  :min-date="repeatFrom ?? today"
+                  :invalid="!!errors.ends_on"
+                  :aria-label="t('recurring.untilDate')"
+                  show-icon
+                  icon-display="input"
+                  fluid
+                />
+              </div>
+            </div>
+          </template>
+        </div>
       </template>
       <template v-if="mode === 'guest' && client">
         <Message
@@ -532,22 +664,21 @@ async function confirm() {
     <template #footer>
       <div class="footer">
         <span class="footer__spacer" />
-        <Button
-          :label="t('common.cancel')"
-          severity="secondary"
-          variant="text"
-          @click="visible = false"
-        />
-        <Button
-          :label="t('booking.confirm')"
-          :loading="saving"
-          :disabled="
-            mode === 'guest'
-              ? !client || !guestReady || !payment || (!!result && !result.ok)
-              : !result?.ok || !payment || checking
-          "
-          @click="confirm"
-        />
+        <Button v-if="recurring" :label="t('recurring.done')" @click="visible = false" />
+        <template v-else>
+          <Button
+            :label="t('common.cancel')"
+            severity="secondary"
+            variant="text"
+            @click="visible = false"
+          />
+          <Button
+            :label="repeat && canRepeat ? t('recurring.confirm') : t('booking.confirm')"
+            :loading="saving"
+            :disabled="confirmDisabled"
+            @click="confirm"
+          />
+        </template>
       </div>
     </template>
   </Drawer>
@@ -586,6 +717,29 @@ async function confirm() {
 }
 .field__hint {
   font: var(--text-small);
+  color: var(--text-secondary);
+}
+.repeat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-sunken);
+}
+.repeat__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.summary__skipped {
+  margin: 0;
+  padding-inline-start: 18px;
   color: var(--text-secondary);
 }
 .guest {

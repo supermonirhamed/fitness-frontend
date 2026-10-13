@@ -8,7 +8,7 @@ import CancelBookingDialog from '../CancelBookingDialog.vue'
 import { tenantApi, type Booking, type CancellationTerms } from '@/api/tenant'
 
 vi.mock('@/api/tenant', () => ({
-  tenantApi: { bookings: { cancelTerms: vi.fn(), cancel: vi.fn() } },
+  tenantApi: { bookings: { cancelTerms: vi.fn(), cancel: vi.fn(), cancelRecurring: vi.fn() } },
 }))
 
 // jsdom has no ResizeObserver (Textarea auto-resize).
@@ -37,7 +37,7 @@ const stubs = {
   }),
 }
 
-async function open(t: CancellationTerms) {
+async function open(t: CancellationTerms, b: Booking = booking) {
   setActivePinia(createPinia())
   vi.mocked(tenantApi.bookings.cancelTerms).mockResolvedValue(t)
   vi.mocked(tenantApi.bookings.cancel).mockResolvedValue({
@@ -45,7 +45,7 @@ async function open(t: CancellationTerms) {
     status: 'LateCancel',
   } as Booking)
   const wrapper = mount(CancelBookingDialog, {
-    props: { booking, session: 'Yoga Flow', timezone: 'Asia/Riyadh', visible: false },
+    props: { booking: b, session: 'Yoga Flow', timezone: 'Asia/Riyadh', visible: false },
     global: { plugins: [i18n, PrimeVue], stubs },
   })
   await wrapper.setProps({ visible: true })
@@ -85,5 +85,21 @@ describe('CancelBookingDialog', () => {
       waive_reason: 'Doctor’s note',
     })
     expect(wrapper.emitted('cancelled')).toHaveLength(1)
+  })
+
+  it('stops a recurring booking with "this and all future sessions" (US-04.08)', async () => {
+    vi.mocked(tenantApi.bookings.cancelRecurring).mockResolvedValue({ cancelled: 6 })
+    const wrapper = await open(terms({}), {
+      ...booking,
+      standing: { id: 4, active: true },
+    } as Booking)
+
+    await wrapper.findAll('input[name="cancel-scope"]')[1]!.setValue(true)
+    await button(wrapper, 'Cancel booking').trigger('click')
+    await flushPromises()
+
+    expect(tenantApi.bookings.cancelRecurring).toHaveBeenCalledWith(4)
+    expect(tenantApi.bookings.cancel).not.toHaveBeenCalled()
+    expect(wrapper.emitted('cancelledFuture')).toEqual([[6]])
   })
 })
