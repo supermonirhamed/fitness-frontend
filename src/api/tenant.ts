@@ -637,6 +637,8 @@ export interface Client {
   home_location: { id: number; name: string } | null
   marketing_consent: boolean
   status: 'Active' | 'Inactive' | 'Blocked' | 'Lead'
+  /** A health note exists (US-05.03); reading it needs clients.health_view. */
+  has_health_notes: boolean
   photo_url: string | null
   created_at: string | null
 }
@@ -653,6 +655,16 @@ export interface ClientInput {
   preferred_language: 'ar' | 'en' | null
   home_location_id: number | null
   marketing_consent: boolean
+}
+
+/** Emergency contacts and health notes (US-05.03). */
+export interface ClientHealth {
+  contacts: { id: number; name: string; relation: string; phone: string }[]
+  has_health_notes: boolean
+  /** Null when restricted. */
+  health_notes: string | null
+  health_restricted: boolean
+  can_edit_health: boolean
 }
 
 /** A client with the same mobile or email (US-05.01); hidden ones carry no details. */
@@ -1435,6 +1447,19 @@ export const tenantApi = {
       email?: string | null
     }): Promise<ClientMatch[]> {
       return (await http.get('/api/clients/duplicates', { params })).data.data
+    },
+    async health(id: number): Promise<ClientHealth> {
+      return (await http.get(`/api/clients/${id}/health`)).data.data
+    },
+    async updateEmergencyContacts(
+      id: number,
+      contacts: { name: string; relation: string; phone: string }[],
+    ): Promise<ClientHealth> {
+      return (await http.put(`/api/clients/${id}/emergency-contacts`, { contacts })).data.data
+    },
+    async updateHealthNotes(id: number, healthNotes: string | null): Promise<ClientHealth> {
+      return (await http.put(`/api/clients/${id}/health-notes`, { health_notes: healthNotes })).data
+        .data
     },
     async uploadPhoto(id: number, file: File): Promise<Client> {
       const body = new FormData()

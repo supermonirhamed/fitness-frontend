@@ -5,12 +5,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
+import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
 import { tenantApi, type Client } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 
@@ -74,12 +75,18 @@ const qrUrl = computed(() => (client.value ? `/api/clients/${client.value.id}/qr
             >
             <span v-if="client.age !== null">{{ t('clients.age', { n: client.age }) }}</span>
           </div>
+          <div v-if="client.has_health_notes" class="head__alerts">
+            <Tag
+              severity="danger"
+              icon="pi pi-heart"
+              class="tag-sm"
+              :value="t('clientHealth.alert')"
+            />
+          </div>
         </div>
       </div>
       <div class="grid">
-        <Message severity="secondary" :closable="false" icon="pi pi-info-circle">{{
-          t('clients.profileSoon')
-        }}</Message>
+        <ClientHealthCard :client-id="client.id" @changed="load" />
         <div class="card qr">
           <div class="qr__title">{{ t('clients.checkInCode') }}</div>
           <img v-if="qrUrl" :src="qrUrl" :alt="t('clients.checkInCode')" width="160" height="160" />
@@ -145,6 +152,11 @@ const qrUrl = computed(() => (client.value ? `/api/clients/${client.value.id}/qr
   gap: 16px;
   font: var(--text-small);
   color: var(--text-secondary);
+}
+.head__alerts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .head__meta i {
   font-size: 12px;

@@ -1702,6 +1702,24 @@ export default {
     done: 'Done',
     tag: 'Recurring',
   },
+  clientHealth: {
+    loadError: "Health and emergency details couldn't be loaded.",
+    contacts: 'Emergency contacts',
+    noContacts: 'No emergency contact yet.',
+    name: 'Name',
+    relation: 'Relation',
+    phone: 'Phone',
+    addContact: 'Add contact',
+    removeContact: 'Remove contact',
+    notes: 'Health notes',
+    noNotes: 'No health notes.',
+    restricted:
+      'Restricted: there is a health note, visible to permitted staff and the client’s coaches.',
+    restrictedNone: 'Restricted to permitted staff and the client’s coaches.',
+    notesPrivacy:
+      'Only staff allowed to see health information, and coaches of sessions the client is booked in, can read this.',
+    alert: 'Health note',
+  },
   payments: {
     title: 'Payment',
     loadError: "Payments couldn't be loaded.",
