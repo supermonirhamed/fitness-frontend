@@ -38,6 +38,12 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     icon: 'pi-shield',
     permission: 'settings.security',
   },
+  {
+    name: 'tenant.settings.waivers',
+    key: 'waivers',
+    icon: 'pi-file-edit',
+    permission: 'settings.view',
+  },
   { name: 'tenant.settings.audit', key: 'audit', icon: 'pi-history', permission: 'audit.view' },
 ]
 

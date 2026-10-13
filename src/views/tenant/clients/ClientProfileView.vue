@@ -22,6 +22,7 @@ import Tag from 'primevue/tag'
 import BookingDetailsDrawer from '@/components/bookings/BookingDetailsDrawer.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
 import ClientTimeline from '@/components/clients/ClientTimeline.vue'
+import ClientWaiversTab from '@/components/clients/ClientWaiversTab.vue'
 import NewClientDrawer from '@/components/clients/NewClientDrawer.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
@@ -48,7 +49,7 @@ const format = useFormat()
 const state = ref<'loading' | 'ready' | 'missing' | 'error'>('loading')
 const client = ref<Client | null>(null)
 const overview = ref<ClientOverview | null>(null)
-const tab = ref('overview')
+const tab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'overview')
 const id = computed(() => Number(route.params.id))
 
 async function load() {
@@ -146,7 +147,7 @@ const whenOptions = computed(() => [
   { value: 'past', label: t('clientProfile.past') },
 ])
 const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } as const
-const LATER = ['family', 'waivers', 'notes', 'memberships'] as const
+const LATER = ['family', 'notes', 'memberships'] as const
 </script>
 
 <template>
@@ -271,6 +272,7 @@ const LATER = ['family', 'waivers', 'notes', 'memberships'] as const
           <Tab v-if="auth.can('payments.view')" value="payments">{{
             t('clientProfile.tabs.payments')
           }}</Tab>
+          <Tab value="waivers">{{ t('clientProfile.tabs.waivers') }}</Tab>
           <Tab value="timeline">{{ t('clientProfile.tabs.timeline') }}</Tab>
           <Tab v-for="later in LATER" :key="later" :value="later" disabled>
             <span v-tooltip.top="t('clientProfile.later')">{{
@@ -478,6 +480,9 @@ const LATER = ['family', 'waivers', 'notes', 'memberships'] as const
             </div>
           </TabPanel>
 
+          <TabPanel value="waivers">
+            <ClientWaiversTab v-if="tab === 'waivers'" :client-id="client.id" />
+          </TabPanel>
           <TabPanel value="timeline">
             <ClientTimeline v-if="tab === 'timeline'" :client-id="client.id" />
           </TabPanel>

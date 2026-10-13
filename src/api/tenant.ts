@@ -697,6 +697,45 @@ export interface ClientFilters {
   visited_to?: string
 }
 
+/** A waiver template (US-05.07), with its latest text. */
+export interface WaiverTemplate {
+  id: number
+  name: Translated
+  display_name: string
+  required_for: 'all' | 'services' | 'minors'
+  services: { id: number; name: string }[]
+  status: 'Active' | 'Archived'
+  version: number | null
+  content: Translated | null
+  published_at: string | null
+  versions_count: number
+  versions?: { version: number; requires_resign: boolean; published_at: string }[]
+}
+
+export interface WaiverSignature {
+  id: number
+  version: number
+  signer_name: string
+  guardian: { id: number; name: string | null } | null
+  method: 'typed' | 'drawn'
+  signed_at: string
+  collected_by: string | null
+}
+
+/** A client's waivers: signed, missing, or to sign again after a new version (US-05.07). */
+export interface ClientWaiverStatus {
+  minor: boolean
+  waivers: {
+    template_id: number
+    name: string
+    required_for: WaiverTemplate['required_for']
+    services: string[]
+    version: number | null
+    state: 'signed' | 'missing' | 'resign'
+    signed: WaiverSignature | null
+  }[]
+}
+
 /** Emergency contacts and health notes (US-05.03). */
 export interface ClientHealth {
   contacts: { id: number; name: string; relation: string; phone: string }[]
@@ -728,7 +767,7 @@ export type EligibilityCheck =
   | 'entitlement'
 
 /** The checks staff with bookings.override may bypass, with a reason. */
-export type OverridableCheck = 'capacity' | 'window' | 'entitlement'
+export type OverridableCheck = 'capacity' | 'window' | 'waivers' | 'entitlement'
 
 export type EntitlementSource =
   'membership' | 'package' | 'drop_in' | 'complimentary' | 'pay_at_desk' | 'guest_pass'
@@ -1535,6 +1574,86 @@ export const tenantApi = {
       const body = new FormData()
       body.append('photo', file)
       return (await http.post(`/api/clients/${id}/photo`, body)).data.data
+    },
+  },
+  /** Settings → Waivers and clients signing them (US-05.07). */
+  waivers: {
+    async list(): Promise<WaiverTemplate[]> {
+      return (await http.get('/api/waivers')).data.data
+    },
+    async get(id: number): Promise<WaiverTemplate> {
+      return (await http.get(`/api/waivers/${id}`)).data.data
+    },
+    async create(input: {
+      name: Translated
+      required_for: WaiverTemplate['required_for']
+      service_ids?: number[]
+      content: Translated
+    }): Promise<WaiverTemplate> {
+      return (await http.post('/api/waivers', input)).data.data
+    },
+    async update(
+      id: number,
+      input: {
+        name: Translated
+        required_for: WaiverTemplate['required_for']
+        service_ids?: number[]
+        status: WaiverTemplate['status']
+      },
+    ): Promise<WaiverTemplate> {
+      return (await http.put(`/api/waivers/${id}`, input)).data.data
+    },
+    /** A new text; `requires_resign` asks existing clients to sign again. */
+    async publish(
+      id: number,
+      content: Translated,
+      requiresResign: boolean,
+    ): Promise<WaiverTemplate> {
+      return (
+        await http.post(`/api/waivers/${id}/publish`, { content, requires_resign: requiresResign })
+      ).data.data
+    },
+    async forClient(clientId: number): Promise<ClientWaiverStatus> {
+      return (await http.get(`/api/clients/${clientId}/waivers`)).data.data
+    },
+    async toSign(
+      clientId: number,
+      templateId: number,
+    ): Promise<{
+      template_id: number
+      name: Translated
+      version: number
+      content: Translated
+      client: { id: number; name: string; minor: boolean }
+    }> {
+      return (await http.get(`/api/clients/${clientId}/waivers/${templateId}`)).data.data
+    },
+    async sign(
+      clientId: number,
+      templateId: number,
+      input: {
+        signer_name: string
+        method: 'typed' | 'drawn'
+        accepted: boolean
+        signature?: string | null
+        guardian_client_id?: number | null
+      },
+    ): Promise<WaiverSignature> {
+      return (await http.post(`/api/clients/${clientId}/waivers/${templateId}/sign`, input)).data
+        .data
+    },
+    async signedCopy(
+      clientId: number,
+      signatureId: number,
+    ): Promise<
+      WaiverSignature & {
+        name: string
+        content: Translated
+        signature: string | null
+        ip_address: string | null
+      }
+    > {
+      return (await http.get(`/api/clients/${clientId}/signed-waivers/${signatureId}`)).data.data
     },
   },
   /** Desk payments (US-04.15): never edited or deleted, only voided with a reason. */

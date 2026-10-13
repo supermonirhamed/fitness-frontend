@@ -49,6 +49,13 @@ const tenantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/tenant/ReceiptView.vue'),
     meta: { permission: 'payments.view' },
   },
+  // Signing a waiver on a staff tablet, handed to the client (US-05.07): no app shell.
+  {
+    path: '/waivers/sign/:client(\\d+)/:template(\\d+)',
+    name: 'tenant.waiver.sign',
+    component: () => import('@/views/tenant/WaiverSignView.vue'),
+    meta: { permission: 'clients.update' },
+  },
   {
     path: '/forgot-password',
     name: 'tenant.forgot',
@@ -210,6 +217,12 @@ const tenantRoutes: RouteRecordRaw[] = [
             name: 'tenant.settings.security',
             component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),
             meta: { permission: 'settings.security' },
+          },
+          {
+            path: 'waivers',
+            name: 'tenant.settings.waivers',
+            component: () => import('@/views/tenant/settings/WaiversView.vue'),
+            meta: { permission: 'settings.view' },
           },
           {
             path: 'audit',

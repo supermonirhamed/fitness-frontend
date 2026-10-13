@@ -23,6 +23,7 @@ describe('permissions helpers', () => {
       'regional',
       'booking',
       'security',
+      'waivers',
       'audit',
     ])
     expect(allowedSettingsPages(can([]))).toEqual([])
