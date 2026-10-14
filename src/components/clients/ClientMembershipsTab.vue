@@ -1,10 +1,14 @@
 <script setup lang="ts">
-// A client's memberships and packages (EP-06) on their profile: status, how it starts (US-06.03),
-// start and expiry (counted from the actual activation), credits left and where it is valid.
-// Current ones first, then the history. Staff with memberships.create sell one from here (US-06.08).
+// A client's memberships and packages (EP-06, US-06.09) on their profile: status, how it starts
+// (US-06.03), start and expiry, credits left with their history, visits this period, and the
+// services and branches it covers. Current ones first, then the history. Staff with
+// memberships.create sell one from here (US-06.08); with entitlements.adjust they add or remove
+// credits or extend the end date, with a reason.
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import AdjustEntitlementDialog from '@/components/memberships/AdjustEntitlementDialog.vue'
+import EntitlementLedger from '@/components/memberships/EntitlementLedger.vue'
 import SellMembershipDrawer from '@/components/memberships/SellMembershipDrawer.vue'
 import ProgressBar from 'primevue/progressbar'
 import Skeleton from 'primevue/skeleton'
@@ -16,7 +20,7 @@ import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ clientId: number }>()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const format = useFormat()
 const auth = useStaffAuth()
 const sellOpen = ref(false)
@@ -55,13 +59,53 @@ const ends = (e: ClientEntitlement) => {
     return t('clientMemberships.ifUsedToday', { date: format.date(e.ends_if_started_today) })
   return e.billing === 'recurring' ? t('clientMemberships.untilCancelled') : '–'
 }
+const list = (names: string[]) => names.join(locale.value === 'ar' ? '، ' : ', ')
 const where = (e: ClientEntitlement) => {
   const l = e.locations
-  if (!l || l.mode === 'all')
-    return l && !l.include_future ? t('plans.allCurrentBranches') : t('plans.locationModes.all')
-  if (l.mode === 'home') return t('plans.locationModes.home')
-  return t('plans.validAtCount', { n: l.location_ids.length })
+  if (l?.mode === 'home') return t('plans.locationModes.home')
+  if (l?.mode === 'selected') return list(e.covers.locations)
+  return l && !l.include_future ? t('plans.allCurrentBranches') : t('plans.locationModes.all')
 }
+const covers = (e: ClientEntitlement) => {
+  const c = e.covers
+  const base =
+    c.mode === 'categories'
+      ? list(c.categories)
+      : c.mode === 'services'
+        ? list(c.services)
+        : c.mode === 'programs'
+          ? list(c.programs)
+          : t('plans.coverModes.all')
+  return c.excluded.length ? t('clientMemberships.except', { base, names: list(c.excluded) }) : base
+}
+const visits = (e: ClientEntitlement) =>
+  e.visits.limit !== null
+    ? t('clientMemberships.visitsOf', { n: e.visits.used, limit: e.visits.limit })
+    : String(e.visits.used)
+
+// Credit history and manual adjustments (US-06.09).
+const historyOpen = ref<Set<number>>(new Set())
+function toggleHistory(e: ClientEntitlement) {
+  const open = new Set(historyOpen.value)
+  if (open.has(e.id)) open.delete(e.id)
+  else open.add(e.id)
+  historyOpen.value = open
+}
+const adjusting = ref<ClientEntitlement | null>(null)
+const adjustOpen = ref(false)
+function openAdjust(e: ClientEntitlement) {
+  adjusting.value = e
+  adjustOpen.value = true
+}
+const canAdjust = (e: ClientEntitlement) =>
+  auth.can('entitlements.adjust') &&
+  e.status !== 'Cancelled' &&
+  (e.credits_total !== null || !!e.ends_on)
+function onAdjusted(saved: ClientEntitlement) {
+  rows.value = rows.value.map((r) => (r.id === saved.id ? saved : r))
+  ledgerVersion.value++
+}
+const ledgerVersion = ref(0)
 </script>
 
 <template>
@@ -125,6 +169,14 @@ const where = (e: ClientEntitlement) => {
             <dt>{{ t('clientMemberships.validAt') }}</dt>
             <dd>{{ where(e) }}</dd>
           </div>
+          <div>
+            <dt>{{ t('clientMemberships.covers') }}</dt>
+            <dd>{{ covers(e) }}</dd>
+          </div>
+          <div v-if="e.kind === 'membership' && e.status !== 'Pending'">
+            <dt>{{ t(`clientMemberships.visitsThis.${e.visits.period}`) }}</dt>
+            <dd class="num">{{ visits(e) }}</dd>
+          </div>
           <div v-if="e.invoice">
             <dt>{{ t('clientMemberships.invoice') }}</dt>
             <dd>
@@ -152,9 +204,42 @@ const where = (e: ClientEntitlement) => {
             class="credits__bar"
           />
         </div>
+        <div v-if="e.credits_total !== null || canAdjust(e)" class="item__actions">
+          <Button
+            v-if="e.credits_total !== null"
+            size="small"
+            variant="text"
+            severity="secondary"
+            :icon="historyOpen.has(e.id) ? 'pi pi-chevron-up' : 'pi pi-history'"
+            :label="t('ledger.title')"
+            :aria-expanded="historyOpen.has(e.id)"
+            @click="toggleHistory(e)"
+          />
+          <Button
+            v-if="canAdjust(e)"
+            size="small"
+            variant="outlined"
+            severity="secondary"
+            icon="pi pi-sliders-h"
+            :label="t('adjust.title')"
+            @click="openAdjust(e)"
+          />
+        </div>
+        <EntitlementLedger
+          v-if="historyOpen.has(e.id)"
+          :key="`${e.id}-${ledgerVersion}`"
+          :client-id="clientId"
+          :entitlement-id="e.id"
+        />
       </li>
     </ul>
     <SellMembershipDrawer v-model:visible="sellOpen" :client-id="clientId" @sold="load" />
+    <AdjustEntitlementDialog
+      v-model:visible="adjustOpen"
+      :client-id="clientId"
+      :entitlement="adjusting"
+      @saved="onAdjusted"
+    />
   </div>
 </template>
 
@@ -166,6 +251,11 @@ const where = (e: ClientEntitlement) => {
 }
 .toolbar {
   display: flex;
+  justify-content: flex-end;
+}
+.item__actions {
+  display: flex;
+  gap: 8px;
   justify-content: flex-end;
 }
 .item__tags {

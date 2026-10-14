@@ -884,6 +884,29 @@ export interface ClientEntitlement {
   ends_if_started_today: string | null
   sold_at: string | null
   locations: MembershipPlan['rules']['locations'] | null
+  /** US-06.09: what it covers by name, and visits this week or month. */
+  covers: {
+    mode: MembershipPlan['rules']['services']['mode']
+    categories: string[]
+    services: string[]
+    programs: string[]
+    excluded: string[]
+    locations: string[]
+  }
+  visits: { used: number; limit: number | null; period: 'week' | 'month' }
+}
+
+/** A credit movement of a package (US-06.09). */
+export interface LedgerEntry {
+  id: number
+  kind: 'added' | 'used' | 'returned' | 'held' | 'released' | 'expired' | 'adjusted'
+  change: number
+  balance_after: number
+  reason: string | null
+  booking_id: number | null
+  booking: { id: number; service: string | null; starts_at: string | null } | null
+  actor: string | null
+  at: string | null
 }
 
 /** A client import (US-05.15): file, column mapping and result report. */
@@ -1923,6 +1946,20 @@ export const tenantApi = {
     /** The client's memberships and packages (EP-06), current first. */
     async entitlements(id: number): Promise<ClientEntitlement[]> {
       return (await http.get(`/api/clients/${id}/entitlements`)).data.data
+    },
+    async entitlementLedger(clientId: number, entitlementId: number): Promise<LedgerEntry[]> {
+      return (await http.get(`/api/clients/${clientId}/entitlements/${entitlementId}/ledger`)).data
+        .data
+    },
+    /** entitlements.adjust: add or remove credits and/or extend the end date, with a reason. */
+    async adjustEntitlement(
+      clientId: number,
+      entitlementId: number,
+      input: { credits?: number | null; ends_on?: string | null; reason: string },
+    ): Promise<ClientEntitlement> {
+      return (
+        await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/adjust`, input)
+      ).data.data
     },
     async family(id: number): Promise<ClientFamily> {
       return (await http.get(`/api/clients/${id}/family`)).data.data
