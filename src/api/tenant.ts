@@ -1337,6 +1337,9 @@ export interface PosCartInput {
   location_id: number
   client_id: number | null
   items: PosItemInput[]
+  /** US-07.07: a promotion picked, or a coupon code typed. */
+  discount_id?: number | null
+  coupon?: string | null
   payments?: { amount: number; method: PaymentMethod; reference?: string | null }[]
 }
 
@@ -1360,6 +1363,8 @@ export interface PosQuote {
   prices_include_vat: boolean
   total: number
   intro_refusals: { item: number; code: string; plan: string | null }[]
+  /** US-07.07: the promotion or coupon applied. */
+  promotion?: { id: number; name: string; code: string | null; amount: number } | null
 }
 
 export interface PosSale {
@@ -1367,6 +1372,37 @@ export interface PosSale {
   entitlements: ClientEntitlement[]
   payments: Payment[]
 }
+
+export interface PaymentSettings {
+  self_void_same_day: boolean
+  /** Role name → most it may take off by hand, in percent. */
+  manual_discount_limits: Record<string, number>
+  roles: string[]
+}
+
+/** A discount, or with a code a coupon (US-07.07). */
+export interface Discount {
+  id: number
+  name: Translated
+  display_name: string
+  code: string | null
+  type: 'percent' | 'amount'
+  value: number
+  applies_to: {
+    mode: 'cart' | 'plans' | 'kinds'
+    plan_ids: number[]
+    kinds: ('membership' | 'package' | 'product')[]
+  }
+  starts_on: string | null
+  ends_on: string | null
+  location_ids: number[] | null
+  max_uses: number | null
+  max_uses_per_client: number | null
+  min_purchase: number | null
+  status: 'Active' | 'Archived'
+  uses: number
+}
+export type DiscountInput = Omit<Discount, 'id' | 'display_name' | 'uses' | 'status'>
 
 export interface InvoiceFilters {
   q?: string
@@ -2720,13 +2756,35 @@ export const tenantApi = {
       return (await http.put('/api/settings/memberships', input)).data.data
     },
   },
-  /** Settings → Payments (US-07.06). */
+  /** Settings → Payments: same-day voids (US-07.06), manual discount limits per role (US-07.07). */
   paymentSettings: {
-    async get(): Promise<{ self_void_same_day: boolean }> {
+    async get(): Promise<PaymentSettings> {
       return (await http.get('/api/settings/payments')).data.data
     },
-    async update(input: { self_void_same_day: boolean }): Promise<{ self_void_same_day: boolean }> {
+    async update(input: Omit<PaymentSettings, 'roles'>): Promise<PaymentSettings> {
       return (await http.put('/api/settings/payments', input)).data.data
+    },
+  },
+  /** Discounts and coupons (US-07.07). */
+  discounts: {
+    async list(params: { active?: boolean; archived?: boolean } = {}): Promise<Discount[]> {
+      return (
+        await http.get('/api/discounts', {
+          params: {
+            active: params.active ? 1 : undefined,
+            archived: params.archived ? 1 : undefined,
+          },
+        })
+      ).data.data
+    },
+    async create(input: DiscountInput): Promise<Discount> {
+      return (await http.post('/api/discounts', input)).data.data
+    },
+    async update(id: number, input: DiscountInput): Promise<Discount> {
+      return (await http.put(`/api/discounts/${id}`, input)).data.data
+    },
+    async archive(id: number): Promise<Discount> {
+      return (await http.post(`/api/discounts/${id}/archive`)).data.data
     },
   },
   /** The payment methods each branch takes (US-07.03). */

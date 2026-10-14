@@ -34,6 +34,9 @@ const nav = computed<NavItem[]>(() => [
     : []),
   ...(auth.can('payments.create') ? [{ key: 'pos', icon: 'pi-shopping-cart', to: '/pos' }] : []),
   ...(auth.can('payments.view') ? [{ key: 'invoices', icon: 'pi-file', to: '/invoices' }] : []),
+  ...(auth.can('marketing.view')
+    ? [{ key: 'promotions', icon: 'pi-percentage', to: '/promotions' }]
+    : []),
   ...(allowedPages(STAFF_PAGES, (p) => auth.can(p)).length
     ? [{ key: 'staff', icon: 'pi-id-card', to: '/staff' }]
     : []),

@@ -210,6 +210,29 @@ const items = computed<PosItemInput[]>(() =>
   }),
 )
 
+// A promotion picked, or a coupon code (US-07.07).
+const promotions = ref<{ id: number; label: string }[]>([])
+onMounted(async () => {
+  promotions.value = (await tenantApi.discounts.list({ active: true }).catch(() => []))
+    .filter((d) => !d.code)
+    .map((d) => ({
+      id: d.id,
+      label: `${d.display_name} · ${d.type === 'percent' ? `${d.value}%` : format.money(d.value)}`,
+    }))
+})
+const promotionId = ref<number | null>(null)
+const couponInput = ref('')
+const coupon = ref<string | null>(null)
+function applyCoupon() {
+  coupon.value = couponInput.value.trim().toUpperCase() || null
+  if (coupon.value) promotionId.value = null
+}
+function clearPromotion() {
+  promotionId.value = null
+  coupon.value = null
+  couponInput.value = ''
+}
+
 // Live quote.
 const quote = ref<PosQuote | null>(null)
 const quoting = ref(false)
@@ -217,7 +240,7 @@ const quoteError = ref<string | null>(null)
 let timer: ReturnType<typeof setTimeout> | undefined
 let seq = 0
 watch(
-  [items, locationId, () => client.value?.id],
+  [items, locationId, () => client.value?.id, promotionId, coupon],
   () => {
     clearTimeout(timer)
     // Memberships and packages are priced once there is a client to sell them to.
@@ -234,6 +257,8 @@ watch(
           location_id: locationId.value!,
           client_id: client.value?.id ?? null,
           items: items.value,
+          discount_id: promotionId.value,
+          coupon: coupon.value,
         })
         if (mine !== seq) return
         quote.value = q
@@ -310,6 +335,8 @@ async function checkout() {
       location_id: locationId.value!,
       client_id: client.value?.id ?? null,
       items: items.value,
+      discount_id: promotionId.value,
+      coupon: coupon.value,
       payments: payRows.value
         .filter((r) => (r.amount ?? 0) > 0)
         .map((r) => ({
@@ -329,6 +356,7 @@ function newSale() {
   sale.value = null
   cart.value = []
   quote.value = null
+  clearPromotion()
   payRows.value = [{ method: 'cash', amount: null, reference: '' }]
   changeClient()
   custom.value = { description: '', price: null, quantity: 1 }
@@ -655,6 +683,55 @@ function newSale() {
           </li>
         </ul>
 
+        <div v-if="cart.length" class="promo">
+          <span class="promo__title"
+            ><i class="pi pi-percentage" aria-hidden="true" />{{ t('pos.promoTitle') }}</span
+          >
+          <div v-if="quote?.promotion" class="promo__applied">
+            <span
+              ><strong>{{ quote.promotion.code ?? quote.promotion.name }}</strong> · −{{
+                format.money(quote.promotion.amount)
+              }}</span
+            >
+            <Button
+              :label="t('pos.removePromo')"
+              variant="text"
+              size="small"
+              @click="clearPromotion"
+            />
+          </div>
+          <div v-else class="promo__pick">
+            <Select
+              v-if="promotions.length"
+              v-model="promotionId"
+              :options="promotions"
+              option-label="label"
+              option-value="id"
+              :placeholder="t('pos.pickPromotion')"
+              show-clear
+              size="small"
+              class="promo__select"
+              @change="coupon = null"
+            />
+            <form class="promo__coupon" @submit.prevent="applyCoupon">
+              <InputText
+                v-model="couponInput"
+                :placeholder="t('pos.couponCode')"
+                size="small"
+                dir="ltr"
+                class="upper"
+                :aria-label="t('pos.couponCode')"
+              />
+              <Button
+                type="submit"
+                :label="t('pos.applyCoupon')"
+                size="small"
+                severity="secondary"
+                :disabled="!couponInput.trim()"
+              />
+            </form>
+          </div>
+        </div>
         <Message
           v-if="hasPlans && !client"
           severity="secondary"
@@ -980,6 +1057,42 @@ function newSale() {
   font: 700 18px var(--font-sans);
   border-top: 1px solid var(--border-default);
   padding-top: 8px;
+}
+.promo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.promo__title {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font: 600 13px var(--font-sans);
+}
+.promo__applied {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--sev-success-fg, var(--green-700));
+}
+.promo__pick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.promo__select {
+  flex: 1;
+  min-width: 160px;
+}
+.promo__coupon {
+  display: flex;
+  gap: 6px;
+}
+.upper :deep(input),
+.upper {
+  text-transform: uppercase;
 }
 .pay {
   display: flex;

@@ -106,6 +106,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'clients.view' },
       },
       {
+        // Promotions: discounts and coupons (US-07.07).
+        path: 'promotions',
+        name: 'tenant.promotions',
+        component: () => import('@/views/tenant/PromotionsView.vue'),
+        meta: { permission: 'marketing.view' },
+      },
+      {
         // Invoices (US-07.05).
         path: 'invoices',
         name: 'tenant.invoices',
