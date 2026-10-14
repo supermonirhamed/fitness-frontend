@@ -148,7 +148,25 @@ async function noShow(reason?: string) {
           {{
             booking.entitlement_source ? t(`booking.payments.${booking.entitlement_source}`) : '—'
           }}
+          <div v-if="booking.paid_with" class="paid-with">
+            {{ booking.paid_with.name
+            }}<template v-if="booking.paid_with.kind === 'package'">
+              ·
+              {{
+                booking.paid_with.credits_used
+                  ? t('bookingDetails.creditsHeld', booking.paid_with.credits_used)
+                  : t('bookingDetails.creditsReturned')
+              }}</template
+            >
+          </div>
         </dd>
+        <template v-if="booking.fee_invoice">
+          <dt>{{ t('bookingDetails.feeInvoice') }}</dt>
+          <dd>
+            <span class="mono">{{ booking.fee_invoice.number }}</span>
+            <StatusTag :status="booking.fee_invoice.status" size="sm" />
+          </dd>
+        </template>
         <template v-if="booking.terms">
           <dt>{{ t('bookingDetails.freeCancel') }}</dt>
           <dd>
@@ -360,5 +378,13 @@ async function noShow(reason?: string) {
   flex-wrap: wrap;
   justify-content: flex-end;
   width: 100%;
+}
+.paid-with {
+  font: var(--text-small);
+  color: var(--text-muted);
+}
+.mono {
+  font-family: var(--font-mono);
+  margin-inline-end: 6px;
 }
 </style>

@@ -1392,6 +1392,15 @@ export interface WaitlistEntry {
 
 /** A booking with its policy terms and timeline (US-04.09). */
 export interface BookingDetails extends Booking {
+  /** US-06.17: the membership or package that paid, and the credits it holds. */
+  paid_with?: {
+    id: number
+    name: string | null
+    kind: 'membership' | 'package' | null
+    credits_used: number
+  } | null
+  /** A late-cancel or no-show fee (US-06.17). */
+  fee_invoice?: { id: number; number: string; status: Invoice['status'] } | null
   policy: Partial<BookingPolicy> | null
   terms: Omit<CancellationTerms, 'can_waive'> | null
   timeline: {

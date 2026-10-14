@@ -1640,6 +1640,9 @@ export default {
     },
   },
   bookingDetails: {
+    creditsHeld: 'no credits | 1 credit used | {n} credits used',
+    creditsReturned: 'credits returned',
+    feeInvoice: 'Penalty fee',
     title: 'Booking',
     loadError: "The booking couldn't be loaded.",
     session: 'Session',

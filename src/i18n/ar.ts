@@ -1618,6 +1618,9 @@ const ar: typeof en = {
     },
   },
   bookingDetails: {
+    creditsHeld: 'لا رصيد | رصيد واحد مستخدم | {n} أرصدة مستخدمة',
+    creditsReturned: 'أُعيد الرصيد',
+    feeInvoice: 'رسوم الغرامة',
     title: 'الحجز',
     loadError: 'تعذّر تحميل الحجز.',
     session: 'الحصة',
