@@ -3,6 +3,7 @@
 // one bordered list, drag to reorder, edit / archive per row. Unused categories can be deleted.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
@@ -16,7 +17,11 @@ import { tenantApi, type ServiceCategory } from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
 import { useStaffAuth } from '@/stores/staffAuth'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+// The name in the interface language first, the other one under it.
+const primaryName = (c: ServiceCategory) =>
+  (locale.value === 'ar' ? c.name.ar || c.name.en : c.name.en || c.name.ar) || '—'
+const otherName = (c: ServiceCategory) => (locale.value === 'ar' ? c.name.en : c.name.ar) || ''
 const toast = useToast()
 const auth = useStaffAuth()
 const canCreate = computed(() => auth.can('services.create'))
@@ -124,12 +129,14 @@ async function confirm() {
   <div class="page">
     <PageHeader
       :title="t('catalog.categoriesTitle')"
-      :subtitle="t('catalog.dragHint')"
       :breadcrumb="[
         { label: t('catalog.title'), to: { name: 'tenant.services' } },
         { label: t('catalog.categoriesTitle') },
       ]"
     >
+      <template v-if="state === 'ready'" #meta>
+        <span>{{ t('catalog.categoriesCount', categories.length) }}</span>
+      </template>
       <template v-if="canUpdate" #actions><ArchiveFilter v-model="archived" /></template>
       <template v-if="canCreate" #primary>
         <Button icon="pi pi-plus" :label="t('catalog.newCategory')" @click="open()" />
@@ -189,48 +196,63 @@ async function confirm() {
           ><i :class="['pi', c.icon]"
         /></span>
         <div class="names">
-          <span class="names__ar" dir="rtl">{{ c.name.ar || '—' }}</span>
-          <span class="names__en" dir="ltr">{{ c.name.en || '—' }}</span>
+          <span class="names__primary">{{ primaryName(c) }}</span>
+          <span v-if="otherName(c)" class="names__other"
+            ><bdi>{{ otherName(c) }}</bdi></span
+          >
         </div>
-        <span class="count">{{ t('catalog.servicesCount', c.services_count ?? 0) }}</span>
-        <template v-if="!archived && canUpdate">
+        <RouterLink
+          v-if="c.services_count"
+          class="count count--link"
+          :to="{ name: 'tenant.services', query: { category: c.id } }"
+          >{{ t('catalog.servicesCount', c.services_count) }}</RouterLink
+        >
+        <span v-else class="count">{{ t('catalog.servicesCount', 0) }}</span>
+        <span class="actions">
+          <template v-if="!archived && canUpdate">
+            <Button
+              v-tooltip.top="t('catalog.editTooltip')"
+              icon="pi pi-pencil"
+              severity="secondary"
+              variant="text"
+              size="small"
+              :aria-label="t('catalog.edit', { name: c.display_name })"
+              @click="open(c)"
+            />
+            <Button
+              v-tooltip.top="t('archive.archive')"
+              icon="pi pi-inbox"
+              severity="secondary"
+              variant="text"
+              size="small"
+              :aria-label="t('archive.archive')"
+              @click="ask(c, 'archive')"
+            />
+          </template>
           <Button
-            icon="pi pi-pencil"
-            severity="secondary"
-            variant="text"
+            v-if="archived && canUpdate"
+            icon="pi pi-replay pi-dir"
+            :label="t('archive.restore')"
+            variant="outlined"
             size="small"
-            :aria-label="t('catalog.edit', { name: c.display_name })"
-            @click="open(c)"
+            @click="ask(c, 'restore')"
           />
           <Button
-            v-tooltip.top="t('archive.archive')"
-            icon="pi pi-inbox"
-            severity="secondary"
+            v-if="canDelete && !c.services_count"
+            v-tooltip.top="t('catalog.deleteTooltip')"
+            icon="pi pi-trash"
+            severity="danger"
             variant="text"
             size="small"
-            :aria-label="t('archive.archive')"
-            @click="ask(c, 'archive')"
+            :aria-label="t('catalog.delete', { name: c.display_name })"
+            @click="ask(c, 'delete')"
           />
-        </template>
-        <Button
-          v-if="archived && canUpdate"
-          icon="pi pi-replay pi-dir"
-          :label="t('archive.restore')"
-          variant="outlined"
-          size="small"
-          @click="ask(c, 'restore')"
-        />
-        <Button
-          v-if="canDelete && !c.services_count"
-          icon="pi pi-trash"
-          severity="danger"
-          variant="text"
-          size="small"
-          :aria-label="t('catalog.delete', { name: c.display_name })"
-          @click="ask(c, 'delete')"
-        />
+        </span>
       </li>
     </ul>
+    <p v-if="state === 'ready' && categories.length > 1 && !archived && canUpdate" class="hint">
+      <i class="pi pi-info-circle" aria-hidden="true" />{{ t('catalog.dragHint') }}
+    </p>
 
     <CategoryFormDialog v-model:visible="formOpen" :category="editing" @saved="onSaved" />
     <ConfirmActionDialog
@@ -255,7 +277,6 @@ async function confirm() {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 820px;
 }
 .list {
   margin: 0;
@@ -264,54 +285,89 @@ async function confirm() {
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
+  overflow: hidden;
 }
 .item {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border-subtle);
+  transition: background-color 0.12s;
 }
 .item:last-child {
   border-bottom: 0;
 }
+.item:hover {
+  background: var(--surface-hover, var(--surface-sunken));
+}
 .item--dragging {
   background: var(--surface-selected);
+  box-shadow: inset 3px 0 0 var(--primary-500, var(--p-primary-color));
 }
 .handle {
   border: 0;
   background: transparent;
   color: var(--text-muted);
   cursor: grab;
-  padding: 4px;
-  border-radius: 4px;
+  padding: 6px;
+  border-radius: 6px;
+}
+.handle:hover,
+.handle:focus-visible {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
 }
 .icon {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   flex: none;
-  border-radius: 8px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 16px;
 }
 .names {
   flex: 1;
   min-width: 0;
   display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2px;
 }
-.names__ar {
-  font: 500 14px var(--font-arabic);
+.names__primary {
+  font: 600 15px/1.3 var(--font-sans);
+  color: var(--text-primary);
 }
-.names__en {
-  font: var(--text-body);
-  color: var(--text-secondary);
+.names__other {
+  font: var(--text-small);
+  color: var(--text-muted);
 }
 .count {
+  min-width: 90px;
   font: var(--text-small);
   color: var(--text-muted);
   white-space: nowrap;
+  text-align: end;
+}
+.count--link {
+  color: var(--text-link, var(--primary-700));
+  text-decoration: none;
+}
+.count--link:hover {
+  text-decoration: underline;
+}
+.actions {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.hint {
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font: var(--text-small);
+  color: var(--text-muted);
 }
 </style>

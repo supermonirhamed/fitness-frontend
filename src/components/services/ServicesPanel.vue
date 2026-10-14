@@ -3,7 +3,7 @@
 // table (ui_kits/admin/ServicesScreen.jsx): filter bar above, whole-row click to the service,
 // dark bulk bar for publish / add to branch / archive. Branch-limited staff see their branches' services.
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -38,6 +38,7 @@ const emit = defineEmits<{ create: [] }>()
 const { t } = useI18n()
 const toast = useToast()
 const router = useRouter()
+const route = useRoute()
 const auth = useStaffAuth()
 const canCreate = computed(() => auth.can('services.create'))
 const canUpdate = computed(() => auth.can('services.update'))
@@ -48,7 +49,8 @@ type StatusFilter = 'active' | 'Published' | 'Draft' | 'Archived'
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const services = ref<Service[]>([])
 const search = ref('')
-const category = ref<number | 'all'>('all')
+// A link from the categories page opens the list filtered by one (?category=3).
+const category = ref<number | 'all'>(route.query.category ? Number(route.query.category) : 'all')
 const type = ref<ActivityType | 'all'>('all')
 const status = ref<StatusFilter>('active')
 const branch = ref<number | null>(null)
