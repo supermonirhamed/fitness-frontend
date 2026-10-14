@@ -194,6 +194,7 @@ const ar: typeof en = {
     title: 'إعدادات المنظمة',
     subtitle: 'طريقة عمل منظمتك ومن يمكنه فعل ماذا.',
     pages: {
+      payments: 'المدفوعات',
       memberships: 'العضويات',
       organization: 'الملف التعريفي',
       regional: 'اللغة والمنطقة',
@@ -2603,6 +2604,29 @@ const ar: typeof en = {
     refundsTitle: 'المبالغ المستردة وإشعارات الدائن',
     noRefunds: 'لا يوجد.',
     activity: 'النشاط',
+  },
+  voiding: {
+    paymentTitle: 'إلغاء الدفعة {receipt}',
+    invoiceTitle: 'إلغاء الفاتورة {number}',
+    voidPayment: 'إلغاء الدفعة',
+    voidInvoice: 'إلغاء الفاتورة',
+    paymentText:
+      'تعود الفواتير التي سددتها مفتوحة، ويُعاد أي رصيد حساب استخدمته أو أنشأته. يبقى الإيصال مع وسم «ملغى».',
+    invoiceText: 'تبقى الفاتورة مع وسم «ملغاة» ولا تُحتسب في الإيرادات.',
+    hasPayments: 'ما زالت على هذه الفاتورة دفعات. ألغِها أولًا.',
+    cancelsAccess: 'سيُلغى أيضًا ما بِيع بها: {names}. تُلغى حجوزاتها القادمة دون غرامة.',
+    confirmAccess: 'إلغاؤها',
+    reason: 'السبب',
+    done: 'تم الإلغاء',
+    voidBanner: 'ملغاة: {reason} · {by} · {date}',
+  },
+  paymentSettings: {
+    loadError: 'تعذّر تحميل إعدادات المدفوعات.',
+    saved: 'تم حفظ إعدادات المدفوعات',
+    voiding: 'الإلغاء',
+    selfVoidLabel: 'الإلغاء في اليوم نفسه لمن أدخلها',
+    selfVoidHelp:
+      'يمكن للموظف إلغاء دفعة أو فاتورة أدخلها بنفسه في اليوم نفسه دون مدير. وإلا يتطلب الإلغاء صلاحية الإلغاء.',
   },
   recordPayment: {
     title: 'تسجيل دفعة',

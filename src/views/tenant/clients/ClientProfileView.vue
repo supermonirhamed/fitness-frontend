@@ -253,6 +253,12 @@ const openId = ref<number | null>(null)
 function openBooking(b: Booking) {
   openBookingId(b.id)
 }
+// A payment voided: payments and invoices reload (the invoices card remounts on the tab).
+const invoicesKey = ref(0)
+function onPaymentVoided() {
+  loadPayments()
+  invoicesKey.value++
+}
 function openBookingId(bookingId: number) {
   openId.value = bookingId
   detailsOpen.value = true
@@ -618,10 +624,15 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
             <div class="payments-tab">
               <ClientInvoicesCard
                 v-if="tab === 'payments'"
+                :key="invoicesKey"
                 :client-id="client.id"
                 @paid="loadPayments"
               />
-              <ClientPaymentsCard :payments="payments" @open-booking="openBookingId" />
+              <ClientPaymentsCard
+                :payments="payments"
+                @open-booking="openBookingId"
+                @changed="onPaymentVoided"
+              />
             </div>
           </TabPanel>
 

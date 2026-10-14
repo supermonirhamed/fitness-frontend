@@ -11,11 +11,19 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import VoidPaymentDialog from '@/components/payments/VoidPaymentDialog.vue'
 import type { Payment, PaymentMethod } from '@/api/tenant'
 import { useFormat } from '@/composables/useFormat'
 
 const props = defineProps<{ payments: Payment[] | null }>()
-const emit = defineEmits<{ openBooking: [id: number] }>()
+const emit = defineEmits<{ openBooking: [id: number]; changed: [] }>()
+// Voiding (US-07.06).
+const voiding = ref<Payment | null>(null)
+const voidOpen = ref(false)
+function startVoid(p: Payment) {
+  voiding.value = p
+  voidOpen.value = true
+}
 const { t } = useI18n()
 const format = useFormat()
 
@@ -182,7 +190,22 @@ const isPackage = (p: Payment) =>
           />
         </template>
       </Column>
+      <Column header-class="row-end" body-class="row-end">
+        <template #body="{ data }">
+          <Button
+            v-if="data.can_void"
+            v-tooltip.top="t('voiding.voidPayment')"
+            icon="pi pi-ban"
+            size="small"
+            variant="text"
+            severity="danger"
+            :aria-label="t('voiding.voidPayment')"
+            @click="startVoid(data)"
+          />
+        </template>
+      </Column>
     </DataTable>
+    <VoidPaymentDialog v-model:visible="voidOpen" :payment="voiding" @voided="emit('changed')" />
   </section>
 </template>
 

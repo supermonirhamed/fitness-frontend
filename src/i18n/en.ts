@@ -197,6 +197,7 @@ export default {
     subtitle: 'How your organization works and who can do what.',
     pages: {
       memberships: 'Memberships',
+      payments: 'Payments',
       organization: 'Profile',
       regional: 'Language & region',
       booking: 'Booking policies',
@@ -2636,6 +2637,30 @@ export default {
     refundsTitle: 'Refunds and credit notes',
     noRefunds: 'None.',
     activity: 'Activity',
+  },
+  voiding: {
+    paymentTitle: 'Void payment {receipt}',
+    invoiceTitle: 'Void invoice {number}',
+    voidPayment: 'Void payment',
+    voidInvoice: 'Void invoice',
+    paymentText:
+      'The invoices it paid open again and any account credit it used or made is put back. The receipt stays, marked Void.',
+    invoiceText: 'The invoice stays, marked Void, and no longer counts in revenue.',
+    hasPayments: 'This invoice still has payments. Void them first.',
+    cancelsAccess:
+      'It also cancels what it sold: {names}. Their upcoming bookings are cancelled without penalty.',
+    confirmAccess: 'Cancel them',
+    reason: 'Reason',
+    done: 'Voided',
+    voidBanner: 'Void: {reason} · {by} · {date}',
+  },
+  paymentSettings: {
+    loadError: "Payment settings couldn't be loaded.",
+    saved: 'Payment settings saved',
+    voiding: 'Voiding',
+    selfVoidLabel: 'Same-day voids by the person who entered it',
+    selfVoidHelp:
+      'Staff can void a payment or invoice they entered themselves on the same day, without a manager. Otherwise voiding needs the void permission.',
   },
   recordPayment: {
     title: 'Record payment',

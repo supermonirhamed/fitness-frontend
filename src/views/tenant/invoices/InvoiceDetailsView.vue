@@ -9,6 +9,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
 import Popover from 'primevue/popover'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
@@ -18,7 +19,9 @@ import NoPermission from '@/components/patterns/NoPermission.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import RecordPaymentDialog from '@/components/payments/RecordPaymentDialog.vue'
-import { tenantApi, type InvoiceDocument } from '@/api/tenant'
+import VoidInvoiceDialog from '@/components/payments/VoidInvoiceDialog.vue'
+import VoidPaymentDialog from '@/components/payments/VoidPaymentDialog.vue'
+import { tenantApi, type InvoiceDocument, type Payment } from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
@@ -55,6 +58,19 @@ const action = (a: string) => {
 
 // Payment
 const paying = ref(false)
+
+// Voiding (US-07.06)
+const voidingInvoice = ref(false)
+const voidingPayment = ref<Payment | null>(null)
+const voidPaymentOpen = ref(false)
+function voidPayment(p: Payment) {
+  voidingPayment.value = p
+  voidPaymentOpen.value = true
+}
+function onVoided() {
+  toast.add({ severity: 'success', summary: t('voiding.done'), life: 3000 })
+  load()
+}
 
 // Print / PDF, in a page of its own.
 function print() {
@@ -117,6 +133,14 @@ async function send() {
           variant="outlined"
           @click="emailPanel?.toggle($event)"
         />
+        <Button
+          v-if="doc.can_void"
+          icon="pi pi-ban"
+          :label="t('voiding.voidInvoice')"
+          severity="danger"
+          variant="outlined"
+          @click="voidingInvoice = true"
+        />
         <Popover ref="emailPanel">
           <form class="email" @submit.prevent="send">
             <label for="inv-email" class="label">{{ t('payments.emailTo') }}</label>
@@ -157,6 +181,13 @@ async function send() {
       @retry="load"
     />
     <template v-else-if="doc">
+      <Message v-if="doc.void" severity="error" :closable="false" icon="pi pi-ban">{{
+        t('voiding.voidBanner', {
+          reason: doc.void.reason,
+          by: doc.void.by ?? '—',
+          date: format.dateTime(doc.void.at),
+        })
+      }}</Message>
       <section class="card pad">
         <dl class="facts">
           <div>
@@ -282,6 +313,15 @@ async function send() {
                 severity="secondary"
                 :value="t('clientProfile.payment.Voided')"
               />
+              <Button
+                v-if="p.can_void"
+                icon="pi pi-ban"
+                size="small"
+                variant="text"
+                severity="danger"
+                :aria-label="t('voiding.voidPayment')"
+                @click="voidPayment(p)"
+              />
             </li>
           </ul>
           <h3 class="spaced">{{ t('invoicesPage.refundsTitle') }}</h3>
@@ -305,6 +345,12 @@ async function send() {
         </section>
       </div>
 
+      <VoidInvoiceDialog v-model:visible="voidingInvoice" :invoice="doc" @voided="onVoided" />
+      <VoidPaymentDialog
+        v-model:visible="voidPaymentOpen"
+        :payment="voidingPayment"
+        @voided="onVoided"
+      />
       <RecordPaymentDialog
         v-if="doc.client.id"
         v-model:visible="paying"

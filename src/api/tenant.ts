@@ -1250,6 +1250,8 @@ export interface Payment {
   void_reason: string | null
   voided_by: string | null
   voided_at: string | null
+  /** US-07.06: whether the current user may void it. */
+  can_void?: boolean
   /** US-07.03: the day it was received, and the invoices it was applied to. */
   paid_on?: string | null
   allocations?: { invoice_id: number; invoice: string | null; amount: number }[]
@@ -1389,7 +1391,12 @@ export interface InvoiceTotals {
 
 /** An invoice as printed and on its details page (US-07.05). */
 export interface InvoiceDocument extends Invoice {
-  client: { id: number | null; name: string | null; member_id: string | null; email?: string | null }
+  client: {
+    id: number | null
+    name: string | null
+    member_id: string | null
+    email?: string | null
+  }
   organization: { name: string; logo_url: string | null }
   branch: {
     name: string | null
@@ -1399,6 +1406,10 @@ export interface InvoiceDocument extends Invoice {
   }
   language: 'ar' | 'en'
   issued_local: string | null
+  /** US-07.06: voiding. */
+  can_void: boolean
+  access: { id: number; name: string; status: string }[]
+  void: { reason: string; at: string; by: string | null } | null
   activity: {
     action: string
     at: string | null
@@ -2709,6 +2720,15 @@ export const tenantApi = {
       return (await http.put('/api/settings/memberships', input)).data.data
     },
   },
+  /** Settings → Payments (US-07.06). */
+  paymentSettings: {
+    async get(): Promise<{ self_void_same_day: boolean }> {
+      return (await http.get('/api/settings/payments')).data.data
+    },
+    async update(input: { self_void_same_day: boolean }): Promise<{ self_void_same_day: boolean }> {
+      return (await http.put('/api/settings/payments', input)).data.data
+    },
+  },
   /** The payment methods each branch takes (US-07.03). */
   paymentMethods: {
     async get(locationId: number): Promise<PaymentMethodSettings> {
@@ -2752,6 +2772,11 @@ export const tenantApi = {
     },
     async email(id: number, email?: string | null): Promise<{ sent_to: string | null }> {
       return (await http.post(`/api/invoices/${id}/email`, { email: email || null })).data.data
+    },
+    /** US-07.06: 409 invoice_has_payments, or void_cancels_access unless cancel_access. */
+    async void(id: number, reason: string, cancelAccess: boolean): Promise<InvoiceDocument> {
+      return (await http.post(`/api/invoices/${id}/void`, { reason, cancel_access: cancelAccess }))
+        .data.data
     },
     async overdue(): Promise<{ data: Invoice[]; totals: InvoiceTotals }> {
       return (await http.get('/api/dashboard/overdue-invoices')).data

@@ -295,6 +295,12 @@ const tenantRoutes: RouteRecordRaw[] = [
             meta: { permission: 'settings.view' },
           },
           {
+            path: 'payments',
+            name: 'tenant.settings.payments',
+            component: () => import('@/views/tenant/settings/PaymentSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
             path: 'security',
             name: 'tenant.settings.security',
             component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),
