@@ -124,6 +124,7 @@ describe('BookingDrawer', () => {
       client_id: 3,
       payer_client_id: null,
       entitlement_source: 'pay_at_desk',
+      entitlement_id: null,
       override: [],
       override_reason: null,
     })

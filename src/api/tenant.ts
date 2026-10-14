@@ -997,6 +997,8 @@ export interface CancellationPreview {
 export interface MembershipSettings {
   grace_days: number
   expiry_notice_days: number
+  /** US-06.16: which kind pays first. */
+  resolver_order: ('unlimited' | 'limited' | 'package')[]
 }
 
 /** An upcoming booking its membership or package no longer covers (US-06.14). */
@@ -1529,8 +1531,22 @@ export interface BookingEligibility {
   }[]
   can_waitlist: boolean
   entitlements: EntitlementSource[]
+  /** US-06.16: the memberships and packages that can pay, in the order they'd be used. */
+  entitlement_options?: EntitlementOption[]
   /** Why the client's memberships/packages can't pay for it (US-06.04/05), when they hold some. */
   entitlement_note?: { code: string; message: string } | null
+}
+
+/** A membership or package that can pay for a booking (US-06.16). */
+export interface EntitlementOption {
+  id: number
+  source: 'membership' | 'package'
+  name: string
+  type: 'unlimited' | 'limited' | 'package'
+  credits_left: number | null
+  visits_left: number | null
+  ends_on: string | null
+  shared_by: string | null
 }
 
 export type CancelReason = 'coach' | 'facility' | 'low_bookings' | 'holiday' | 'other'
@@ -2762,6 +2778,8 @@ export const tenantApi = {
       /** A guardian paying for their child's booking (US-05.09). */
       payer_client_id?: number | null
       entitlement_source: EntitlementSource
+      /** US-06.16: which membership or package pays; the first valid one when omitted. */
+      entitlement_id?: number | null
       override?: OverridableCheck[]
       override_reason?: string | null
     }): Promise<Booking> {

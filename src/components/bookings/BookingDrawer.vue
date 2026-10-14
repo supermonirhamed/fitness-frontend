@@ -15,6 +15,7 @@ import DatePicker from 'primevue/datepicker'
 import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
+import RadioButton from 'primevue/radiobutton'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
@@ -30,12 +31,14 @@ import {
   type BookingEligibility,
   type CalendarSession,
   type Client,
+  type EntitlementOption,
   type EntitlementSource,
   type GuestOptions,
   type OverridableCheck,
   type RecurringBooking,
   type WaitlistEntry,
 } from '@/api/tenant'
+import { useFormat } from '@/composables/useFormat'
 import { apiMessage, errorCode } from '@/lib/apiErrors'
 import { validationErrors } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -107,7 +110,28 @@ const checking = ref(false)
 const override = ref<OverridableCheck[]>([])
 const overrideReason = ref<string | null>(null)
 const overrideOpen = ref(false)
+const format = useFormat()
 const payment = ref<EntitlementSource | null>(null)
+// Which membership or package pays (US-06.16): the first in the organization's order unless staff
+// pick another.
+const entitlementId = ref<number | null>(null)
+const payWith = computed(() =>
+  (result.value?.entitlement_options ?? []).filter((o) => o.source === payment.value),
+)
+watch(payWith, (options) => {
+  if (!options.some((o) => o.id === entitlementId.value))
+    entitlementId.value = options[0]?.id ?? null
+})
+const optionDetail = (o: EntitlementOption) =>
+  [
+    o.credits_left !== null ? t('booking.payWith.credits', { n: o.credits_left }) : null,
+    o.visits_left !== null ? t('booking.payWith.visits', { n: o.visits_left }) : null,
+    o.type === 'unlimited' ? t('plans.types.Unlimited') : null,
+    o.ends_on ? t('booking.payWith.until', { date: format.date(o.ends_on) }) : null,
+    o.shared_by ? t('sharing.sharedBy', { name: o.shared_by }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 const saving = ref(false)
 const error = ref<string | null>(null)
 
@@ -381,6 +405,7 @@ async function confirm() {
             client_id: attendeeId.value,
             payer_client_id: forWho.value ? client.value.id : null,
             entitlement_source: payment.value,
+            entitlement_id: payWith.value.length > 1 ? entitlementId.value : null,
             override: override.value,
             override_reason: overrideReason.value,
           })
@@ -667,6 +692,25 @@ async function confirm() {
           <small v-if="payment" class="field__hint">{{
             t(`booking.paymentHints.${payment}`)
           }}</small>
+          <div
+            v-if="payWith.length > 1 && mode === 'client'"
+            class="pay-with"
+            role="radiogroup"
+            :aria-label="t('booking.payWith.label')"
+          >
+            <span class="field__label">{{ t('booking.payWith.label') }}</span>
+            <label
+              v-for="o in payWith"
+              :key="o.id"
+              :class="['pay-with__option', { 'pay-with__option--on': entitlementId === o.id }]"
+            >
+              <RadioButton v-model="entitlementId" :value="o.id" :name="'pay-with'" />
+              <span class="pay-with__text">
+                <strong>{{ o.name }}</strong>
+                <small>{{ optionDetail(o) }}</small>
+              </span>
+            </label>
+          </div>
           <Message
             v-if="result.entitlement_note"
             severity="warn"
@@ -893,5 +937,33 @@ async function confirm() {
 }
 .footer__spacer {
   flex: 1;
+}
+.pay-with {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.pay-with__option {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pay-with__option--on {
+  border-color: var(--primary-500, var(--p-primary-color));
+  background: var(--primary-50);
+}
+.pay-with__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pay-with__text small {
+  font: var(--text-small);
+  color: var(--text-muted);
 }
 </style>

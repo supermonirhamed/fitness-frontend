@@ -1661,6 +1661,12 @@ export default {
     },
   },
   booking: {
+    payWith: {
+      label: 'Pay with',
+      credits: '{n} credits left',
+      visits: '{n} visits left',
+      until: 'until {date}',
+    },
     title: 'New booking',
     client: 'Client',
     search: 'Name, mobile, email, member ID',
@@ -2617,6 +2623,17 @@ export default {
     noticeHelp:
       'Members whose membership or package ends and won’t renew are told this many days before (sent once notifications are set up).',
     noticeExample: 'Sent {n} days before the last day.',
+    paying: 'Paying for bookings',
+    orderLabel: 'Which pays first',
+    orderHelp:
+      'When a client holds more than one membership or package that covers a session, the first kind in this list pays. Staff can still pick another when booking.',
+    kinds: {
+      unlimited: 'Unlimited membership',
+      limited: 'Limited membership (with visits left)',
+      package: 'Package (ending soonest first)',
+    },
+    moveUp: 'Move up',
+    moveDown: 'Move down',
   },
   clientMemberships: {
     uncovered:
