@@ -1283,10 +1283,12 @@ export interface Invoice {
   created_by: string | null
   lines?: {
     id: number
-    kind: 'membership' | 'package' | 'membership_period' | 'joining_fee'
+    /** What it was for (US-07.01): see invoices.kinds. */
+    kind: string
     description: string
     beneficiary: string | null
     entitlement_id: number | null
+    booking_id?: number | null
     period_starts_on: string | null
     period_ends_on: string | null
     quantity: number

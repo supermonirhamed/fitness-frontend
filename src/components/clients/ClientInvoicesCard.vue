@@ -16,6 +16,7 @@ import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import InvoiceDetailsDialog from '@/components/clients/InvoiceDetailsDialog.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import { tenantApi, type Invoice, type PaymentMethod } from '@/api/tenant'
@@ -50,6 +51,14 @@ async function load() {
 }
 onMounted(load)
 defineExpose({ load })
+
+// The whole invoice (US-07.01).
+const detailsOpen = ref(false)
+const detailsId = ref<number | null>(null)
+function openDetails(i: Invoice) {
+  detailsId.value = i.id
+  detailsOpen.value = true
+}
 
 const what = (i: Invoice) => (i.lines ?? []).map((l) => l.description).join(' + ')
 const isOpen = (i: Invoice) => i.status === 'Due' || i.status === 'PartiallyPaid'
@@ -138,7 +147,9 @@ async function record() {
       </template>
       <Column :header="t('invoices.number')">
         <template #body="{ data }">
-          <span class="mono">{{ data.number }}</span>
+          <button type="button" class="number" @click="openDetails(data)">
+            {{ data.number }}
+          </button>
           <div class="muted">{{ format.date(data.issued_on) }}</div>
         </template>
       </Column>
@@ -190,6 +201,7 @@ async function record() {
     </DataTable>
   </section>
 
+  <InvoiceDetailsDialog v-model:visible="detailsOpen" :invoice-id="detailsId" />
   <Dialog
     v-model:visible="open"
     modal
@@ -285,8 +297,16 @@ async function record() {
   font: var(--text-small);
   color: var(--text-muted);
 }
-.mono {
+.number {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
   font-family: var(--font-mono);
+  color: var(--text-link, var(--primary-700));
+}
+.number:hover {
+  text-decoration: underline;
 }
 .due {
   color: var(--sev-danger-fg, var(--red-600));
