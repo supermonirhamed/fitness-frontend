@@ -13,6 +13,14 @@ vi.mock('@/api/tenant', () => ({
   tenantApi: { payments: { forBooking: vi.fn(), record: vi.fn(), void: vi.fn() } },
 }))
 
+// jsdom has no matchMedia (Select).
+window.matchMedia ??= ((query: string) => ({
+  matches: false,
+  media: query,
+  addEventListener: () => {},
+  removeEventListener: () => {},
+})) as unknown as typeof window.matchMedia
+
 const terms = (over: Partial<BookingPayments> = {}): BookingPayments => ({
   currency: 'SAR',
   required: true,
@@ -28,8 +36,9 @@ const terms = (over: Partial<BookingPayments> = {}): BookingPayments => ({
   ...over,
 })
 
-// The dialog renders inline.
+// The dialog renders inline; the date picker needs a browser.
 const stubs = {
+  DatePicker: true,
   Dialog: defineComponent({
     props: { visible: Boolean },
     setup:
@@ -48,7 +57,7 @@ function render() {
   })
 }
 
-describe('BookingPaymentsPanel (US-04.15)', () => {
+describe('BookingPaymentsPanel (US-04.15, US-07.03)', () => {
   beforeEach(() => {
     setLocale('en')
     vi.clearAllMocks()
@@ -70,10 +79,9 @@ describe('BookingPaymentsPanel (US-04.15)', () => {
       .find((b) => b.text() === 'Record payment')!
       .trigger('click')
 
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text() === 'Bank transfer')!
-      .trigger('click')
+    // The branch's methods (defaults here) in a dropdown.
+    wrapper.findComponent({ name: 'Select' }).vm.$emit('update:modelValue', 'bank_transfer')
+    await flushPromises()
     const save = () =>
       wrapper
         .findAll('button')
@@ -89,6 +97,7 @@ describe('BookingPaymentsPanel (US-04.15)', () => {
       method: 'bank_transfer',
       reference: 'TRX-889',
       note: null,
+      paid_on: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     })
   })
 })

@@ -11,7 +11,8 @@ import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import SelectButton from 'primevue/selectbutton'
+import DatePicker from 'primevue/datepicker'
+import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import OverrideDialog from '@/components/patterns/OverrideDialog.vue'
@@ -19,6 +20,8 @@ import { tenantApi, type BookingPayments, type Payment, type PaymentMethod } fro
 import { apiMessage } from '@/lib/apiErrors'
 import { validationErrors } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
+import { usePaymentMethods } from '@/composables/usePaymentMethods'
+import { isoDay } from '@/lib/audit'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const props = defineProps<{ bookingId: number; timezone?: string }>()
@@ -47,9 +50,9 @@ const SEVERITY = {
   paid: 'success',
   not_required: 'secondary',
 } as const
-const METHODS: PaymentMethod[] = ['cash', 'bank_transfer', 'card_terminal', 'other']
-const methodOptions = computed(() =>
-  METHODS.map((m) => ({ value: m, label: t(`payments.methods.${m}`) })),
+// The methods the booking's branch takes, and which need a reference (US-07.03).
+const { options: methodOptions, needsReference: methodNeedsReference } = usePaymentMethods(
+  computed(() => info.value?.location_id ?? null),
 )
 const canRecord = computed(() => auth.can('payments.create') && !!info.value?.required)
 const canVoid = computed(() => auth.can('payments.void'))
@@ -61,19 +64,19 @@ const form = ref({
   method: 'cash' as PaymentMethod,
   reference: '',
   note: '',
+  paidOn: new Date() as Date | null,
 })
 const saving = ref(false)
 const errors = ref<Record<string, string[]>>({})
 const error = ref<string | null>(null)
-const needsReference = computed(() =>
-  ['bank_transfer', 'card_terminal'].includes(form.value.method),
-)
+const needsReference = computed(() => methodNeedsReference(form.value.method))
 function openRecord() {
   form.value = {
     amount: info.value?.balance ?? info.value?.due ?? null,
-    method: 'cash',
+    method: (methodOptions.value[0]?.value ?? 'cash') as PaymentMethod,
     reference: '',
     note: '',
+    paidOn: new Date(),
   }
   errors.value = {}
   error.value = null
@@ -96,6 +99,7 @@ async function record() {
       method: form.value.method,
       reference: form.value.reference.trim() || null,
       note: form.value.note.trim() || null,
+      paid_on: form.value.paidOn ? isoDay(form.value.paidOn) : null,
     })
     recordOpen.value = false
     toast.add({
@@ -244,14 +248,25 @@ const receiptUrl = (p: Payment) => `/receipts/${p.id}`
         <small class="muted">{{ t('payments.amountHint') }}</small>
       </div>
       <div class="field">
-        <span id="pay-method" class="field__label">{{ t('payments.method') }}</span>
-        <SelectButton
+        <label for="pay-method" class="field__label">{{ t('payments.method') }}</label>
+        <Select
           v-model="form.method"
+          input-id="pay-method"
           :options="methodOptions"
           option-label="label"
           option-value="value"
-          :allow-empty="false"
-          aria-labelledby="pay-method"
+          fluid
+        />
+      </div>
+      <div class="field">
+        <label for="pay-date" class="field__label">{{ t('recordPayment.paidOn') }}</label>
+        <DatePicker
+          v-model="form.paidOn"
+          input-id="pay-date"
+          :max-date="new Date()"
+          show-icon
+          icon-display="input"
+          fluid
         />
       </div>
       <div class="field">

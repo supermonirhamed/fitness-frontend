@@ -76,6 +76,20 @@ onMounted(async () => {
           {{ receipt.item.service }}
           <span v-if="receipt.item.session" dir="ltr">· {{ receipt.item.session }}</span>
         </dd>
+        <template v-if="receipt.paid_on">
+          <dt>{{ t('recordPayment.paidOn') }}</dt>
+          <dd dir="ltr">{{ receipt.paid_on }}</dd>
+        </template>
+      </dl>
+      <!-- The invoices it paid (US-07.03). -->
+      <dl v-if="(receipt.invoices?.length ?? 0) > 1" class="receipt__rows">
+        <template v-for="inv in receipt.invoices" :key="inv.number ?? ''">
+          <dt>
+            <span class="mono">{{ inv.number }}</span
+            ><template v-if="inv.for"> · {{ inv.for }}</template>
+          </dt>
+          <dd class="num">{{ format.money(inv.amount) }}</dd>
+        </template>
       </dl>
       <dl class="receipt__rows receipt__sums">
         <dt>{{ t('payments.subtotal') }}</dt>

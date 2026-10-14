@@ -29,6 +29,7 @@ import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import BusinessHoursEditor from '@/components/locations/BusinessHoursEditor.vue'
 import VatPanel from '@/components/locations/VatPanel.vue'
+import PaymentMethodsPanel from '@/components/locations/PaymentMethodsPanel.vue'
 import FacilitiesPanel from '@/components/locations/FacilitiesPanel.vue'
 import HourOverridesSection from '@/components/locations/HourOverridesSection.vue'
 import DeactivateLocationDialog from '@/components/locations/DeactivateLocationDialog.vue'
@@ -431,6 +432,7 @@ async function refreshStats() {
             }}<span v-if="location.stats" class="tab-count">{{ location.stats.staff }}</span></Tab
           >
           <Tab value="vat">{{ t('locationDetails.tabs.vat') }}</Tab>
+          <Tab value="payments">{{ t('locationDetails.tabs.payments') }}</Tab>
           <Tab value="policies">{{ t('locationDetails.tabs.policies') }}</Tab>
           <Tab v-if="auth.can('audit.view')" value="activity">{{ t('details.tabs.activity') }}</Tab>
         </TabList>
@@ -585,6 +587,14 @@ async function refreshStats() {
               v-if="tab === 'vat'"
               :location-id="location.id"
               :can-edit="auth.can('locations.vat')"
+            />
+          </TabPanel>
+
+          <TabPanel value="payments">
+            <PaymentMethodsPanel
+              v-if="tab === 'payments'"
+              :location-id="location.id"
+              :can-edit="auth.can('locations.update')"
             />
           </TabPanel>
 

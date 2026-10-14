@@ -1219,7 +1219,14 @@ export interface GuestOptions {
   }
 }
 
-export type PaymentMethod = 'cash' | 'bank_transfer' | 'card_terminal' | 'other'
+export type PaymentMethod =
+  'cash' | 'bank_transfer' | 'card_terminal' | 'cheque' | 'account_credit' | 'other'
+
+/** What a branch takes (US-07.03). */
+export interface PaymentMethodSettings {
+  methods: PaymentMethod[]
+  reference_required: PaymentMethod[]
+}
 export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'not_required'
 
 /** A payment recorded at the desk (US-04.15); amounts in major units. */
@@ -1243,6 +1250,9 @@ export interface Payment {
   void_reason: string | null
   voided_by: string | null
   voided_at: string | null
+  /** US-07.03: the day it was received, and the invoices it was applied to. */
+  paid_on?: string | null
+  allocations?: { invoice_id: number; invoice: string | null; amount: number }[]
   /** What it paid for (client payments list): a booked session, or an invoice's products. */
   for?:
     | {
@@ -1412,6 +1422,9 @@ export interface BookingPayments {
   paid: number
   balance: number | null
   status: PaymentStatus
+  /** US-07.03: the booking's drop-in invoice, once it has one; the branch it's paid at. */
+  invoice?: { id: number; number: string } | null
+  location_id?: number
   payments: Payment[]
 }
 
@@ -1426,6 +1439,8 @@ export interface Receipt extends Payment {
   }
   client: { name: string | null; member_id: string | null }
   item: { service: string | null; session: string | null }
+  /** US-07.03: the invoices it paid, and how much went to each. */
+  invoices?: { number: string | null; for: string | null; amount: number }[]
   recorded_local: string | null
 }
 
@@ -2313,6 +2328,25 @@ export const tenantApi = {
     async uncoveredBookings(clientId: number): Promise<UncoveredBooking[]> {
       return (await http.get(`/api/clients/${clientId}/uncovered-bookings`)).data.data
     },
+    /**
+     * US-07.03: a payment applied to the client's open invoices (those given, in order, or all of
+     * them oldest first). 422 `overpayment` (with `credit`) unless overpayment_to_credit.
+     */
+    async recordPayment(
+      clientId: number,
+      input: {
+        amount: number
+        method: PaymentMethod
+        reference?: string | null
+        note?: string | null
+        paid_on?: string | null
+        location_id?: number | null
+        invoice_ids?: number[] | null
+        overpayment_to_credit?: boolean
+      },
+    ): Promise<Payment> {
+      return (await http.post(`/api/clients/${clientId}/payments`, input)).data.data
+    },
     async accountCredit(clientId: number): Promise<AccountCreditSummary> {
       return (await http.get(`/api/clients/${clientId}/account-credit`)).data.data
     },
@@ -2631,6 +2665,15 @@ export const tenantApi = {
       return (await http.put('/api/settings/memberships', input)).data.data
     },
   },
+  /** The payment methods each branch takes (US-07.03). */
+  paymentMethods: {
+    async get(locationId: number): Promise<PaymentMethodSettings> {
+      return (await http.get(`/api/locations/${locationId}/payment-methods`)).data.data
+    },
+    async update(locationId: number, input: PaymentMethodSettings): Promise<PaymentMethodSettings> {
+      return (await http.put(`/api/locations/${locationId}/payment-methods`, input)).data.data
+    },
+  },
   /** Point of sale (US-07.02, payments.create; memberships need memberships.create). */
   pos: {
     async quote(input: PosCartInput): Promise<PosQuote> {
@@ -2683,6 +2726,7 @@ export const tenantApi = {
         method: PaymentMethod
         reference?: string | null
         note?: string | null
+        paid_on?: string | null
       },
     ): Promise<Payment> {
       return (await http.post(`/api/bookings/${bookingId}/payments`, input)).data.data
