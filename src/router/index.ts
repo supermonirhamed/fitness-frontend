@@ -42,6 +42,13 @@ const tenantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/tenant/TenantSignInView.vue'),
     meta: { guest: true },
   },
+  // An invoice to print or save as PDF (US-07.05), outside the app shell.
+  {
+    path: '/invoices/:id(\\d+)/print',
+    name: 'tenant.invoice.print',
+    component: () => import('@/views/tenant/invoices/InvoicePrintView.vue'),
+    meta: { permission: 'payments.view' },
+  },
   // A payment's receipt, outside the app shell so it prints cleanly (US-04.15).
   {
     path: '/receipts/:id(\\d+)',
@@ -97,6 +104,19 @@ const tenantRoutes: RouteRecordRaw[] = [
         name: 'tenant.clients',
         component: () => import('@/views/tenant/clients/ClientsView.vue'),
         meta: { permission: 'clients.view' },
+      },
+      {
+        // Invoices (US-07.05).
+        path: 'invoices',
+        name: 'tenant.invoices',
+        component: () => import('@/views/tenant/invoices/InvoicesView.vue'),
+        meta: { permission: 'payments.view' },
+      },
+      {
+        path: 'invoices/:id(\\d+)',
+        name: 'tenant.invoice',
+        component: () => import('@/views/tenant/invoices/InvoiceDetailsView.vue'),
+        meta: { permission: 'payments.view' },
       },
       {
         // Point of sale (US-07.02).

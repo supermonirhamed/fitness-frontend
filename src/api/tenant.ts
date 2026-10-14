@@ -1276,7 +1276,8 @@ export interface Invoice {
   id: number
   number: string
   status: 'Due' | 'PartiallyPaid' | 'Paid' | 'Void'
-  client: { id: number; name: string | null }
+  /** The payer; no id for a walk-in (US-07.02). */
+  client: { id: number | null; name: string | null }
   location: string | null
   issued_on: string
   due_on: string
@@ -1363,6 +1364,47 @@ export interface PosSale {
   invoice: Invoice
   entitlements: ClientEntitlement[]
   payments: Payment[]
+}
+
+export interface InvoiceFilters {
+  q?: string
+  location_id?: number
+  status?: Invoice['status'][]
+  client_id?: number
+  from?: string
+  to?: string
+  due?: 'open' | 'overdue'
+  kind?: string
+  created_by?: number
+  page?: number
+  per_page?: number
+}
+
+export interface InvoiceTotals {
+  count: number
+  total: number
+  balance: number
+  overdue: number
+}
+
+/** An invoice as printed and on its details page (US-07.05). */
+export interface InvoiceDocument extends Invoice {
+  client: { id: number | null; name: string | null; member_id: string | null; email?: string | null }
+  organization: { name: string; logo_url: string | null }
+  branch: {
+    name: string | null
+    address: string | null
+    legal_name: string | null
+    tax_number: string | null
+  }
+  language: 'ar' | 'en'
+  issued_local: string | null
+  activity: {
+    action: string
+    at: string | null
+    user: string | null
+    values: Record<string, unknown>
+  }[]
 }
 
 /** A membership or package sale at the desk (US-06.08). */
@@ -2697,6 +2739,23 @@ export const tenantApi = {
     },
   },
   invoices: {
+    /** US-07.05: invoices at the user's branches, filtered, with totals (void ones left out). */
+    async list(filters: InvoiceFilters = {}): Promise<{
+      data: Invoice[]
+      meta: { current_page: number; last_page: number; total: number }
+      totals: InvoiceTotals
+    }> {
+      return (await http.get('/api/invoices', { params: filters })).data
+    },
+    async details(id: number): Promise<InvoiceDocument> {
+      return (await http.get(`/api/invoices/${id}/details`)).data.data
+    },
+    async email(id: number, email?: string | null): Promise<{ sent_to: string | null }> {
+      return (await http.post(`/api/invoices/${id}/email`, { email: email || null })).data.data
+    },
+    async overdue(): Promise<{ data: Invoice[]; totals: InvoiceTotals }> {
+      return (await http.get('/api/dashboard/overdue-invoices')).data
+    },
     async forClient(clientId: number): Promise<Invoice[]> {
       return (await http.get(`/api/clients/${clientId}/invoices`)).data.data
     },
