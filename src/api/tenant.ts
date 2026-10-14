@@ -916,6 +916,8 @@ export interface ClientEntitlement {
   /** US-06.12: a downgrade waiting for the next renewal; the price per period as sold. */
   scheduled_change: { plan_id: number; name: string; on: string } | null
   price: number
+  /** US-06.13: cancelled (at the end of the period it still runs until ends_on). */
+  cancellation: { at: string; reason: MembershipCancelReason; note: string | null } | null
   freeze: {
     id: number
     status: 'Scheduled' | 'Active'
@@ -949,6 +951,30 @@ export interface FreezePreview {
   fee: number
   ends_on: string | null
   renews_on: string | null
+  bookings: AffectedBooking[]
+}
+
+export const MEMBERSHIP_CANCEL_REASONS = [
+  'moving',
+  'price',
+  'schedule',
+  'health',
+  'dissatisfied',
+  'competitor',
+  'other',
+] as const
+export type MembershipCancelReason = (typeof MEMBERSHIP_CANCEL_REASONS)[number]
+
+/** What cancelling would do (US-06.13). */
+export interface CancellationPreview {
+  when: 'period_end' | 'immediate'
+  ends_on: string
+  commitment_ends_on: string | null
+  /** Still owed for the minimum commitment, invoiced unless waived. */
+  owed: number
+  owed_periods: number
+  /** The unused part that may be refunded (immediate only). */
+  refundable: number
   bookings: AffectedBooking[]
 }
 
@@ -2118,6 +2144,33 @@ export const tenantApi = {
     async cancelPlanChange(clientId: number, entitlementId: number): Promise<ClientEntitlement> {
       return (
         await http.delete(`/api/clients/${clientId}/entitlements/${entitlementId}/change-plan`)
+      ).data.data
+    },
+    /** US-06.13: cancel at the end of the period or today, with a reason. */
+    async cancelPreview(
+      clientId: number,
+      entitlementId: number,
+      when: CancellationPreview['when'],
+    ): Promise<CancellationPreview> {
+      return (
+        await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/cancel/preview`, {
+          when,
+        })
+      ).data.data
+    },
+    async cancelEntitlement(
+      clientId: number,
+      entitlementId: number,
+      input: {
+        when: CancellationPreview['when']
+        reason: MembershipCancelReason
+        note?: string | null
+        waive_commitment?: boolean
+        refund?: number | null
+      },
+    ): Promise<ClientEntitlement> {
+      return (
+        await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/cancel`, input)
       ).data.data
     },
     async accountCredit(clientId: number): Promise<AccountCreditSummary> {

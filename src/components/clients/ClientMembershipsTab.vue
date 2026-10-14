@@ -4,7 +4,7 @@
 // services and branches it covers. Current ones first, then the history. Staff with
 // memberships.create sell one from here (US-06.08) and freeze it (US-06.11); with
 // entitlements.adjust they add or remove credits or extend the end date, with a reason. Recurring
-// memberships change plan here (US-06.12).
+// memberships change plan here (US-06.12); any can be cancelled (US-06.13).
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -13,6 +13,7 @@ import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import AdjustEntitlementDialog from '@/components/memberships/AdjustEntitlementDialog.vue'
 import AutoRenewDialog from '@/components/memberships/AutoRenewDialog.vue'
+import CancelMembershipDialog from '@/components/memberships/CancelMembershipDialog.vue'
 import ChangePlanDialog from '@/components/memberships/ChangePlanDialog.vue'
 import FreezeMembershipDialog from '@/components/memberships/FreezeMembershipDialog.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
@@ -84,6 +85,7 @@ function openAutoRenew(e: ClientEntitlement) {
 }
 const canToggleRenew = (e: ClientEntitlement) =>
   e.recurring &&
+  !e.cancellation &&
   auth.can('memberships.create') &&
   ['Active', 'Suspended', 'Pending', 'Frozen'].includes(e.status)
 const list = (names: string[]) => names.join(locale.value === 'ar' ? '، ' : ', ')
@@ -212,6 +214,28 @@ function openCancelChange(e: ClientEntitlement) {
     () => tenantApi.clients.cancelPlanChange(props.clientId, e.id),
   )
 }
+// Cancelling (US-06.13); one cancelled at the end of its period can be withdrawn.
+const cancelling = ref<ClientEntitlement | null>(null)
+const cancelOpen = ref(false)
+const canCancel = (e: ClientEntitlement) =>
+  auth.can('memberships.create') && current(e) && !e.cancellation
+function onCancelled(saved: ClientEntitlement) {
+  onAdjusted(saved)
+  toast.add({
+    severity: 'success',
+    summary:
+      saved.status === 'Cancelled'
+        ? t('cancelMembership.cancelled')
+        : t('cancelMembership.cancelsOn', { date: format.date(saved.ends_on!) }),
+    life: 4000,
+  })
+}
+function openWithdraw(e: ClientEntitlement) {
+  ask(t('cancelMembership.withdraw'), t('cancelMembership.withdrawText'), () =>
+    tenantApi.clients.setAutoRenew(props.clientId, e.id, { auto_renew: true }),
+  )
+}
+
 // The actions menu of one membership or package.
 const menu = ref<InstanceType<typeof Menu>>()
 const menuItems = ref<MenuItem[]>([])
@@ -237,6 +261,15 @@ function itemsFor(e: ClientEntitlement): MenuItem[] {
       label: t('adjust.title'),
       icon: 'pi pi-sliders-h',
       command: () => openAdjust(e),
+    },
+    canCancel(e) && { separator: true },
+    canCancel(e) && {
+      label: t('cancelMembership.title'),
+      icon: 'pi pi-ban',
+      command: () => {
+        cancelling.value = e
+        cancelOpen.value = true
+      },
     },
   ].filter(Boolean) as MenuItem[]
 }
@@ -322,6 +355,32 @@ function openMenu(event: Event, e: ClientEntitlement) {
               variant="text"
               :label="e.freeze.status === 'Active' ? t('freeze.endNow') : t('freeze.callOff')"
               @click="openEndFreeze(e)"
+            />
+          </span>
+        </Message>
+        <Message
+          v-if="e.cancellation"
+          :severity="e.status === 'Cancelled' ? 'secondary' : 'warn'"
+          :closable="false"
+          icon="pi pi-ban"
+          size="small"
+        >
+          <span class="banner">
+            <span
+              >{{
+                e.status === 'Cancelled'
+                  ? t('cancelMembership.cancelledOn', { date: format.date(e.cancellation.at) })
+                  : t('cancelMembership.cancelsOn', { date: format.date(e.ends_on!) })
+              }}
+              · {{ t(`cancelMembership.reasons.${e.cancellation.reason}`)
+              }}<template v-if="e.cancellation.note"> · {{ e.cancellation.note }}</template></span
+            >
+            <Button
+              v-if="e.status !== 'Cancelled' && e.recurring && auth.can('memberships.create')"
+              size="small"
+              variant="text"
+              :label="t('cancelMembership.withdraw')"
+              @click="openWithdraw(e)"
             />
           </span>
         </Message>
@@ -466,6 +525,12 @@ function openMenu(event: Event, e: ClientEntitlement) {
       :client-id="clientId"
       :entitlement="freezing"
       @saved="onFrozen"
+    />
+    <CancelMembershipDialog
+      v-model:visible="cancelOpen"
+      :client-id="clientId"
+      :entitlement="cancelling"
+      @saved="onCancelled"
     />
     <ChangePlanDialog
       v-model:visible="changeOpen"
