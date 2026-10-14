@@ -1302,6 +1302,59 @@ export interface Invoice {
   payments?: Payment[]
 }
 
+/** A point-of-sale cart item (US-07.02): a membership/package, or a custom item. */
+export type PosItemInput =
+  | {
+      type: 'plan'
+      plan_id: number
+      for_client_id?: number | null
+      starts_on?: string | null
+      intro_override?: string | null
+      discount?: { type: 'percent' | 'amount'; value: number; reason?: string | null } | null
+    }
+  | {
+      type: 'custom'
+      description: string
+      unit_price: number
+      quantity: number
+      discount?: { type: 'percent' | 'amount'; value: number; reason?: string | null } | null
+    }
+
+export interface PosCartInput {
+  location_id: number
+  client_id: number | null
+  items: PosItemInput[]
+  payments?: { amount: number; method: PaymentMethod; reference?: string | null }[]
+}
+
+export interface PosQuote {
+  currency: string
+  lines: {
+    item: number
+    kind: string
+    description: string
+    quantity: number
+    unit_price: number
+    discount: number
+    vat: number
+    total: number
+  }[]
+  subtotal: number
+  discount: number
+  net: number
+  vat: number
+  vat_rate: string | null
+  prices_include_vat: boolean
+  total: number
+  intro_refusals: { item: number; code: string; plan: string | null }[]
+}
+
+export interface PosSale {
+  invoice: Invoice
+  entitlements: ClientEntitlement[]
+  payments: Payment[]
+}
+
 /** A membership or package sale at the desk (US-06.08). */
 export interface MembershipSaleInput {
   client_id: number
@@ -2576,6 +2629,15 @@ export const tenantApi = {
     },
     async update(input: MembershipSettings): Promise<MembershipSettings> {
       return (await http.put('/api/settings/memberships', input)).data.data
+    },
+  },
+  /** Point of sale (US-07.02, payments.create; memberships need memberships.create). */
+  pos: {
+    async quote(input: PosCartInput): Promise<PosQuote> {
+      return (await http.post('/api/pos/quote', input)).data.data
+    },
+    async checkout(input: PosCartInput): Promise<PosSale> {
+      return (await http.post('/api/pos/checkout', input)).data.data
     },
   },
   /** Selling memberships and packages (US-06.08); taking a payment with it needs payments.create. */

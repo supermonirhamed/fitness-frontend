@@ -99,6 +99,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'clients.view' },
       },
       {
+        // Point of sale (US-07.02).
+        path: 'pos',
+        name: 'tenant.pos',
+        component: () => import('@/views/tenant/PosView.vue'),
+        meta: { permission: 'payments.create' },
+      },
+      {
         path: 'memberships',
         name: 'tenant.memberships',
         component: () => import('@/views/tenant/memberships/PlansView.vue'),
