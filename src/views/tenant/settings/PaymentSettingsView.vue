@@ -14,7 +14,8 @@ import NoPermission from '@/components/patterns/NoPermission.vue'
 import SettingRow from '@/components/patterns/SettingRow.vue'
 import SettingsCard from '@/components/patterns/SettingsCard.vue'
 import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
-import { tenantApi } from '@/api/tenant'
+import { tenantApi, type PaymentSettings } from '@/api/tenant'
+import Select from 'primevue/select'
 import { statusOf } from '@/lib/http'
 import { useStaffAuth } from '@/stores/staffAuth'
 
@@ -23,22 +24,27 @@ const toast = useToast()
 const auth = useStaffAuth()
 const canEdit = computed(() => auth.can('settings.update'))
 
-type Form = { self_void_same_day: boolean; manual_discount_limits: Record<string, number | null> }
+type Form = {
+  self_void_same_day: boolean
+  session_cancel_refund: PaymentSettings['session_cancel_refund']
+  manual_discount_limits: Record<string, number | null>
+}
 const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
 const roles = ref<string[]>([])
-const form = ref<Form>({ self_void_same_day: false, manual_discount_limits: {} })
+const form = ref<Form>({
+  self_void_same_day: false,
+  session_cancel_refund: 'account_credit',
+  manual_discount_limits: {},
+})
 const saved = ref('')
 const saving = ref(false)
 const dirty = computed(() => JSON.stringify(form.value) !== saved.value)
 
-function apply(data: {
-  self_void_same_day: boolean
-  manual_discount_limits: Record<string, number>
-  roles: string[]
-}) {
+function apply(data: PaymentSettings) {
   roles.value = data.roles
   form.value = {
     self_void_same_day: data.self_void_same_day,
+    session_cancel_refund: data.session_cancel_refund,
     manual_discount_limits: Object.fromEntries(
       data.roles.map((r) => [r, data.manual_discount_limits[r] ?? null]),
     ),
@@ -65,6 +71,7 @@ async function save() {
     apply(
       await tenantApi.paymentSettings.update({
         self_void_same_day: form.value.self_void_same_day,
+        session_cancel_refund: form.value.session_cancel_refund,
         manual_discount_limits: limits,
       }),
     )
@@ -101,6 +108,28 @@ const roleName = (r: string) => {
         label-for="self-void"
       >
         <ToggleSwitch v-model="form.self_void_same_day" input-id="self-void" :disabled="!canEdit" />
+      </SettingRow>
+      <div class="settings-group" role="heading" aria-level="3">
+        {{ t('paymentSettings.refunds') }}
+      </div>
+      <SettingRow
+        :label="t('paymentSettings.sessionRefundLabel')"
+        :help="t('paymentSettings.sessionRefundHelp')"
+        label-for="session-refund"
+      >
+        <Select
+          v-model="form.session_cancel_refund"
+          input-id="session-refund"
+          :options="[
+            { value: 'account_credit', label: t('refunds.toCredit') },
+            { value: 'original', label: t('paymentSettings.originalMethod') },
+            { value: 'none', label: t('paymentSettings.noAutoRefund') },
+          ]"
+          option-label="label"
+          option-value="value"
+          :disabled="!canEdit"
+          class="select"
+        />
       </SettingRow>
       <div class="settings-group" role="heading" aria-level="3">
         {{ t('paymentSettings.discounts') }}
@@ -152,6 +181,9 @@ const roleName = (r: string) => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.select {
+  min-width: 220px;
 }
 .limit {
   width: 120px;

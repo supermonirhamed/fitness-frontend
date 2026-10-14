@@ -1252,6 +1252,9 @@ export interface Payment {
   voided_at: string | null
   /** US-07.06: whether the current user may void it. */
   can_void?: boolean
+  /** US-07.08: refunded so far, and whether the current user may refund it. */
+  refunded?: number
+  can_refund?: boolean
   /** US-07.03: the day it was received, and the invoices it was applied to. */
   paid_on?: string | null
   allocations?: { invoice_id: number; invoice: string | null; amount: number }[]
@@ -1373,8 +1376,26 @@ export interface PosSale {
   payments: Payment[]
 }
 
+/** What a payment may still refund (US-07.08). */
+export interface RefundTerms {
+  refundable: number
+  refunded: number
+  method: PaymentMethod
+  access: {
+    id: number
+    name: string
+    kind: 'membership' | 'package'
+    status: string
+    credits_total: number | null
+    credits_used: number
+    credits_left: number | null
+  }[]
+}
+
 export interface PaymentSettings {
   self_void_same_day: boolean
+  /** US-07.08: what happens to desk payments when the club cancels a session. */
+  session_cancel_refund: 'account_credit' | 'original' | 'none'
   /** Role name → most it may take off by hand, in percent. */
   manual_discount_limits: Record<string, number>
   roles: string[]
@@ -1446,6 +1467,23 @@ export interface InvoiceDocument extends Invoice {
   can_void: boolean
   access: { id: number; name: string; status: string }[]
   void: { reason: string; at: string; by: string | null } | null
+  /** US-07.08: credit notes, each with the refund that made it. */
+  credit_notes: {
+    id: number
+    number: string
+    issued_on: string
+    reason: string
+    net: number
+    vat: number
+    total: number
+    refund: {
+      destination: 'original' | 'account_credit'
+      method: PaymentMethod
+      reference: string | null
+      access: string
+      by: string | null
+    } | null
+  }[]
   activity: {
     action: string
     at: string | null
@@ -2877,6 +2915,28 @@ export const tenantApi = {
     },
     async void(id: number, reason: string): Promise<Payment> {
       return (await http.post(`/api/payments/${id}/void`, { reason })).data.data
+    },
+    /** US-07.08: what may be refunded and the access it bought (credits used). */
+    async refundTerms(id: number): Promise<RefundTerms> {
+      return (await http.get(`/api/payments/${id}/refund`)).data.data
+    },
+    async refund(
+      id: number,
+      input: {
+        amount: number
+        destination: 'original' | 'account_credit'
+        reference?: string | null
+        reason: string
+        access?: Record<number, { action: 'keep' | 'reduce' | 'cancel'; credits?: number | null }>
+      },
+    ): Promise<{
+      id: number
+      credit_note: string
+      destination: string
+      amount: number
+      payment: Payment
+    }> {
+      return (await http.post(`/api/payments/${id}/refund`, input)).data.data
     },
     async receipt(id: number): Promise<Receipt> {
       return (await http.get(`/api/payments/${id}/receipt`)).data.data

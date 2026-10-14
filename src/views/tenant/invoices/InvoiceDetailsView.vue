@@ -19,6 +19,7 @@ import NoPermission from '@/components/patterns/NoPermission.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import RecordPaymentDialog from '@/components/payments/RecordPaymentDialog.vue'
+import RefundDialog from '@/components/payments/RefundDialog.vue'
 import VoidInvoiceDialog from '@/components/payments/VoidInvoiceDialog.vue'
 import VoidPaymentDialog from '@/components/payments/VoidPaymentDialog.vue'
 import { tenantApi, type InvoiceDocument, type Payment } from '@/api/tenant'
@@ -66,6 +67,13 @@ const voidPaymentOpen = ref(false)
 function voidPayment(p: Payment) {
   voidingPayment.value = p
   voidPaymentOpen.value = true
+}
+// Refunds (US-07.08).
+const refunding = ref<Payment | null>(null)
+const refundOpen = ref(false)
+function refund(p: Payment) {
+  refunding.value = p
+  refundOpen.value = true
 }
 function onVoided() {
   toast.add({ severity: 'success', summary: t('voiding.done'), life: 3000 })
@@ -314,6 +322,15 @@ async function send() {
                 :value="t('clientProfile.payment.Voided')"
               />
               <Button
+                v-if="p.can_refund"
+                icon="pi pi-replay"
+                size="small"
+                variant="text"
+                severity="secondary"
+                :aria-label="t('refunds.refund')"
+                @click="refund(p)"
+              />
+              <Button
                 v-if="p.can_void"
                 icon="pi pi-ban"
                 size="small"
@@ -325,7 +342,22 @@ async function send() {
             </li>
           </ul>
           <h3 class="spaced">{{ t('invoicesPage.refundsTitle') }}</h3>
-          <p class="muted">{{ t('invoicesPage.noRefunds') }}</p>
+          <p v-if="!doc.credit_notes.length" class="muted">{{ t('invoicesPage.noRefunds') }}</p>
+          <ul v-else class="rows">
+            <li v-for="n in doc.credit_notes" :key="n.id" class="note">
+              <span class="mono">{{ n.number }}</span>
+              <span class="muted">{{ format.date(n.issued_on) }}</span>
+              <span v-if="n.refund" class="muted">{{
+                n.refund.destination === 'account_credit'
+                  ? t('refunds.toCredit')
+                  : t('refunds.toOriginal', { method: t(`payments.methods.${n.refund.method}`) })
+              }}</span>
+              <span class="num grow">−{{ format.money(n.total) }}</span>
+              <small class="muted note__reason"
+                >{{ n.reason }} · {{ t('refunds.vatBack', { amount: format.money(n.vat) }) }}</small
+              >
+            </li>
+          </ul>
         </section>
         <section class="card pad">
           <h3>{{ t('invoicesPage.activity') }}</h3>
@@ -346,6 +378,7 @@ async function send() {
       </div>
 
       <VoidInvoiceDialog v-model:visible="voidingInvoice" :invoice="doc" @voided="onVoided" />
+      <RefundDialog v-model:visible="refundOpen" :payment="refunding" @refunded="load" />
       <VoidPaymentDialog
         v-model:visible="voidPaymentOpen"
         :payment="voidingPayment"
@@ -478,6 +511,12 @@ h3 {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+.note {
+  flex-wrap: wrap;
+}
+.note__reason {
+  flex-basis: 100%;
 }
 .grow {
   margin-inline-start: auto;

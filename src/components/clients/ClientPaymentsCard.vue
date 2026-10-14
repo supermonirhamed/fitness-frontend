@@ -11,6 +11,7 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
+import RefundDialog from '@/components/payments/RefundDialog.vue'
 import VoidPaymentDialog from '@/components/payments/VoidPaymentDialog.vue'
 import type { Payment, PaymentMethod } from '@/api/tenant'
 import { useFormat } from '@/composables/useFormat'
@@ -23,6 +24,13 @@ const voidOpen = ref(false)
 function startVoid(p: Payment) {
   voiding.value = p
   voidOpen.value = true
+}
+// Refunds (US-07.08).
+const refunding = ref<Payment | null>(null)
+const refundOpen = ref(false)
+function startRefund(p: Payment) {
+  refunding.value = p
+  refundOpen.value = true
 }
 const { t } = useI18n()
 const format = useFormat()
@@ -178,6 +186,9 @@ const isPackage = (p: Payment) =>
           <span :class="['num', { voided: data.status === 'Voided' }]">{{
             format.money(data.amount)
           }}</span>
+          <small v-if="data.refunded" class="muted refunded">{{
+            t('refunds.refundedAmount', { amount: format.money(data.refunded) })
+          }}</small>
         </template>
       </Column>
       <Column :header="t('bookings.columns.status')">
@@ -193,6 +204,16 @@ const isPackage = (p: Payment) =>
       <Column header-class="row-end" body-class="row-end">
         <template #body="{ data }">
           <Button
+            v-if="data.can_refund"
+            v-tooltip.top="t('refunds.refund')"
+            icon="pi pi-replay"
+            size="small"
+            variant="text"
+            severity="secondary"
+            :aria-label="t('refunds.refund')"
+            @click="startRefund(data)"
+          />
+          <Button
             v-if="data.can_void"
             v-tooltip.top="t('voiding.voidPayment')"
             icon="pi pi-ban"
@@ -206,6 +227,7 @@ const isPackage = (p: Payment) =>
       </Column>
     </DataTable>
     <VoidPaymentDialog v-model:visible="voidOpen" :payment="voiding" @voided="emit('changed')" />
+    <RefundDialog v-model:visible="refundOpen" :payment="refunding" @refunded="emit('changed')" />
   </section>
 </template>
 
@@ -285,6 +307,9 @@ const isPackage = (p: Payment) =>
 }
 .for__what {
   font-weight: 500;
+}
+.refunded {
+  display: block;
 }
 .voided {
   text-decoration: line-through;
