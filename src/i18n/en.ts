@@ -184,6 +184,7 @@ export default {
     title: 'Organization settings',
     subtitle: 'How your organization works and who can do what.',
     pages: {
+      memberships: 'Memberships',
       organization: 'Profile',
       regional: 'Language & region',
       booking: 'Booking policies',
@@ -2418,7 +2419,35 @@ export default {
     endsOnHelp: 'Only later than the current end date.',
     reason: 'Reason',
   },
+  autoRenew: {
+    offTitle: 'Turn off auto-renewal',
+    onTitle: 'Turn auto-renewal back on',
+    turnOff: 'Turn off auto-renewal',
+    turnOn: 'Turn on auto-renewal',
+    endsWithPeriod: 'The membership will end on {date}, at the end of the current period.',
+    endsAfterCommitment:
+      'The minimum commitment runs until {date}: the membership renews until then and ends with that period.',
+    commitmentNoWaive: 'Only staff allowed to waive commitments can end it sooner.',
+    waive: 'Waive the minimum commitment and end with the current period',
+    reason: 'Reason',
+    onText: 'The membership will renew again at the end of each period, until cancelled.',
+  },
+  membershipSettings: {
+    saved: 'Membership settings saved',
+    loadError: "Membership settings couldn't be loaded.",
+    renewals: 'Renewals',
+    graceLabel: 'Grace period for unpaid renewals',
+    graceHelp:
+      'Members keep access while a renewal invoice is unpaid, for this many days after it is due. After that the membership is suspended until it is paid.',
+    graceExample: 'Suspended {n} days after the renewal date if still unpaid.',
+  },
   clientMemberships: {
+    suspended: 'Suspended: an invoice is unpaid past the grace period. Paying it restores access.',
+    period: 'Current period',
+    renewsOn: 'Renews on',
+    endsOn: 'Ends on',
+    autoRenewOff: '(auto-renewal off)',
+    commitment: 'Commitment until',
     covers: 'Covers',
     except: '{base}, except {names}',
     visitsOf: '{n} of {limit}',

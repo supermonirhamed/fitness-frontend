@@ -33,6 +33,12 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     permission: 'settings.view',
   },
   {
+    name: 'tenant.settings.memberships',
+    key: 'memberships',
+    icon: 'pi-id-card',
+    permission: 'settings.view',
+  },
+  {
     name: 'tenant.settings.security',
     key: 'security',
     icon: 'pi-shield',

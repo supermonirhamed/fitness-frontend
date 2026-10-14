@@ -864,7 +864,7 @@ export type MembershipPlanInput = Omit<
 export interface ClientEntitlement {
   id: number
   kind: PlanKind
-  status: 'Pending' | 'Active' | 'Frozen' | 'Expired' | 'Cancelled' | 'Exhausted'
+  status: 'Pending' | 'Active' | 'Frozen' | 'Suspended' | 'Expired' | 'Cancelled' | 'Exhausted'
   name: string
   plan_id: number
   type: 'Unlimited' | 'Limited' | null
@@ -894,6 +894,13 @@ export interface ClientEntitlement {
     locations: string[]
   }
   visits: { used: number; limit: number | null; period: 'week' | 'month' }
+  /** US-06.10: recurring memberships. */
+  recurring: boolean
+  auto_renew: boolean
+  period_starts_on: string | null
+  period_ends_on: string | null
+  commitment_ends_on: string | null
+  renews_on: string | null
 }
 
 /** A credit movement of a package (US-06.09). */
@@ -1961,6 +1968,16 @@ export const tenantApi = {
         await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/adjust`, input)
       ).data.data
     },
+    /** US-06.10: auto-renewal on or off; waiving the commitment needs memberships.waive_commitment. */
+    async setAutoRenew(
+      clientId: number,
+      entitlementId: number,
+      input: { auto_renew: boolean; waive_commitment?: boolean; reason?: string | null },
+    ): Promise<ClientEntitlement> {
+      return (
+        await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/auto-renew`, input)
+      ).data.data
+    },
     async family(id: number): Promise<ClientFamily> {
       return (await http.get(`/api/clients/${id}/family`)).data.data
     },
@@ -2261,6 +2278,15 @@ export const tenantApi = {
     },
   },
   /** Desk payments (US-04.15): never edited or deleted, only voided with a reason. */
+  /** Settings → Memberships (US-06.10). */
+  membershipSettings: {
+    async get(): Promise<{ grace_days: number }> {
+      return (await http.get('/api/settings/memberships')).data.data
+    },
+    async update(input: { grace_days: number }): Promise<{ grace_days: number }> {
+      return (await http.put('/api/settings/memberships', input)).data.data
+    },
+  },
   /** Selling memberships and packages (US-06.08); taking a payment with it needs payments.create. */
   sales: {
     async quote(input: MembershipSaleInput): Promise<MembershipSaleQuote> {

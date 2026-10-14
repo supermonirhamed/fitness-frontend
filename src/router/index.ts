@@ -262,6 +262,12 @@ const tenantRoutes: RouteRecordRaw[] = [
           { path: 'users', redirect: { name: 'tenant.staff.users' } },
           { path: 'roles', redirect: { name: 'tenant.staff.roles' } },
           {
+            path: 'memberships',
+            name: 'tenant.settings.memberships',
+            component: () => import('@/views/tenant/settings/MembershipSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
             path: 'security',
             name: 'tenant.settings.security',
             component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),

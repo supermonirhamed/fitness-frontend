@@ -8,6 +8,8 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import AdjustEntitlementDialog from '@/components/memberships/AdjustEntitlementDialog.vue'
+import AutoRenewDialog from '@/components/memberships/AutoRenewDialog.vue'
+import Message from 'primevue/message'
 import EntitlementLedger from '@/components/memberships/EntitlementLedger.vue'
 import SellMembershipDrawer from '@/components/memberships/SellMembershipDrawer.vue'
 import ProgressBar from 'primevue/progressbar'
@@ -38,7 +40,8 @@ async function load() {
 }
 onMounted(load)
 
-const current = (e: ClientEntitlement) => ['Active', 'Pending', 'Frozen'].includes(e.status)
+const current = (e: ClientEntitlement) =>
+  ['Active', 'Pending', 'Frozen', 'Suspended'].includes(e.status)
 const what = (e: ClientEntitlement) =>
   e.kind === 'package'
     ? t('plans.kindOne.package')
@@ -59,6 +62,22 @@ const ends = (e: ClientEntitlement) => {
     return t('clientMemberships.ifUsedToday', { date: format.date(e.ends_if_started_today) })
   return e.billing === 'recurring' ? t('clientMemberships.untilCancelled') : '–'
 }
+const period = (e: ClientEntitlement) =>
+  e.period_starts_on && e.period_ends_on
+    ? `${format.date(e.period_starts_on)} – ${format.date(e.period_ends_on)}`
+    : '–'
+
+// Auto-renewal (US-06.10).
+const renewing = ref<ClientEntitlement | null>(null)
+const renewOpen = ref(false)
+function openAutoRenew(e: ClientEntitlement) {
+  renewing.value = e
+  renewOpen.value = true
+}
+const canToggleRenew = (e: ClientEntitlement) =>
+  e.recurring &&
+  auth.can('memberships.create') &&
+  ['Active', 'Suspended', 'Pending', 'Frozen'].includes(e.status)
 const list = (names: string[]) => names.join(locale.value === 'ar' ? '، ' : ', ')
 const where = (e: ClientEntitlement) => {
   const l = e.locations
@@ -156,6 +175,14 @@ const ledgerVersion = ref(0)
             <StatusTag :status="e.status" size="sm" />
           </span>
         </div>
+        <Message
+          v-if="e.status === 'Suspended'"
+          severity="error"
+          :closable="false"
+          icon="pi pi-lock"
+          size="small"
+          >{{ t('clientMemberships.suspended') }}</Message
+        >
         <dl class="facts">
           <div>
             <dt>{{ t('clientMemberships.starts') }}</dt>
@@ -165,6 +192,27 @@ const ledgerVersion = ref(0)
             <dt>{{ t('clientMemberships.ends') }}</dt>
             <dd>{{ ends(e) }}</dd>
           </div>
+          <template v-if="e.recurring && e.period_ends_on">
+            <div>
+              <dt>{{ t('clientMemberships.period') }}</dt>
+              <dd>{{ period(e) }}</dd>
+            </div>
+            <div>
+              <dt>
+                {{ e.renews_on ? t('clientMemberships.renewsOn') : t('clientMemberships.endsOn') }}
+              </dt>
+              <dd>
+                {{ format.date((e.renews_on ?? e.ends_on)!) }}
+                <small v-if="!e.auto_renew" class="muted">{{
+                  t('clientMemberships.autoRenewOff')
+                }}</small>
+              </dd>
+            </div>
+            <div v-if="e.commitment_ends_on">
+              <dt>{{ t('clientMemberships.commitment') }}</dt>
+              <dd>{{ format.date(e.commitment_ends_on) }}</dd>
+            </div>
+          </template>
           <div>
             <dt>{{ t('clientMemberships.validAt') }}</dt>
             <dd>{{ where(e) }}</dd>
@@ -204,7 +252,19 @@ const ledgerVersion = ref(0)
             class="credits__bar"
           />
         </div>
-        <div v-if="e.credits_total !== null || canAdjust(e)" class="item__actions">
+        <div
+          v-if="e.credits_total !== null || canAdjust(e) || canToggleRenew(e)"
+          class="item__actions"
+        >
+          <Button
+            v-if="canToggleRenew(e)"
+            size="small"
+            variant="text"
+            :severity="e.auto_renew ? 'secondary' : 'primary'"
+            icon="pi pi-refresh"
+            :label="e.auto_renew ? t('autoRenew.turnOff') : t('autoRenew.turnOn')"
+            @click="openAutoRenew(e)"
+          />
           <Button
             v-if="e.credits_total !== null"
             size="small"
@@ -234,6 +294,12 @@ const ledgerVersion = ref(0)
       </li>
     </ul>
     <SellMembershipDrawer v-model:visible="sellOpen" :client-id="clientId" @sold="load" />
+    <AutoRenewDialog
+      v-model:visible="renewOpen"
+      :client-id="clientId"
+      :entitlement="renewing"
+      @saved="onAdjusted"
+    />
     <AdjustEntitlementDialog
       v-model:visible="adjustOpen"
       :client-id="clientId"
