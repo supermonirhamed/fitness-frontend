@@ -28,11 +28,13 @@ import TimeField from '@/components/patterns/TimeField.vue'
 import TranslatedField from '@/components/patterns/TranslatedField.vue'
 import {
   tenantApi,
+  type FreezePolicy,
   type MembershipPlan,
   type MembershipPlanInput,
   type PlanKind,
 } from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
+import { usePlanSummary } from '@/composables/usePlanSummary'
 import { statusOf, validationErrors } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
 import { useOrganization } from '@/stores/organization'
@@ -75,6 +77,7 @@ const blank = (): MembershipPlanInput => ({
   activation_max_wait_days: 30,
   intro_offer: null,
   requires_payment: false,
+  freeze_policy: null,
   prices: [],
   rules: {
     services: {
@@ -100,6 +103,10 @@ const categories = ref<{ id: number; name: string }[]>([])
 const services = ref<{ id: number; name: string }[]>([])
 const programs = ref<{ id: number; name: string }[]>([])
 const dropIn = ref(false)
+// Freezing (US-06.11), memberships only.
+const freezeOn = ref(false)
+const freeze = ref<FreezePolicy>({ min_days: 7, max_days: 60, max_per_year: 2, fee: null })
+const { freezeSummary } = usePlanSummary()
 const branches = computed(() => auth.user?.switchable_locations ?? [])
 const errors = ref<Record<string, string[]>>({})
 const error = ref<string | null>(null)
@@ -151,6 +158,8 @@ async function load() {
       }),
     )
     offPeak.value = !!p?.rules.limits.hours
+    freezeOn.value = !!p?.freeze_policy
+    if (p?.freeze_policy) freeze.value = { ...p.freeze_policy }
     hours.value = p?.rules.limits.hours ?? { from: '06:00', to: '16:00' }
     state.value = 'ready'
   } catch (e) {
@@ -369,6 +378,7 @@ async function save() {
     duration_unit: oneTime ? (f.duration_unit ?? 'months') : null,
     billing_interval: pkg || oneTime ? null : (f.billing_interval ?? 'month'),
     min_commitment_months: pkg || oneTime ? null : f.min_commitment_months,
+    freeze_policy: !pkg && freezeOn.value ? freeze.value : null,
     prices: Object.entries(priceAt.value)
       .filter(([, v]) => v.on && v.price !== null)
       .map(([id, v]) => ({ location_id: Number(id), price: v.price! })),
@@ -865,6 +875,88 @@ const title = computed(() =>
           >
         </section>
 
+        <!-- Freezing (US-06.11) -->
+        <section v-if="!isPackage" class="card section">
+          <header class="section__head">
+            <span class="section__icon"><i class="pi pi-pause-circle" aria-hidden="true" /></span>
+            <div>
+              <h2>{{ t('plans.sections.freeze') }}</h2>
+              <p>{{ t('plans.sectionHints.freeze') }}</p>
+            </div>
+          </header>
+          <div class="toggle">
+            <ToggleSwitch v-model="freezeOn" input-id="plan-freeze" />
+            <label for="plan-freeze"
+              >{{ t('plans.freezeAllowed') }}
+              <small class="toggle__hint">{{ t('plans.freezeAllowedHint') }}</small></label
+            >
+          </div>
+          <div v-if="freezeOn" class="grid2">
+            <FormField
+              :label="t('plans.freezeMin')"
+              for="plan-freeze-min"
+              :error="err('freeze_policy.min_days')"
+            >
+              <InputNumber
+                v-model="freeze.min_days"
+                input-id="plan-freeze-min"
+                :min="1"
+                :max="365"
+                :suffix="` ${t('plans.units.days')}`"
+                :placeholder="t('plans.noLimit')"
+                fluid
+              />
+            </FormField>
+            <FormField
+              :label="t('plans.freezeMax')"
+              for="plan-freeze-max"
+              :error="err('freeze_policy.max_days')"
+            >
+              <InputNumber
+                v-model="freeze.max_days"
+                input-id="plan-freeze-max"
+                :min="1"
+                :max="365"
+                :suffix="` ${t('plans.units.days')}`"
+                :placeholder="t('plans.noLimit')"
+                fluid
+              />
+            </FormField>
+            <FormField
+              :label="t('plans.freezePerYear')"
+              for="plan-freeze-year"
+              :help="t('plans.freezePerYearHelp')"
+              :error="err('freeze_policy.max_per_year')"
+            >
+              <InputNumber
+                v-model="freeze.max_per_year"
+                input-id="plan-freeze-year"
+                :min="1"
+                :max="12"
+                :placeholder="t('plans.noLimit')"
+                fluid
+              />
+            </FormField>
+            <FormField
+              :label="t('plans.freezeFee')"
+              for="plan-freeze-fee"
+              :help="t('plans.freezeFeeHelp')"
+              :error="err('freeze_policy.fee')"
+            >
+              <InputNumber
+                v-model="freeze.fee"
+                input-id="plan-freeze-fee"
+                mode="currency"
+                :currency="currency"
+                :min="0"
+                :max-fraction-digits="3"
+                :placeholder="t('plans.noFee')"
+                fluid
+              />
+            </FormField>
+          </div>
+        </section>
+
         <!-- 4. Prices -->
         <section class="card section">
           <header class="section__head">
@@ -1116,6 +1208,9 @@ const title = computed(() =>
               <i class="pi pi-gift" aria-hidden="true" />{{
                 freeTrial ? t('plans.freeTrial') : t(`plans.intros.${form.intro_offer}`)
               }}
+            </li>
+            <li v-if="!isPackage && freezeOn">
+              <i class="pi pi-pause-circle" aria-hidden="true" />{{ freezeSummary(freeze) }}
             </li>
             <li v-if="offPeak">
               <i class="pi pi-clock" aria-hidden="true" />{{ t('plans.hoursSummary', hours) }}

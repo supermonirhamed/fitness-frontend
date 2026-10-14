@@ -299,6 +299,16 @@ const credits = (h: PlanHolder) =>
               <dd>{{ activation }}</dd>
               <dt>{{ t('plans.sections.intro') }}</dt>
               <dd>{{ summary.intro(plan) ?? t('plans.intros.none') }}</dd>
+              <template v-if="plan.kind === 'membership'">
+                <dt>{{ t('plans.sections.freeze') }}</dt>
+                <dd>
+                  {{
+                    plan.freeze_policy
+                      ? summary.freezeSummary(plan.freeze_policy)
+                      : t('plans.freezeNotAllowed')
+                  }}
+                </dd>
+              </template>
             </dl>
           </TabPanel>
 

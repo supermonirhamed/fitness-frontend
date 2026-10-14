@@ -2,13 +2,18 @@
 // A client's memberships and packages (EP-06, US-06.09) on their profile: status, how it starts
 // (US-06.03), start and expiry, credits left with their history, visits this period, and the
 // services and branches it covers. Current ones first, then the history. Staff with
-// memberships.create sell one from here (US-06.08); with entitlements.adjust they add or remove
-// credits or extend the end date, with a reason.
+// memberships.create sell one from here (US-06.08) and freeze it (US-06.11); with
+// entitlements.adjust they add or remove credits or extend the end date, with a reason.
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import AdjustEntitlementDialog from '@/components/memberships/AdjustEntitlementDialog.vue'
 import AutoRenewDialog from '@/components/memberships/AutoRenewDialog.vue'
+import FreezeMembershipDialog from '@/components/memberships/FreezeMembershipDialog.vue'
+import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import Message from 'primevue/message'
 import EntitlementLedger from '@/components/memberships/EntitlementLedger.vue'
 import SellMembershipDrawer from '@/components/memberships/SellMembershipDrawer.vue'
@@ -18,6 +23,7 @@ import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import { tenantApi, type ClientEntitlement } from '@/api/tenant'
+import { apiMessage } from '@/lib/apiErrors'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
 
@@ -125,6 +131,72 @@ function onAdjusted(saved: ClientEntitlement) {
   ledgerVersion.value++
 }
 const ledgerVersion = ref(0)
+
+// Freezing (US-06.11).
+const toast = useToast()
+const freezing = ref<ClientEntitlement | null>(null)
+const freezeOpen = ref(false)
+const canFreeze = (e: ClientEntitlement) =>
+  auth.can('memberships.create') && !!e.freeze_policy && e.status === 'Active' && !e.freeze
+function onFrozen(saved: ClientEntitlement) {
+  onAdjusted(saved)
+  toast.add({
+    severity: 'success',
+    summary:
+      saved.status === 'Frozen'
+        ? t('freeze.frozen', { date: format.date(saved.freeze!.ends_on) })
+        : t('freeze.scheduled', { date: format.date(saved.freeze!.starts_on) }),
+    life: 4000,
+  })
+}
+const ending = ref<ClientEntitlement | null>(null)
+const endOpen = ref(false)
+const endBusy = ref(false)
+const endError = ref<string | null>(null)
+function openEndFreeze(e: ClientEntitlement) {
+  ending.value = e
+  endError.value = null
+  endOpen.value = true
+}
+async function endFreeze() {
+  const e = ending.value
+  if (!e?.freeze) return
+  endBusy.value = true
+  endError.value = null
+  try {
+    onAdjusted(await tenantApi.clients.endFreeze(props.clientId, e.id, e.freeze.id))
+    endOpen.value = false
+  } catch (err) {
+    endError.value = apiMessage(err) ?? t('common.genericError')
+  } finally {
+    endBusy.value = false
+  }
+}
+
+// The actions menu of one membership or package.
+const menu = ref<InstanceType<typeof Menu>>()
+const menuItems = ref<MenuItem[]>([])
+function itemsFor(e: ClientEntitlement): MenuItem[] {
+  return [
+    canFreeze(e) && {
+      label: t('freeze.title'),
+      icon: 'pi pi-pause-circle',
+      command: () => {
+        freezing.value = e
+        freezeOpen.value = true
+      },
+    },
+    canAdjust(e) && {
+      label: t('adjust.title'),
+      icon: 'pi pi-sliders-h',
+      command: () => openAdjust(e),
+    },
+  ].filter(Boolean) as MenuItem[]
+}
+function openMenu(event: Event, e: ClientEntitlement) {
+  menuItems.value = itemsFor(e)
+  menu.value?.toggle(event)
+}
 </script>
 
 <template>
@@ -183,6 +255,29 @@ const ledgerVersion = ref(0)
           size="small"
           >{{ t('clientMemberships.suspended') }}</Message
         >
+        <Message
+          v-if="e.freeze"
+          :severity="e.freeze.status === 'Active' ? 'info' : 'secondary'"
+          :closable="false"
+          icon="pi pi-pause-circle"
+          size="small"
+        >
+          <span class="banner">
+            <span>{{
+              t(e.freeze.status === 'Active' ? 'freeze.frozenBanner' : 'freeze.scheduledBanner', {
+                from: format.date(e.freeze.starts_on),
+                to: format.date(e.freeze.ends_on),
+              })
+            }}</span>
+            <Button
+              v-if="auth.can('memberships.create')"
+              size="small"
+              variant="text"
+              :label="e.freeze.status === 'Active' ? t('freeze.endNow') : t('freeze.callOff')"
+              @click="openEndFreeze(e)"
+            />
+          </span>
+        </Message>
         <dl class="facts">
           <div>
             <dt>{{ t('clientMemberships.starts') }}</dt>
@@ -253,7 +348,7 @@ const ledgerVersion = ref(0)
           />
         </div>
         <div
-          v-if="e.credits_total !== null || canAdjust(e) || canToggleRenew(e)"
+          v-if="e.credits_total !== null || itemsFor(e).length || canToggleRenew(e)"
           class="item__actions"
         >
           <Button
@@ -276,13 +371,14 @@ const ledgerVersion = ref(0)
             @click="toggleHistory(e)"
           />
           <Button
-            v-if="canAdjust(e)"
+            v-if="itemsFor(e).length"
             size="small"
             variant="outlined"
             severity="secondary"
-            icon="pi pi-sliders-h"
-            :label="t('adjust.title')"
-            @click="openAdjust(e)"
+            icon="pi pi-ellipsis-h"
+            :label="t('clientMemberships.actions')"
+            aria-haspopup="true"
+            @click="openMenu($event, e)"
           />
         </div>
         <EntitlementLedger
@@ -293,7 +389,27 @@ const ledgerVersion = ref(0)
         />
       </li>
     </ul>
+    <Menu ref="menu" :model="menuItems" popup />
     <SellMembershipDrawer v-model:visible="sellOpen" :client-id="clientId" @sold="load" />
+    <FreezeMembershipDialog
+      v-model:visible="freezeOpen"
+      :client-id="clientId"
+      :entitlement="freezing"
+      @saved="onFrozen"
+    />
+    <ConfirmActionDialog
+      v-model:visible="endOpen"
+      :title="ending?.freeze?.status === 'Active' ? t('freeze.endNow') : t('freeze.callOff')"
+      :description="
+        ending?.freeze?.status === 'Active' ? t('freeze.endNowText') : t('freeze.callOffText')
+      "
+      :confirm-label="
+        ending?.freeze?.status === 'Active' ? t('freeze.endNow') : t('freeze.callOff')
+      "
+      :loading="endBusy"
+      :error="endError"
+      @confirm="endFreeze"
+    />
     <AutoRenewDialog
       v-model:visible="renewOpen"
       :client-id="clientId"
@@ -323,6 +439,13 @@ const ledgerVersion = ref(0)
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+.banner {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
 }
 .item__tags {
   display: inline-flex;

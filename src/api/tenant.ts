@@ -787,6 +787,8 @@ export interface MembershipPlan {
   intro_offer: 'new_clients' | 'first_time' | null
   /** US-06.08: access waits until the invoice is paid in full. */
   requires_payment: boolean
+  /** US-06.11: memberships only; null: can't be frozen. */
+  freeze_policy: FreezePolicy | null
   rules: {
     services: {
       mode: 'all' | 'categories' | 'services' | 'programs'
@@ -901,6 +903,43 @@ export interface ClientEntitlement {
   period_ends_on: string | null
   commitment_ends_on: string | null
   renews_on: string | null
+  /** US-06.11: the plan's freeze policy, freezes in the last 12 months, the current or upcoming one. */
+  freeze_policy: FreezePolicy | null
+  freezes_this_year: number
+  freeze: {
+    id: number
+    status: 'Scheduled' | 'Active'
+    starts_on: string
+    ends_on: string
+    days: number
+    reason: string
+  } | null
+}
+
+/** How a membership may be frozen (US-06.11); null limits mean none. */
+export interface FreezePolicy {
+  min_days: number | null
+  max_days: number | null
+  max_per_year: number | null
+  fee: number | null
+}
+
+/** An upcoming booking a membership change affects (US-06.11–13). */
+export interface AffectedBooking {
+  id: number
+  client: string | null
+  session: string
+  starts_at: string
+  location: string | null
+}
+
+/** What a freeze would do (US-06.11). */
+export interface FreezePreview {
+  days: number
+  fee: number
+  ends_on: string | null
+  renews_on: string | null
+  bookings: AffectedBooking[]
 }
 
 /** A credit movement of a package (US-06.09). */
@@ -1976,6 +2015,39 @@ export const tenantApi = {
     ): Promise<ClientEntitlement> {
       return (
         await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/auto-renew`, input)
+      ).data.data
+    },
+    /** US-06.11: what a freeze would do, the freeze itself, and ending one early. */
+    async freezePreview(
+      clientId: number,
+      entitlementId: number,
+      input: { starts_on: string; ends_on: string },
+    ): Promise<FreezePreview> {
+      return (
+        await http.post(
+          `/api/clients/${clientId}/entitlements/${entitlementId}/freeze/preview`,
+          input,
+        )
+      ).data.data
+    },
+    async freeze(
+      clientId: number,
+      entitlementId: number,
+      input: { starts_on: string; ends_on: string; reason: string; cancel_bookings: boolean },
+    ): Promise<ClientEntitlement> {
+      return (
+        await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/freeze`, input)
+      ).data.data
+    },
+    async endFreeze(
+      clientId: number,
+      entitlementId: number,
+      freezeId: number,
+    ): Promise<ClientEntitlement> {
+      return (
+        await http.post(
+          `/api/clients/${clientId}/entitlements/${entitlementId}/freezes/${freezeId}/end`,
+        )
       ).data.data
     },
     async family(id: number): Promise<ClientFamily> {

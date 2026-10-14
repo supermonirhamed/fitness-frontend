@@ -1,5 +1,5 @@
 import { useI18n } from 'vue-i18n'
-import type { MembershipPlan } from '@/api/tenant'
+import type { FreezePolicy, MembershipPlan } from '@/api/tenant'
 import { useFormat } from './useFormat'
 
 /** One-line summaries of a plan or package (EP-06), shared by the plans list and details page. */
@@ -65,5 +65,24 @@ export function usePlanSummary() {
   const intro = (p: MembershipPlan) =>
     p.intro_offer ? (isFree(p) ? t('plans.freeTrial') : t(`plans.intros.${p.intro_offer}`)) : null
 
-  return { access, billing, covers, badge, priceRange, isFree, intro }
+  /** US-06.11: "Freeze 7–60 days, 2× a year, fee SAR 50". */
+  const freezeSummary = (f: FreezePolicy) => {
+    const days =
+      f.min_days && f.max_days
+        ? t('plans.freezeDaysRange', { min: f.min_days, max: f.max_days })
+        : f.max_days
+          ? t('plans.freezeDaysMax', { n: f.max_days })
+          : f.min_days
+            ? t('plans.freezeDaysMin', { n: f.min_days })
+            : t('plans.freezeAny')
+    return [
+      days,
+      f.max_per_year ? t('plans.freezePerYearSummary', { n: f.max_per_year }) : null,
+      f.fee ? t('plans.freezeFeeSummary', { fee: format.money(f.fee) }) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  }
+
+  return { access, billing, covers, badge, priceRange, isFree, intro, freezeSummary }
 }
