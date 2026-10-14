@@ -2642,6 +2642,7 @@ export default {
     moveDown: 'Move down',
   },
   clientMemberships: {
+    limitReached: 'Limit reached · resets {date}',
     uncovered:
       'No upcoming bookings without cover | 1 upcoming booking is no longer covered: its membership or package ended | {n} upcoming bookings are no longer covered: their membership or package ended',
     actions: 'More',

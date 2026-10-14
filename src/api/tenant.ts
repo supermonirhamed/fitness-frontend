@@ -910,7 +910,7 @@ export interface ClientEntitlement {
     excluded: string[]
     locations: string[]
   }
-  visits: { used: number; limit: number | null; period: 'week' | 'month' }
+  visits: { used: number; limit: number | null; period: 'week' | 'month'; resets_on?: string }
   /** US-06.10: recurring memberships. */
   recurring: boolean
   auto_renew: boolean

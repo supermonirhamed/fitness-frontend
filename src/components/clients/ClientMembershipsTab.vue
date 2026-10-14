@@ -495,7 +495,18 @@ function openMenu(event: Event, e: ClientEntitlement) {
           </div>
           <div v-if="e.kind === 'membership' && e.status !== 'Pending'">
             <dt>{{ t(`clientMemberships.visitsThis.${e.visits.period}`) }}</dt>
-            <dd class="num">{{ visits(e) }}</dd>
+            <dd class="num">
+              {{ visits(e) }}
+              <small
+                v-if="
+                  e.visits.limit !== null && e.visits.used >= e.visits.limit && e.visits.resets_on
+                "
+                class="limit-reached"
+                >{{
+                  t('clientMemberships.limitReached', { date: format.date(e.visits.resets_on) })
+                }}</small
+              >
+            </dd>
           </div>
           <div v-if="e.invoice">
             <dt>{{ t('clientMemberships.invoice') }}</dt>
@@ -748,5 +759,10 @@ function openMenu(event: Event, e: ClientEntitlement) {
   .facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.limit-reached {
+  display: block;
+  font: var(--text-caption);
+  color: var(--sev-warn-fg);
 }
 </style>
