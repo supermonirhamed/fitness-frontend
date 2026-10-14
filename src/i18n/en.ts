@@ -2804,6 +2804,16 @@ export default {
   },
   payments: {
     title: 'Payment',
+    receiptLanguage: 'Receipt language',
+    downloadPdf: 'Download PDF',
+    pdfHint: 'Choose “Save as PDF” as the printer.',
+    email: 'Email',
+    emailTo: 'Send to',
+    emailPlaceholder: 'The client’s email',
+    emailHint: 'Leave it empty to use the client’s email. Sent in the receipt’s language.',
+    send: 'Send',
+    emailed: 'Receipt sent',
+    emailedTo: 'Receipt sent to {email}',
     loadError: "Payments couldn't be loaded.",
     status: {
       unpaid: 'Unpaid',

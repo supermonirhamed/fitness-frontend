@@ -2768,6 +2768,16 @@ const ar: typeof en = {
   },
   payments: {
     title: 'الدفع',
+    receiptLanguage: 'لغة الإيصال',
+    downloadPdf: 'تنزيل PDF',
+    pdfHint: 'اختر «حفظ بتنسيق PDF» كطابعة.',
+    email: 'إرسال بالبريد',
+    emailTo: 'إرسال إلى',
+    emailPlaceholder: 'بريد العميل',
+    emailHint: 'اتركه فارغًا لاستخدام بريد العميل. يُرسل بلغة العميل.',
+    send: 'إرسال',
+    emailed: 'تم إرسال الإيصال',
+    emailedTo: 'تم إرسال الإيصال إلى {email}',
     loadError: 'تعذّر تحميل المدفوعات.',
     status: {
       unpaid: 'غير مدفوع',

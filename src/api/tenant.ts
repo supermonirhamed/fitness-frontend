@@ -1437,7 +1437,9 @@ export interface Receipt extends Payment {
     legal_name: string | null
     tax_number: string | null
   }
-  client: { name: string | null; member_id: string | null }
+  client: { name: string | null; member_id: string | null; email?: string | null }
+  /** The client's language (US-07.04). */
+  language?: 'ar' | 'en'
   item: { service: string | null; session: string | null }
   /** US-07.03: the invoices it paid, and how much went to each. */
   invoices?: { number: string | null; for: string | null; amount: number }[]
@@ -2736,6 +2738,11 @@ export const tenantApi = {
     },
     async receipt(id: number): Promise<Receipt> {
       return (await http.get(`/api/payments/${id}/receipt`)).data.data
+    },
+    /** US-07.04: emails the receipt in the client's language, to their email or the one given. */
+    async emailReceipt(id: number, email?: string | null): Promise<{ sent_to: string | null }> {
+      return (await http.post(`/api/payments/${id}/receipt/email`, { email: email || null })).data
+        .data
     },
   },
   /** Staff manage a session's waitlist (US-04.13). */

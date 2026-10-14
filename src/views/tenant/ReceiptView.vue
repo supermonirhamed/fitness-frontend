@@ -1,26 +1,79 @@
 <script setup lang="ts">
-// A desk payment's receipt (US-04.15, brief 05 §6), on its own page so it prints cleanly: 80 mm
-// thermal or A4, in the page's language. "Download PDF" is the browser's print to PDF.
-import { onMounted, ref } from 'vue'
+// A payment's receipt (US-04.15, US-07.04), on its own page so it prints cleanly: 80 mm thermal or
+// A4, in the client's language (switchable). "Download PDF" prints A4 to PDF in the browser;
+// "Email" sends it to the client (or an address given) in their language.
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
+import Popover from 'primevue/popover'
 import SelectButton from 'primevue/selectbutton'
 import { tenantApi, type Receipt } from '@/api/tenant'
 import { useFormat } from '@/composables/useFormat'
+import { apiMessage } from '@/lib/apiErrors'
+import en from '@/i18n/en'
+import ar from '@/i18n/ar'
 
 const route = useRoute()
-const { t } = useI18n()
+// The receipt has its own language, the client's (not necessarily the staff member's); the
+// toolbar stays in the staff member's.
+const { t, locale: lang } = useI18n({
+  useScope: 'local',
+  inheritLocale: false,
+  messages: { en, ar },
+})
+const { t: tu } = useI18n()
 const format = useFormat()
+const toast = useToast()
 const receipt = ref<Receipt | null>(null)
 const failed = ref(false)
 const paper = ref<'thermal' | 'a4'>('thermal')
+const dir = computed(() => (lang.value === 'ar' ? 'rtl' : 'ltr'))
 
 const print = () => window.print()
+async function downloadPdf() {
+  paper.value = 'a4'
+  await nextTick()
+  toast.add({ severity: 'info', summary: tu('payments.pdfHint'), life: 5000 })
+  window.print()
+}
+
+// Email
+const emailPanel = ref<InstanceType<typeof Popover>>()
+const email = ref('')
+const sending = ref(false)
+async function send() {
+  if (!receipt.value) return
+  sending.value = true
+  try {
+    const { sent_to } = await tenantApi.payments.emailReceipt(
+      receipt.value.id,
+      email.value.trim() || null,
+    )
+    emailPanel.value?.hide()
+    toast.add({
+      severity: 'success',
+      summary: sent_to ? tu('payments.emailedTo', { email: sent_to }) : tu('payments.emailed'),
+      life: 4000,
+    })
+  } catch (e) {
+    toast.add({
+      severity: 'error',
+      summary: apiMessage(e) ?? tu('common.genericError'),
+      life: 5000,
+    })
+  } finally {
+    sending.value = false
+  }
+}
 
 onMounted(async () => {
   try {
     receipt.value = await tenantApi.payments.receipt(Number(route.params.id))
+    lang.value = receipt.value.language ?? 'ar'
+    email.value = receipt.value.client.email ?? ''
   } catch {
     failed.value = true
   }
@@ -33,18 +86,58 @@ onMounted(async () => {
       <SelectButton
         v-model="paper"
         :options="[
-          { value: 'thermal', label: t('payments.paper.thermal') },
-          { value: 'a4', label: t('payments.paper.a4') },
+          { value: 'thermal', label: tu('payments.paper.thermal') },
+          { value: 'a4', label: tu('payments.paper.a4') },
         ]"
         option-label="label"
         option-value="value"
         :allow-empty="false"
       />
-      <Button icon="pi pi-print" :label="t('payments.print')" @click="print" />
+      <SelectButton
+        v-model="lang"
+        :options="[
+          { value: 'ar', label: 'العربية' },
+          { value: 'en', label: 'English' },
+        ]"
+        option-label="label"
+        option-value="value"
+        :allow-empty="false"
+        :aria-label="tu('payments.receiptLanguage')"
+      />
+      <Button icon="pi pi-print" :label="tu('payments.print')" @click="print" />
+      <Button
+        icon="pi pi-file-pdf"
+        :label="tu('payments.downloadPdf')"
+        severity="secondary"
+        variant="outlined"
+        @click="downloadPdf"
+      />
+      <Button
+        icon="pi pi-envelope"
+        :label="tu('payments.email')"
+        severity="secondary"
+        variant="outlined"
+        :disabled="!receipt"
+        @click="emailPanel?.toggle($event)"
+      />
+      <Popover ref="emailPanel">
+        <form class="email" @submit.prevent="send">
+          <label for="receipt-email" class="email__label">{{ tu('payments.emailTo') }}</label>
+          <InputText
+            id="receipt-email"
+            v-model="email"
+            type="email"
+            dir="ltr"
+            :placeholder="tu('payments.emailPlaceholder')"
+          />
+          <small class="email__hint">{{ tu('payments.emailHint') }}</small>
+          <Button type="submit" :label="tu('payments.send')" icon="pi pi-send" :loading="sending" />
+        </form>
+      </Popover>
     </div>
 
-    <p v-if="failed" class="no-print">{{ t('payments.loadError') }}</p>
-    <article v-else-if="receipt" class="receipt">
+    <p v-if="failed" class="no-print">{{ tu('payments.loadError') }}</p>
+    <article v-else-if="receipt" class="receipt" :dir="dir" :lang="lang">
       <header class="receipt__head">
         <img
           v-if="receipt.organization.logo_url"
@@ -125,6 +218,19 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   gap: 16px;
+}
+.email {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 280px;
+}
+.email__label {
+  font: 500 14px var(--font-sans);
+}
+.email__hint {
+  font: var(--text-small);
+  color: var(--text-muted);
 }
 .toolbar {
   display: flex;
