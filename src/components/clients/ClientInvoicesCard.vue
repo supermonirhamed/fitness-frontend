@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // A client's invoices as payer (US-06.08: membership and package sales; renewals, US-06.10): what
 // each was for, its total, paid amount and balance, open ones first. Staff with payments.create
-// record a payment against an open invoice, in part or in full.
+// record a payment against an open invoice, in part or in full. The client's account credit
+// (from an immediate downgrade, US-06.12, or a cancellation refund, US-06.13) shows in the header.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -32,10 +33,16 @@ const auth = useStaffAuth()
 
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const invoices = ref<Invoice[]>([])
+const credit = ref<number>(0)
 async function load() {
   state.value = 'loading'
   try {
-    invoices.value = await tenantApi.invoices.forClient(props.clientId)
+    const [list, account] = await Promise.all([
+      tenantApi.invoices.forClient(props.clientId),
+      tenantApi.clients.accountCredit(props.clientId).catch(() => null),
+    ])
+    invoices.value = list
+    credit.value = account?.balance ?? 0
     state.value = 'ready'
   } catch {
     state.value = 'error'
@@ -118,6 +125,11 @@ async function record() {
   <section class="card">
     <header class="card__head">
       <h3>{{ t('invoices.title') }}</h3>
+      <span v-if="credit" class="credit"
+        ><i class="pi pi-wallet" aria-hidden="true" />{{
+          t('invoices.accountCredit', { amount: format.money(credit) })
+        }}</span
+      >
     </header>
     <ErrorState v-if="state === 'error'" compact @retry="load" />
     <DataTable v-else :value="invoices" :loading="state === 'loading'" data-key="id">
@@ -253,6 +265,17 @@ async function record() {
 }
 .card__head {
   padding: 14px 16px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.credit {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font: 500 13px var(--font-sans);
+  color: var(--sev-success-fg, var(--text-secondary));
 }
 .card__head h3 {
   margin: 0;

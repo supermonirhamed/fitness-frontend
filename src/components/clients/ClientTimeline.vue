@@ -22,6 +22,7 @@ const TYPES: TimelineType[] = [
   'attendance',
   'waitlist',
   'payments',
+  'memberships',
   'profile',
   'notes',
 ]
@@ -33,6 +34,7 @@ const ICONS: Record<string, string> = {
   payments: 'pi-wallet',
   profile: 'pi-user-edit',
   notes: 'pi-comment',
+  memberships: 'pi-id-card',
   other: 'pi-circle',
 }
 const type = ref<TimelineType | 'all'>('all')
@@ -77,6 +79,8 @@ const title = (e: TimelineEvent) => {
 function detail(e: TimelineEvent): string {
   const v = e.values
   const parts: string[] = []
+  if (typeof v.from === 'string' && typeof v.to === 'string') parts.push(`${v.from} → ${v.to}`)
+  else if (typeof v.plan === 'string') parts.push(v.plan)
   if (typeof v.session === 'string') parts.push(v.session)
   if (typeof v.starts_at === 'string') parts.push(format.dateTime(v.starts_at))
   if (typeof v.amount === 'number') parts.push(format.money(v.amount))
@@ -177,6 +181,9 @@ function detail(e: TimelineEvent): string {
 .event__dot--payments,
 .event__dot--attendance {
   color: var(--sev-success-solid);
+}
+.event__dot--memberships {
+  color: var(--primary-600);
 }
 .event__dot--waitlist {
   color: var(--sev-warn-solid);

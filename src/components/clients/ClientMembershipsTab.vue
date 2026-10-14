@@ -3,7 +3,8 @@
 // (US-06.03), start and expiry, credits left with their history, visits this period, and the
 // services and branches it covers. Current ones first, then the history. Staff with
 // memberships.create sell one from here (US-06.08) and freeze it (US-06.11); with
-// entitlements.adjust they add or remove credits or extend the end date, with a reason.
+// entitlements.adjust they add or remove credits or extend the end date, with a reason. Recurring
+// memberships change plan here (US-06.12).
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -12,6 +13,7 @@ import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import AdjustEntitlementDialog from '@/components/memberships/AdjustEntitlementDialog.vue'
 import AutoRenewDialog from '@/components/memberships/AutoRenewDialog.vue'
+import ChangePlanDialog from '@/components/memberships/ChangePlanDialog.vue'
 import FreezeMembershipDialog from '@/components/memberships/FreezeMembershipDialog.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import Message from 'primevue/message'
@@ -149,35 +151,80 @@ function onFrozen(saved: ClientEntitlement) {
     life: 4000,
   })
 }
-const ending = ref<ClientEntitlement | null>(null)
-const endOpen = ref(false)
-const endBusy = ref(false)
-const endError = ref<string | null>(null)
-function openEndFreeze(e: ClientEntitlement) {
-  ending.value = e
-  endError.value = null
-  endOpen.value = true
+// A confirmation before ending a freeze or calling off a planned change.
+const confirm = ref<{
+  title: string
+  text: string
+  run: () => Promise<ClientEntitlement>
+} | null>(null)
+const confirmOpen = ref(false)
+const confirmBusy = ref(false)
+const confirmError = ref<string | null>(null)
+function ask(title: string, text: string, run: () => Promise<ClientEntitlement>) {
+  confirm.value = { title, text, run }
+  confirmError.value = null
+  confirmOpen.value = true
 }
-async function endFreeze() {
-  const e = ending.value
-  if (!e?.freeze) return
-  endBusy.value = true
-  endError.value = null
+async function confirmed() {
+  if (!confirm.value) return
+  confirmBusy.value = true
+  confirmError.value = null
   try {
-    onAdjusted(await tenantApi.clients.endFreeze(props.clientId, e.id, e.freeze.id))
-    endOpen.value = false
+    onAdjusted(await confirm.value.run())
+    confirmOpen.value = false
   } catch (err) {
-    endError.value = apiMessage(err) ?? t('common.genericError')
+    confirmError.value = apiMessage(err) ?? t('common.genericError')
   } finally {
-    endBusy.value = false
+    confirmBusy.value = false
   }
 }
+function openEndFreeze(e: ClientEntitlement) {
+  const active = e.freeze?.status === 'Active'
+  ask(
+    active ? t('freeze.endNow') : t('freeze.callOff'),
+    active ? t('freeze.endNowText') : t('freeze.callOffText'),
+    () => tenantApi.clients.endFreeze(props.clientId, e.id, e.freeze!.id),
+  )
+}
 
+// Upgrade / downgrade (US-06.12).
+const changing = ref<ClientEntitlement | null>(null)
+const changeOpen = ref(false)
+const canChange = (e: ClientEntitlement) =>
+  auth.can('memberships.create') && e.recurring && e.status === 'Active' && !e.scheduled_change
+function onChanged(saved: ClientEntitlement) {
+  onAdjusted(saved)
+  toast.add({
+    severity: 'success',
+    summary: saved.scheduled_change
+      ? t('changePlan.scheduled', {
+          name: saved.scheduled_change.name,
+          date: format.date(saved.scheduled_change.on),
+        })
+      : t('changePlan.changed', { name: saved.name }),
+    life: 4000,
+  })
+}
+function openCancelChange(e: ClientEntitlement) {
+  ask(
+    t('changePlan.callOff'),
+    t('changePlan.callOffText', { name: e.scheduled_change!.name }),
+    () => tenantApi.clients.cancelPlanChange(props.clientId, e.id),
+  )
+}
 // The actions menu of one membership or package.
 const menu = ref<InstanceType<typeof Menu>>()
 const menuItems = ref<MenuItem[]>([])
 function itemsFor(e: ClientEntitlement): MenuItem[] {
   return [
+    canChange(e) && {
+      label: t('changePlan.title'),
+      icon: 'pi pi-arrow-right-arrow-left',
+      command: () => {
+        changing.value = e
+        changeOpen.value = true
+      },
+    },
     canFreeze(e) && {
       label: t('freeze.title'),
       icon: 'pi pi-pause-circle',
@@ -275,6 +322,29 @@ function openMenu(event: Event, e: ClientEntitlement) {
               variant="text"
               :label="e.freeze.status === 'Active' ? t('freeze.endNow') : t('freeze.callOff')"
               @click="openEndFreeze(e)"
+            />
+          </span>
+        </Message>
+        <Message
+          v-if="e.scheduled_change"
+          severity="secondary"
+          :closable="false"
+          icon="pi pi-arrow-down"
+          size="small"
+        >
+          <span class="banner">
+            <span>{{
+              t('changePlan.waiting', {
+                name: e.scheduled_change.name,
+                date: format.date(e.scheduled_change.on),
+              })
+            }}</span>
+            <Button
+              v-if="auth.can('memberships.create')"
+              size="small"
+              variant="text"
+              :label="t('changePlan.callOff')"
+              @click="openCancelChange(e)"
             />
           </span>
         </Message>
@@ -397,18 +467,20 @@ function openMenu(event: Event, e: ClientEntitlement) {
       :entitlement="freezing"
       @saved="onFrozen"
     />
+    <ChangePlanDialog
+      v-model:visible="changeOpen"
+      :client-id="clientId"
+      :entitlement="changing"
+      @saved="onChanged"
+    />
     <ConfirmActionDialog
-      v-model:visible="endOpen"
-      :title="ending?.freeze?.status === 'Active' ? t('freeze.endNow') : t('freeze.callOff')"
-      :description="
-        ending?.freeze?.status === 'Active' ? t('freeze.endNowText') : t('freeze.callOffText')
-      "
-      :confirm-label="
-        ending?.freeze?.status === 'Active' ? t('freeze.endNow') : t('freeze.callOff')
-      "
-      :loading="endBusy"
-      :error="endError"
-      @confirm="endFreeze"
+      v-model:visible="confirmOpen"
+      :title="confirm?.title ?? ''"
+      :description="confirm?.text"
+      :confirm-label="confirm?.title ?? ''"
+      :loading="confirmBusy"
+      :error="confirmError"
+      @confirm="confirmed"
     />
     <AutoRenewDialog
       v-model:visible="renewOpen"

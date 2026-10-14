@@ -666,7 +666,14 @@ export interface ClientInput {
 }
 
 export type TimelineType =
-  'bookings' | 'cancellations' | 'attendance' | 'waitlist' | 'payments' | 'profile' | 'notes'
+  | 'bookings'
+  | 'cancellations'
+  | 'attendance'
+  | 'waitlist'
+  | 'payments'
+  | 'memberships'
+  | 'profile'
+  | 'notes'
 
 /** One thing that happened with a client (US-05.06). */
 export interface TimelineEvent {
@@ -906,6 +913,9 @@ export interface ClientEntitlement {
   /** US-06.11: the plan's freeze policy, freezes in the last 12 months, the current or upcoming one. */
   freeze_policy: FreezePolicy | null
   freezes_this_year: number
+  /** US-06.12: a downgrade waiting for the next renewal; the price per period as sold. */
+  scheduled_change: { plan_id: number; name: string; on: string } | null
+  price: number
   freeze: {
     id: number
     status: 'Scheduled' | 'Active'
@@ -940,6 +950,34 @@ export interface FreezePreview {
   ends_on: string | null
   renews_on: string | null
   bookings: AffectedBooking[]
+}
+
+/** What moving to another plan would do (US-06.12). */
+export interface PlanChangePreview {
+  direction: 'upgrade' | 'downgrade'
+  effective_on: string
+  immediate: boolean
+  days_left: number
+  /** Invoiced (upgrade) or credited (immediate downgrade) for the rest of the period. */
+  amount: number
+  currency: string
+  new_price: number
+  bookings: AffectedBooking[]
+}
+
+/** A client's account credit (US-06.12/13; spending it with US-07.09). */
+export interface AccountCreditSummary {
+  balance: number
+  currency: string
+  entries: {
+    id: number
+    kind: 'plan_change' | 'refund' | 'adjusted' | 'used'
+    change: number
+    balance_after: number
+    reason: string | null
+    actor: string | null
+    at: string | null
+  }[]
 }
 
 /** A credit movement of a package (US-06.09). */
@@ -2049,6 +2087,41 @@ export const tenantApi = {
           `/api/clients/${clientId}/entitlements/${entitlementId}/freezes/${freezeId}/end`,
         )
       ).data.data
+    },
+    /** US-06.12: upgrade or downgrade; `bookings` keeps or cancels each one the new plan doesn't cover. */
+    async changePlanPreview(
+      clientId: number,
+      entitlementId: number,
+      input: { plan_id: number; immediate: boolean },
+    ): Promise<PlanChangePreview> {
+      return (
+        await http.post(
+          `/api/clients/${clientId}/entitlements/${entitlementId}/change-plan/preview`,
+          input,
+        )
+      ).data.data
+    },
+    async changePlan(
+      clientId: number,
+      entitlementId: number,
+      input: {
+        plan_id: number
+        immediate: boolean
+        reason?: string | null
+        bookings: Record<number, 'keep' | 'cancel'>
+      },
+    ): Promise<ClientEntitlement> {
+      return (
+        await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/change-plan`, input)
+      ).data.data
+    },
+    async cancelPlanChange(clientId: number, entitlementId: number): Promise<ClientEntitlement> {
+      return (
+        await http.delete(`/api/clients/${clientId}/entitlements/${entitlementId}/change-plan`)
+      ).data.data
+    },
+    async accountCredit(clientId: number): Promise<AccountCreditSummary> {
+      return (await http.get(`/api/clients/${clientId}/account-credit`)).data.data
     },
     async family(id: number): Promise<ClientFamily> {
       return (await http.get(`/api/clients/${id}/family`)).data.data
