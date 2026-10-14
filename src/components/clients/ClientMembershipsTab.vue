@@ -4,7 +4,8 @@
 // services and branches it covers. Current ones first, then the history. Staff with
 // memberships.create sell one from here (US-06.08) and freeze it (US-06.11); with
 // entitlements.adjust they add or remove credits or extend the end date, with a reason. Recurring
-// memberships change plan here (US-06.12); any can be cancelled (US-06.13).
+// memberships change plan here (US-06.12); any can be cancelled (US-06.13) or, when its product
+// allows, shared with the holder's children (US-06.15). Shared ones show on the child's profile too.
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -15,6 +16,7 @@ import AdjustEntitlementDialog from '@/components/memberships/AdjustEntitlementD
 import AutoRenewDialog from '@/components/memberships/AutoRenewDialog.vue'
 import CancelMembershipDialog from '@/components/memberships/CancelMembershipDialog.vue'
 import ChangePlanDialog from '@/components/memberships/ChangePlanDialog.vue'
+import FamilySharingDialog from '@/components/memberships/FamilySharingDialog.vue'
 import FreezeMembershipDialog from '@/components/memberships/FreezeMembershipDialog.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import Message from 'primevue/message'
@@ -59,6 +61,8 @@ async function load() {
 }
 onMounted(load)
 
+/** Held by this client, not shared with them by a guardian (US-06.15): only the holder's are managed here. */
+const own = (e: ClientEntitlement) => e.holder.id === props.clientId
 const current = (e: ClientEntitlement) =>
   ['Active', 'Pending', 'Frozen', 'Suspended'].includes(e.status)
 const what = (e: ClientEntitlement) =>
@@ -94,6 +98,7 @@ function openAutoRenew(e: ClientEntitlement) {
   renewOpen.value = true
 }
 const canToggleRenew = (e: ClientEntitlement) =>
+  own(e) &&
   e.recurring &&
   !e.cancellation &&
   auth.can('memberships.create') &&
@@ -246,11 +251,28 @@ function openWithdraw(e: ClientEntitlement) {
   )
 }
 
+// Family sharing (US-06.15).
+const sharingWith = ref<ClientEntitlement | null>(null)
+const shareOpen = ref(false)
+const canShare = (e: ClientEntitlement) =>
+  auth.can('memberships.create') && !!e.sharing && current(e)
+const sharedWith = (e: ClientEntitlement) =>
+  list(e.sharing!.members.map((m) => t('sharing.memberVisits', { name: m.name, n: m.visits })))
+
 // The actions menu of one membership or package.
 const menu = ref<InstanceType<typeof Menu>>()
 const menuItems = ref<MenuItem[]>([])
 function itemsFor(e: ClientEntitlement): MenuItem[] {
+  if (!own(e)) return []
   return [
+    canShare(e) && {
+      label: t('sharing.title'),
+      icon: 'pi pi-users',
+      command: () => {
+        sharingWith.value = e
+        shareOpen.value = true
+      },
+    },
     canChange(e) && {
       label: t('changePlan.title'),
       icon: 'pi pi-arrow-right-arrow-left',
@@ -334,6 +356,11 @@ function openMenu(event: Event, e: ClientEntitlement) {
             >
           </div>
           <span class="item__tags">
+            <span v-if="!own(e)" class="shared"
+              ><i class="pi pi-users" aria-hidden="true" />{{
+                t('sharing.sharedBy', { name: e.holder.name })
+              }}</span
+            >
             <span v-if="e.awaiting_payment" class="awaiting"
               ><i class="pi pi-lock" aria-hidden="true" />{{
                 t('clientMemberships.awaitingPayment')
@@ -365,7 +392,7 @@ function openMenu(event: Event, e: ClientEntitlement) {
               })
             }}</span>
             <Button
-              v-if="auth.can('memberships.create')"
+              v-if="own(e) && auth.can('memberships.create')"
               size="small"
               variant="text"
               :label="e.freeze.status === 'Active' ? t('freeze.endNow') : t('freeze.callOff')"
@@ -391,7 +418,9 @@ function openMenu(event: Event, e: ClientEntitlement) {
               }}<template v-if="e.cancellation.note"> · {{ e.cancellation.note }}</template></span
             >
             <Button
-              v-if="e.status !== 'Cancelled' && e.recurring && auth.can('memberships.create')"
+              v-if="
+                own(e) && e.status !== 'Cancelled' && e.recurring && auth.can('memberships.create')
+              "
               size="small"
               variant="text"
               :label="t('cancelMembership.withdraw')"
@@ -414,7 +443,7 @@ function openMenu(event: Event, e: ClientEntitlement) {
               })
             }}</span>
             <Button
-              v-if="auth.can('memberships.create')"
+              v-if="own(e) && auth.can('memberships.create')"
               size="small"
               variant="text"
               :label="t('changePlan.callOff')"
@@ -452,6 +481,10 @@ function openMenu(event: Event, e: ClientEntitlement) {
               <dd>{{ format.date(e.commitment_ends_on) }}</dd>
             </div>
           </template>
+          <div v-if="own(e) && e.sharing">
+            <dt>{{ t('sharing.sharedWith') }}</dt>
+            <dd>{{ e.sharing.members.length ? sharedWith(e) : t('sharing.nobody') }}</dd>
+          </div>
           <div>
             <dt>{{ t('clientMemberships.validAt') }}</dt>
             <dd>{{ where(e) }}</dd>
@@ -541,6 +574,12 @@ function openMenu(event: Event, e: ClientEntitlement) {
       :entitlement="freezing"
       @saved="onFrozen"
     />
+    <FamilySharingDialog
+      v-model:visible="shareOpen"
+      :client-id="clientId"
+      :entitlement="sharingWith"
+      @saved="onAdjusted"
+    />
     <CancelMembershipDialog
       v-model:visible="cancelOpen"
       :client-id="clientId"
@@ -603,6 +642,13 @@ function openMenu(event: Event, e: ClientEntitlement) {
   display: inline-flex;
   gap: 8px;
   align-items: center;
+}
+.shared {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font: var(--text-caption);
+  color: var(--primary-700);
 }
 .awaiting {
   display: inline-flex;

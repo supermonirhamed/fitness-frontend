@@ -1751,6 +1751,12 @@ export default {
   },
   plans: {
     freezeAllowed: 'Can be frozen',
+    sharingAllowed: 'Family members can share it',
+    sharingAllowedHint:
+      'The holder chooses which of their children share it. Without this it is never shared.',
+    sharingMax: 'Family members besides the holder',
+    sharingSummary: 'Shared by up to {n} family members',
+    sharingNotAllowed: 'Not shared',
     freezeAllowedHint: 'The frozen days are added to the end and renewal dates.',
     freezeMin: 'Shortest freeze',
     freezeMax: 'Longest freeze',
@@ -1859,6 +1865,7 @@ export default {
     sections: {
       intro: 'Intro offer',
       freeze: 'Freezing',
+      sharing: 'Family sharing',
       credits: 'Credits & validity',
       activation: 'When it starts',
       basics: 'Basics',
@@ -1958,6 +1965,7 @@ export default {
     sectionHints: {
       intro: 'Limit it to new clients: a first month at half price, or a free trial class.',
       freeze: 'Whether members can pause it when travelling or injured, without losing days.',
+      sharing: 'Let a parent share it with their children: one membership or one pool of credits.',
       credits: 'How many sessions the package gives, and how long it lasts.',
       activation: 'So clients don’t lose days before they use it.',
       basics: 'How the plan appears to staff and clients.',
@@ -2333,6 +2341,7 @@ export default {
       membership_auto_renew_on: 'Auto-renewal turned on',
       membership_auto_renew_off: 'Auto-renewal turned off',
       membership_cancelled: 'Membership cancelled',
+      membership_sharing_updated: 'Family sharing changed',
       membership_cancellation_withdrawn: 'Cancellation withdrawn',
       membership_expired: 'Membership or package expired',
       account_credit_changed: 'Account credit changed',
@@ -2524,6 +2533,17 @@ export default {
     waiting: 'Changes to {name} at the renewal on {date}.',
     callOff: 'Call off change',
     callOffText: 'The membership stays on its current plan instead of moving to {name}.',
+  },
+  sharing: {
+    title: 'Family sharing',
+    save: 'Save',
+    text: 'Choose up to {n} of the holder’s children to share it. They use the same membership or credits; each booking shows who made it.',
+    noChildren: 'This client has no children in their family yet. Add them on the Family tab.',
+    age: '{n} yrs',
+    sharedBy: 'Shared by {name}',
+    sharedWith: 'Shared with',
+    nobody: 'Nobody yet',
+    memberVisits: '{name} ({n})',
   },
   freeze: {
     title: 'Freeze',

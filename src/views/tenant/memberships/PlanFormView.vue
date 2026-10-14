@@ -78,6 +78,7 @@ const blank = (): MembershipPlanInput => ({
   intro_offer: null,
   requires_payment: false,
   freeze_policy: null,
+  family_sharing_max: null,
   prices: [],
   rules: {
     services: {
@@ -107,6 +108,9 @@ const dropIn = ref(false)
 const freezeOn = ref(false)
 const freeze = ref<FreezePolicy>({ min_days: 7, max_days: 60, max_per_year: 2, fee: null })
 const { freezeSummary } = usePlanSummary()
+// Family sharing (US-06.15).
+const sharingOn = ref(false)
+const sharingMax = ref<number | null>(2)
 const branches = computed(() => auth.user?.switchable_locations ?? [])
 const errors = ref<Record<string, string[]>>({})
 const error = ref<string | null>(null)
@@ -159,6 +163,8 @@ async function load() {
     )
     offPeak.value = !!p?.rules.limits.hours
     freezeOn.value = !!p?.freeze_policy
+    sharingOn.value = !!p?.family_sharing_max
+    sharingMax.value = p?.family_sharing_max ?? 2
     if (p?.freeze_policy) freeze.value = { ...p.freeze_policy }
     hours.value = p?.rules.limits.hours ?? { from: '06:00', to: '16:00' }
     state.value = 'ready'
@@ -379,6 +385,7 @@ async function save() {
     billing_interval: pkg || oneTime ? null : (f.billing_interval ?? 'month'),
     min_commitment_months: pkg || oneTime ? null : f.min_commitment_months,
     freeze_policy: !pkg && freezeOn.value ? freeze.value : null,
+    family_sharing_max: sharingOn.value ? sharingMax.value : null,
     prices: Object.entries(priceAt.value)
       .filter(([, v]) => v.on && v.price !== null)
       .map(([id, v]) => ({ location_id: Number(id), price: v.price! })),
@@ -957,6 +964,40 @@ const title = computed(() =>
           </div>
         </section>
 
+        <!-- Family sharing (US-06.15) -->
+        <section class="card section">
+          <header class="section__head">
+            <span class="section__icon"><i class="pi pi-users" aria-hidden="true" /></span>
+            <div>
+              <h2>{{ t('plans.sections.sharing') }}</h2>
+              <p>{{ t('plans.sectionHints.sharing') }}</p>
+            </div>
+          </header>
+          <div class="toggle">
+            <ToggleSwitch v-model="sharingOn" input-id="plan-sharing" />
+            <label for="plan-sharing"
+              >{{ t('plans.sharingAllowed') }}
+              <small class="toggle__hint">{{ t('plans.sharingAllowedHint') }}</small></label
+            >
+          </div>
+          <div v-if="sharingOn" class="grid2">
+            <FormField
+              :label="t('plans.sharingMax')"
+              for="plan-sharing-max"
+              :error="err('family_sharing_max')"
+            >
+              <InputNumber
+                v-model="sharingMax"
+                input-id="plan-sharing-max"
+                :min="1"
+                :max="10"
+                show-buttons
+                fluid
+              />
+            </FormField>
+          </div>
+        </section>
+
         <!-- 4. Prices -->
         <section class="card section">
           <header class="section__head">
@@ -1207,6 +1248,11 @@ const title = computed(() =>
             <li v-if="form.intro_offer">
               <i class="pi pi-gift" aria-hidden="true" />{{
                 freeTrial ? t('plans.freeTrial') : t(`plans.intros.${form.intro_offer}`)
+              }}
+            </li>
+            <li v-if="sharingOn && sharingMax">
+              <i class="pi pi-users" aria-hidden="true" />{{
+                t('plans.sharingSummary', { n: sharingMax })
               }}
             </li>
             <li v-if="!isPackage && freezeOn">

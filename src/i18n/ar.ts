@@ -1727,6 +1727,11 @@ const ar: typeof en = {
   },
   plans: {
     freezeAllowed: 'يمكن تجميده',
+    sharingAllowed: 'يمكن لأفراد العائلة مشاركته',
+    sharingAllowedHint: 'يختار صاحب الاشتراك أي أبنائه يشاركونه. بدون ذلك لا يُشارك أبدًا.',
+    sharingMax: 'عدد أفراد العائلة غير صاحب الاشتراك',
+    sharingSummary: 'يشاركه حتى {n} من أفراد العائلة',
+    sharingNotAllowed: 'لا يُشارك',
     freezeAllowedHint: 'تُضاف أيام التجميد إلى تاريخي الانتهاء والتجديد.',
     freezeMin: 'أقصر تجميد',
     freezeMax: 'أطول تجميد',
@@ -1833,6 +1838,7 @@ const ar: typeof en = {
     sections: {
       intro: 'عرض تعريفي',
       freeze: 'التجميد',
+      sharing: 'المشاركة العائلية',
       credits: 'الرصيد والصلاحية',
       activation: 'متى تبدأ',
       basics: 'الأساسيات',
@@ -1932,6 +1938,7 @@ const ar: typeof en = {
     sectionHints: {
       intro: 'اقصره على العملاء الجدد: شهر أول بنصف السعر، أو حصة تجريبية مجانية.',
       freeze: 'هل يمكن للأعضاء إيقافه مؤقتًا عند السفر أو الإصابة دون خسارة أيام.',
+      sharing: 'اسمح لولي الأمر بمشاركته مع أبنائه: اشتراك واحد أو رصيد واحد.',
       credits: 'كم حصة تمنحها الباقة، وكم تدوم.',
       activation: 'حتى لا يخسر العميل أيامًا قبل أن يستخدمها.',
       basics: 'كيف تظهر الخطة للموظفين والعملاء.',
@@ -2302,6 +2309,7 @@ const ar: typeof en = {
       membership_auto_renew_on: 'شُغّل التجديد التلقائي',
       membership_auto_renew_off: 'أُوقف التجديد التلقائي',
       membership_cancelled: 'أُلغي الاشتراك',
+      membership_sharing_updated: 'تغيّرت المشاركة العائلية',
       membership_cancellation_withdrawn: 'تم التراجع عن الإلغاء',
       membership_expired: 'انتهت عضوية أو باقة',
       account_credit_changed: 'تغيّر رصيد الحساب',
@@ -2493,6 +2501,17 @@ const ar: typeof en = {
     waiting: 'تتغير إلى {name} عند التجديد في {date}.',
     callOff: 'إلغاء التغيير',
     callOffText: 'يبقى الاشتراك على خطته الحالية بدل الانتقال إلى {name}.',
+  },
+  sharing: {
+    title: 'المشاركة العائلية',
+    save: 'حفظ',
+    text: 'اختر حتى {n} من أبناء صاحب الاشتراك لمشاركته. يستخدمون الاشتراك أو الرصيد نفسه، ويظهر في كل حجز من قام به.',
+    noChildren: 'لا يوجد أبناء في عائلة هذا العميل بعد. أضفهم من تبويب العائلة.',
+    age: '{n} سنة',
+    sharedBy: 'مشترك من {name}',
+    sharedWith: 'مشترك مع',
+    nobody: 'لا أحد بعد',
+    memberVisits: '{name} ({n})',
   },
   freeze: {
     title: 'تجميد',

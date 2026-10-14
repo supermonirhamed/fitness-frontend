@@ -299,6 +299,14 @@ const credits = (h: PlanHolder) =>
               <dd>{{ activation }}</dd>
               <dt>{{ t('plans.sections.intro') }}</dt>
               <dd>{{ summary.intro(plan) ?? t('plans.intros.none') }}</dd>
+              <dt>{{ t('plans.sections.sharing') }}</dt>
+              <dd>
+                {{
+                  plan.family_sharing_max
+                    ? t('plans.sharingSummary', { n: plan.family_sharing_max })
+                    : t('plans.sharingNotAllowed')
+                }}
+              </dd>
               <template v-if="plan.kind === 'membership'">
                 <dt>{{ t('plans.sections.freeze') }}</dt>
                 <dd>

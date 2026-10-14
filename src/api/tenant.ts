@@ -802,6 +802,8 @@ export interface MembershipPlan {
   requires_payment: boolean
   /** US-06.11: memberships only; null: can't be frozen. */
   freeze_policy: FreezePolicy | null
+  /** US-06.15: family members who may share it besides the holder; null: never shared. */
+  family_sharing_max: number | null
   rules: {
     services: {
       mode: 'all' | 'categories' | 'services' | 'programs'
@@ -922,6 +924,13 @@ export interface ClientEntitlement {
   /** US-06.12: a downgrade waiting for the next renewal; the price per period as sold. */
   scheduled_change: { plan_id: number; name: string; on: string } | null
   price: number
+  /** US-06.15: who holds it (a guardian sharing it shows on the child's profile too). */
+  holder: { id: number; name: string | null }
+  sharing: {
+    max: number
+    members: { id: number; name: string; visits: number }[]
+    holder_visits: number
+  } | null
   /** US-06.13: cancelled (at the end of the period it still runs until ends_on). */
   cancellation: { at: string; reason: MembershipCancelReason; note: string | null } | null
   freeze: {
@@ -2191,6 +2200,18 @@ export const tenantApi = {
     ): Promise<ClientEntitlement> {
       return (
         await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/cancel`, input)
+      ).data.data
+    },
+    /** US-06.15: the holder's children who share it. */
+    async setSharers(
+      clientId: number,
+      entitlementId: number,
+      clientIds: number[],
+    ): Promise<ClientEntitlement> {
+      return (
+        await http.put(`/api/clients/${clientId}/entitlements/${entitlementId}/sharers`, {
+          client_ids: clientIds,
+        })
       ).data.data
     },
     async uncoveredBookings(clientId: number): Promise<UncoveredBooking[]> {
