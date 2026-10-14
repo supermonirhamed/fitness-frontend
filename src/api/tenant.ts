@@ -1241,6 +1241,22 @@ export interface Payment {
   void_reason: string | null
   voided_by: string | null
   voided_at: string | null
+  /** What it paid for (client payments list): a booked session, or an invoice's products. */
+  for?:
+    | {
+        type: 'booking'
+        booking_id: number
+        session_id: number | null
+        service: string | null
+        starts_at: string | null
+      }
+    | {
+        type: 'invoice'
+        invoice_id: number
+        invoice: string
+        items: { kind: string; description: string }[]
+      }
+    | null
 }
 
 /** An invoice (US-07.01, issued by membership and package sales, US-06.08); amounts in major units. */

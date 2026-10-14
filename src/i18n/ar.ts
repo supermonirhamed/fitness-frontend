@@ -472,7 +472,13 @@ const ar: typeof en = {
     draft: 'مسودة — غير ظاهرة للعملاء بعد',
     draftDetail: 'يمكن للموظفين الحجز؛ انشرها لفتح الحجز عبر الإنترنت.',
   },
+  filters: {
+    remove: 'إزالة الفلتر {name}',
+    clearAll: 'مسح الكل',
+  },
   clients: {
+    matches: 'لا نتائج | نتيجة واحدة | {n} نتيجة',
+    range: '{from}–{to} من {total}',
     title: 'العملاء',
     count: 'لا يوجد عملاء | عميل واحد | {n} عملاء',
     new: 'عميل جديد',
@@ -498,6 +504,12 @@ const ar: typeof en = {
     coachOnly: 'تظهر لك العملاء المحجوزون في حصصك.',
     filters: {
       home: 'الفرع الرئيسي',
+      allStatuses: 'كل الحالات',
+      nStatuses: '{n} حالات',
+      more: 'فلاتر إضافية',
+      anyBranch: 'أي فرع',
+      ageLabel: 'العمر',
+      anyTag: 'أي وسم',
       created: 'تاريخ الإنشاء',
       age: { any: 'كل الأعمار', minor: 'أقل من 18', adult: '18 فأكثر' },
       visit: {
@@ -2118,6 +2130,8 @@ const ar: typeof en = {
     noBookings: 'لا توجد حجوزات هنا.',
     noAttendance: 'لم يُسجّل حضور بعد.',
     noPayments: 'لا توجد مدفوعات مسجلة.',
+    paymentsTitle: 'المدفوعات المستلمة',
+    paymentsCount: 'لا مدفوعات | دفعة واحدة | {n} دفعات',
     payment: { Recorded: 'مسجلة', Voided: 'ملغاة' },
   },
   segments: {
@@ -2501,6 +2515,15 @@ const ar: typeof en = {
     waiting: 'تتغير إلى {name} عند التجديد في {date}.',
     callOff: 'إلغاء التغيير',
     callOffText: 'يبقى الاشتراك على خطته الحالية بدل الانتقال إلى {name}.',
+  },
+  clientPayments: {
+    for: 'مقابل',
+    kinds: { all: 'الكل', booking: 'الحصص', invoice: 'العضويات والباقات' },
+    anyMethod: 'أي طريقة',
+    anyStatus: 'أي حالة',
+    shown: '{n} من {total}',
+    noMatch: 'لا توجد مدفوعات مطابقة لهذه الفلاتر',
+    booking: 'حجز',
   },
   sharing: {
     title: 'المشاركة العائلية',

@@ -30,6 +30,7 @@ import ClientFamilyTab from '@/components/clients/ClientFamilyTab.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
 import ClientInvoicesCard from '@/components/clients/ClientInvoicesCard.vue'
 import ClientMembershipsTab from '@/components/clients/ClientMembershipsTab.vue'
+import ClientPaymentsCard from '@/components/clients/ClientPaymentsCard.vue'
 import ClientNotesTab from '@/components/clients/ClientNotesTab.vue'
 import MergeClientsDialog from '@/components/clients/MergeClientsDialog.vue'
 import ClientTimeline from '@/components/clients/ClientTimeline.vue'
@@ -50,7 +51,6 @@ import {
   type Tag as TagItem,
 } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
-import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const route = useRoute()
@@ -58,7 +58,6 @@ const router = useRouter()
 const { t } = useI18n()
 const toast = useToast()
 const auth = useStaffAuth()
-const format = useFormat()
 
 const state = ref<'loading' | 'ready' | 'missing' | 'error'>('loading')
 const client = ref<Client | null>(null)
@@ -237,17 +236,25 @@ async function loadAttendance() {
 async function loadPayments() {
   payments.value = await tenantApi.clients.payments(id.value).catch(() => [])
 }
-watch(tab, (value) => {
-  if (value === 'bookings' && !bookings.value) loadBookings()
-  if (value === 'attendance' && !attendance.value) loadAttendance()
-  if (value === 'payments' && !payments.value) loadPayments()
-})
+// Also when the profile opens on a tab (?tab=payments).
+watch(
+  tab,
+  (value) => {
+    if (value === 'bookings' && !bookings.value) loadBookings()
+    if (value === 'attendance' && !attendance.value) loadAttendance()
+    if (value === 'payments' && !payments.value) loadPayments()
+  },
+  { immediate: true },
+)
 watch(when, loadBookings)
 
 const detailsOpen = ref(false)
 const openId = ref<number | null>(null)
 function openBooking(b: Booking) {
-  openId.value = b.id
+  openBookingId(b.id)
+}
+function openBookingId(bookingId: number) {
+  openId.value = bookingId
   detailsOpen.value = true
 }
 function onBookingChanged() {
@@ -608,49 +615,13 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
           </TabPanel>
 
           <TabPanel value="payments">
-            <ClientInvoicesCard
-              v-if="tab === 'payments'"
-              :client-id="client.id"
-              class="invoices"
-              @paid="loadPayments"
-            />
-            <div class="card">
-              <DataTable :value="payments ?? []" :loading="payments === null" data-key="id">
-                <template #empty>
-                  <EmptyState compact icon="pi-wallet" :title="t('clientProfile.noPayments')" />
-                </template>
-                <Column :header="t('payments.date')">
-                  <template #body="{ data }">{{
-                    data.recorded_at ? format.dateTime(data.recorded_at) : ''
-                  }}</template>
-                </Column>
-                <Column :header="t('payments.receiptNumber')">
-                  <template #body="{ data }">
-                    <a :href="`/receipts/${data.id}`" target="_blank" rel="noopener" class="mono">{{
-                      data.receipt_number
-                    }}</a>
-                  </template>
-                </Column>
-                <Column :header="t('payments.method')">
-                  <template #body="{ data }">{{ t(`payments.methods.${data.method}`) }}</template>
-                </Column>
-                <Column :header="t('payments.total')" header-class="row-end" body-class="row-end">
-                  <template #body="{ data }">
-                    <span :class="['num', { voided: data.status === 'Voided' }]">{{
-                      format.money(data.amount)
-                    }}</span>
-                  </template>
-                </Column>
-                <Column :header="t('bookings.columns.status')">
-                  <template #body="{ data }">
-                    <Tag
-                      class="tag-sm"
-                      :severity="data.status === 'Voided' ? 'secondary' : 'success'"
-                      :value="t(`clientProfile.payment.${data.status}`)"
-                    />
-                  </template>
-                </Column>
-              </DataTable>
+            <div class="payments-tab">
+              <ClientInvoicesCard
+                v-if="tab === 'payments'"
+                :client-id="client.id"
+                @paid="loadPayments"
+              />
+              <ClientPaymentsCard :payments="payments" @open-booking="openBookingId" />
             </div>
           </TabPanel>
 
@@ -800,8 +771,21 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
 .crumbs i {
   font-size: 10px;
 }
-.invoices {
-  margin-bottom: 16px;
+.payments-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.card__head {
+  padding: 14px 16px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.card__head h3 {
+  margin: 0;
+  font: var(--text-h4);
 }
 .card {
   background: var(--surface-card);
@@ -919,10 +903,6 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
 .tab-bar {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-default);
-}
-.voided {
-  text-decoration: line-through;
-  color: var(--text-muted);
 }
 .qr {
   padding: 16px;

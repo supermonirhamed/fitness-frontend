@@ -475,7 +475,13 @@ export default {
     draft: 'Draft — not visible to clients yet',
     draftDetail: 'Staff can still book; publish it to open online booking.',
   },
+  filters: {
+    remove: 'Remove filter {name}',
+    clearAll: 'Clear all',
+  },
   clients: {
+    matches: 'No matches | 1 match | {n} matches',
+    range: '{from}–{to} of {total}',
     title: 'Clients',
     count: 'No clients | 1 client | {n} clients',
     new: 'New client',
@@ -501,6 +507,12 @@ export default {
     coachOnly: 'You see the clients booked in your sessions.',
     filters: {
       home: 'Home branch',
+      allStatuses: 'All statuses',
+      nStatuses: '{n} statuses',
+      more: 'More filters',
+      anyBranch: 'Any branch',
+      ageLabel: 'Age',
+      anyTag: 'Any tag',
       created: 'Created',
       age: { any: 'Any age', minor: 'Under 18', adult: '18 and over' },
       visit: {
@@ -2148,6 +2160,8 @@ export default {
     noBookings: 'No bookings here.',
     noAttendance: 'No attendance recorded yet.',
     noPayments: 'No payments recorded.',
+    paymentsTitle: 'Payments received',
+    paymentsCount: 'No payments | 1 payment | {n} payments',
     payment: { Recorded: 'Recorded', Voided: 'Voided' },
   },
   segments: {
@@ -2533,6 +2547,15 @@ export default {
     waiting: 'Changes to {name} at the renewal on {date}.',
     callOff: 'Call off change',
     callOffText: 'The membership stays on its current plan instead of moving to {name}.',
+  },
+  clientPayments: {
+    for: 'For',
+    kinds: { all: 'All', booking: 'Sessions', invoice: 'Memberships & packages' },
+    anyMethod: 'Any method',
+    anyStatus: 'Any status',
+    shown: '{n} of {total}',
+    noMatch: 'No payments match these filters',
+    booking: 'Booking',
   },
   sharing: {
     title: 'Family sharing',

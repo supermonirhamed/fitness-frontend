@@ -12,14 +12,15 @@ import Column from 'primevue/column'
 import DataTable, { type DataTablePageEvent } from 'primevue/datatable'
 import DatePicker from 'primevue/datepicker'
 import MultiSelect from 'primevue/multiselect'
+import Popover from 'primevue/popover'
+import type { MenuItem } from 'primevue/menuitem'
 import Select from 'primevue/select'
-import Tag from 'primevue/tag'
 import BulkActionBar from '@/components/patterns/BulkActionBar.vue'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
-import FilterBar from '@/components/patterns/FilterBar.vue'
+import FilterBar, { type FilterChip } from '@/components/patterns/FilterBar.vue'
 import FormDialog from '@/components/patterns/FormDialog.vue'
 import FormField from '@/components/patterns/FormField.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
@@ -119,6 +120,100 @@ function exportCsv() {
   window.location.href = tenantApi.clients.exportUrl(filters.value)
 }
 
+// Header "more" menu: import, tags & segments, export (design: ClientsScreen).
+const moreItems = computed<MenuItem[]>(
+  () =>
+    [
+      canCreate.value && {
+        label: t('import.title'),
+        icon: 'pi pi-upload',
+        command: () => router.push({ name: 'tenant.clients.import' }),
+      },
+      {
+        label: t('segments.title'),
+        icon: 'pi pi-tags',
+        command: () => router.push({ name: 'tenant.clients.segments' }),
+      },
+      canExport.value && {
+        label: t('bookings.export'),
+        icon: 'pi pi-download',
+        command: exportCsv,
+      },
+    ].filter(Boolean) as MenuItem[],
+)
+
+// Status and segment stay in the bar; the rest open under "More filters".
+const morePanel = ref<InstanceType<typeof Popover>>()
+const moreCount = computed(
+  () =>
+    [
+      locationId.value !== null,
+      age.value !== 'any',
+      lastVisit.value !== 'any',
+      !!created.value?.[0],
+      tagIds.value.length > 0,
+    ].filter(Boolean).length,
+)
+const label = <T extends { value: unknown; label: string }>(options: T[], value: unknown) =>
+  options.find((o) => o.value === value)?.label ?? ''
+const chips = computed<FilterChip[]>(() => {
+  const list: FilterChip[] = []
+  if (statuses.value.length)
+    list.push({
+      key: 'status',
+      label: `${t('clients.columns.status')}: ${statuses.value.map((v) => t(`status.${v}`)).join('، ')}`,
+    })
+  if (segmentId.value !== null)
+    list.push({
+      key: 'segment',
+      label: `${t('segments.segment')}: ${segmentOptions.value.find((x) => x.id === segmentId.value)?.name ?? ''}`,
+    })
+  if (locationId.value !== null)
+    list.push({
+      key: 'location',
+      label: `${t('clients.filters.home')}: ${locations.value.find((l) => l.id === locationId.value)?.name ?? ''}`,
+    })
+  if (age.value !== 'any') list.push({ key: 'age', label: label(ageOptions.value, age.value) })
+  if (lastVisit.value !== 'any')
+    list.push({ key: 'visit', label: label(visitOptions.value, lastVisit.value) })
+  if (created.value?.[0])
+    list.push({
+      key: 'created',
+      label: `${t('clients.filters.created')}: ${format.date(created.value[0])}${
+        created.value[1] ? ` – ${format.date(created.value[1])}` : ''
+      }`,
+    })
+  if (tagIds.value.length)
+    list.push({
+      key: 'tags',
+      label: `${t('segments.tags')}: ${tagOptions.value
+        .filter((x) => tagIds.value.includes(x.id))
+        .map((x) => x.name)
+        .join('، ')}`,
+    })
+  return list
+})
+function removeFilter(key: string) {
+  if (key === 'status') statuses.value = []
+  else if (key === 'segment') segmentId.value = null
+  else if (key === 'location') locationId.value = null
+  else if (key === 'age') age.value = 'any'
+  else if (key === 'visit') lastVisit.value = 'any'
+  else if (key === 'created') created.value = null
+  else if (key === 'tags') tagIds.value = []
+}
+
+// "1–25 of 312" next to the pages.
+const range = computed(() =>
+  t('clients.range', {
+    from: total.value ? (page.value - 1) * PER_PAGE + 1 : 0,
+    to: Math.min(page.value * PER_PAGE, total.value),
+    total: total.value,
+  }),
+)
+// Two tags show; the rest count as "+N".
+const TAGS_SHOWN = 2
+
 let request = 0
 async function load() {
   const mine = ++request
@@ -214,34 +309,9 @@ function onSaved(client: Client) {
 
 <template>
   <div class="page">
-    <PageHeader :title="t('clients.title')">
-      <template v-if="state === 'ready' && !filtered" #meta>
-        <span>{{ t('clients.count', total) }}</span>
-      </template>
-      <template #actions>
-        <Button
-          v-if="canCreate"
-          icon="pi pi-upload"
-          :label="t('import.title')"
-          severity="secondary"
-          variant="text"
-          @click="router.push({ name: 'tenant.clients.import' })"
-        />
-        <Button
-          icon="pi pi-tags"
-          :label="t('segments.title')"
-          severity="secondary"
-          variant="text"
-          @click="router.push({ name: 'tenant.clients.segments' })"
-        />
-        <Button
-          v-if="canExport"
-          icon="pi pi-download"
-          :label="t('bookings.export')"
-          severity="secondary"
-          variant="outlined"
-          @click="exportCsv"
-        />
+    <PageHeader :title="t('clients.title')" :more-items="moreItems">
+      <template v-if="state === 'ready' || clients.length" #meta>
+        <span>{{ filtered ? t('clients.matches', total) : t('clients.count', total) }}</span>
       </template>
       <template v-if="canCreate" #primary>
         <Button icon="pi pi-user-plus" :label="t('clients.new')" @click="drawerOpen = true" />
@@ -253,71 +323,21 @@ function onSaved(client: Client) {
       <Message v-if="ownOnly" severity="info" :closable="false" icon="pi pi-info-circle">{{
         t('clients.coachOnly')
       }}</Message>
-      <FilterBar v-model:search="search" :placeholder="t('clients.search')">
-        <Select
-          v-if="locations.length > 1"
-          v-model="locationId"
-          :options="locations"
-          option-label="name"
-          option-value="id"
-          :placeholder="t('clients.filters.home')"
-          show-clear
-          class="filter"
-        />
+      <FilterBar
+        v-model:search="search"
+        :placeholder="t('clients.search')"
+        :chips="chips"
+        @remove="removeFilter"
+        @clear="clearFilters"
+      >
         <MultiSelect
           v-model="statuses"
           :options="statusOptions"
           option-label="label"
           option-value="value"
-          :placeholder="t('clients.columns.status')"
+          :placeholder="t('clients.filters.allStatuses')"
           :max-selected-labels="1"
-          class="filter"
-        />
-        <Select
-          v-model="age"
-          :options="ageOptions"
-          option-label="label"
-          option-value="value"
-          class="filter"
-        />
-        <Select
-          v-model="lastVisit"
-          :options="visitOptions"
-          option-label="label"
-          option-value="value"
-          class="filter"
-        />
-        <DatePicker
-          v-model="created"
-          selection-mode="range"
-          date-format="yy-mm-dd"
-          :manual-input="false"
-          :placeholder="t('clients.filters.created')"
-          :aria-label="t('clients.filters.created')"
-          show-icon
-          icon-display="input"
-          show-button-bar
-          class="filter"
-        />
-        <template #end>
-          <Button
-            v-if="filtered"
-            :label="t('bookings.clear')"
-            variant="text"
-            severity="secondary"
-            @click="clearFilters"
-          />
-        </template>
-      </FilterBar>
-      <div v-if="tagOptions.length || segmentOptions.length" class="filters2">
-        <MultiSelect
-          v-if="tagOptions.length"
-          v-model="tagIds"
-          :options="tagOptions"
-          option-label="name"
-          option-value="id"
-          :placeholder="t('segments.tags')"
-          :max-selected-labels="2"
+          :selected-items-label="t('clients.filters.nStatuses', { n: statuses.length })"
           class="filter"
         />
         <Select
@@ -330,7 +350,81 @@ function onSaved(client: Client) {
           show-clear
           class="filter"
         />
-      </div>
+        <Button
+          :label="t('clients.filters.more')"
+          icon="pi pi-filter"
+          severity="secondary"
+          variant="outlined"
+          :badge="moreCount ? String(moreCount) : undefined"
+          aria-haspopup="true"
+          @click="morePanel?.toggle($event)"
+        />
+      </FilterBar>
+      <Popover ref="morePanel">
+        <div class="more-filters">
+          <FormField
+            v-if="locations.length > 1"
+            :label="t('clients.filters.home')"
+            for="filter-home"
+          >
+            <Select
+              v-model="locationId"
+              input-id="filter-home"
+              :options="locations"
+              option-label="name"
+              option-value="id"
+              :placeholder="t('clients.filters.anyBranch')"
+              show-clear
+              fluid
+            />
+          </FormField>
+          <FormField :label="t('clients.filters.ageLabel')" for="filter-age">
+            <Select
+              v-model="age"
+              input-id="filter-age"
+              :options="ageOptions"
+              option-label="label"
+              option-value="value"
+              fluid
+            />
+          </FormField>
+          <FormField :label="t('clients.columns.lastVisit')" for="filter-visit">
+            <Select
+              v-model="lastVisit"
+              input-id="filter-visit"
+              :options="visitOptions"
+              option-label="label"
+              option-value="value"
+              fluid
+            />
+          </FormField>
+          <FormField :label="t('clients.filters.created')" for="filter-created">
+            <DatePicker
+              v-model="created"
+              input-id="filter-created"
+              selection-mode="range"
+              :manual-input="false"
+              show-icon
+              icon-display="input"
+              show-button-bar
+              fluid
+            />
+          </FormField>
+          <FormField v-if="tagOptions.length" :label="t('segments.tags')" for="filter-tags">
+            <MultiSelect
+              v-model="tagIds"
+              input-id="filter-tags"
+              :options="tagOptions"
+              option-label="name"
+              option-value="id"
+              :placeholder="t('clients.filters.anyTag')"
+              :max-selected-labels="2"
+              filter
+              fluid
+            />
+          </FormField>
+        </div>
+      </Popover>
       <BulkActionBar
         v-if="selected.length"
         :label="t('bookings.bulk.selected', { n: selected.length })"
@@ -385,6 +479,8 @@ function onSaved(client: Client) {
         :total-records="total"
         :first="(page - 1) * PER_PAGE"
         :loading="state === 'loading'"
+        paginator-template="CurrentPageReport FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink"
+        :current-page-report-template="range"
         :row-class="() => 'row-click'"
         @page="onPage"
         @row-click="open($event.data)"
@@ -412,47 +508,56 @@ function onSaved(client: Client) {
             </div>
           </template>
         </Column>
-        <Column :header="t('segments.tags')">
-          <template #body="{ data }">
-            <span class="tags">
-              <Tag
-                v-for="tag in data.tags ?? []"
-                :key="tag.id"
-                class="tag-sm"
-                :value="tag.name"
-                :style="tag.color ? { background: tag.color, color: '#fff' } : undefined"
-              />
-            </span>
-          </template>
-        </Column>
         <Column :header="t('clients.columns.mobile')">
           <template #body="{ data }">
             <span v-if="data.contact_hidden" class="muted">{{ t('clients.hidden') }}</span>
-            <span v-else dir="ltr" class="num muted">{{ data.mobile ?? data.email }}</span>
+            <span v-else dir="ltr" class="num muted nowrap">{{ data.mobile ?? data.email }}</span>
           </template>
         </Column>
         <Column :header="t('clients.columns.home')">
-          <template #body="{ data }">{{ data.home_location?.name ?? '—' }}</template>
+          <template #body="{ data }"
+            ><span class="nowrap">{{ data.home_location?.name ?? '—' }}</span></template
+          >
         </Column>
         <Column :header="t('clients.columns.status')">
-          <template #body="{ data }"><StatusTag :status="data.status" /></template>
+          <template #body="{ data }"><StatusTag :status="data.status" size="sm" /></template>
+        </Column>
+        <Column :header="t('segments.tags')">
+          <template #body="{ data }">
+            <span class="tags">
+              <span v-for="tag in (data.tags ?? []).slice(0, TAGS_SHOWN)" :key="tag.id" class="chip"
+                ><span
+                  class="chip__dot"
+                  :style="{ background: tag.color ?? 'var(--text-muted)' }"
+                />{{ tag.name }}</span
+              >
+              <span
+                v-if="(data.tags?.length ?? 0) > TAGS_SHOWN"
+                v-tooltip.top="
+                  data.tags
+                    .slice(TAGS_SHOWN)
+                    .map((x: TagItem) => x.name)
+                    .join(', ')
+                "
+                class="chip chip--more"
+                >+{{ data.tags.length - TAGS_SHOWN }}</span
+              >
+            </span>
+          </template>
         </Column>
         <Column :header="t('clients.columns.lastVisit')">
           <template #body="{ data }">
-            <span class="muted">{{
+            <span :class="['nowrap', { muted: !data.last_visit_at }]">{{
               data.last_visit_at ? format.date(data.last_visit_at) : t('clients.never')
             }}</span>
           </template>
         </Column>
         <Column :header="t('clients.columns.upcoming')" header-class="row-end" body-class="row-end">
           <template #body="{ data }"
-            ><span class="num">{{ data.upcoming_bookings ?? 0 }}</span></template
+            ><span :class="['num', { muted: !data.upcoming_bookings }]">{{
+              data.upcoming_bookings ?? 0
+            }}</span></template
           >
-        </Column>
-        <Column :header="t('clients.columns.since')">
-          <template #body="{ data }">
-            <span class="muted">{{ data.created_at ? format.date(data.created_at) : '—' }}</span>
-          </template>
         </Column>
         <Column header-class="row-end" body-class="row-end">
           <template #body>
@@ -522,15 +627,40 @@ function onSaved(client: Client) {
 .filter {
   min-width: 150px;
 }
-.filters2 {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.more-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(200px, 1fr));
+  gap: 12px 16px;
+  width: min(480px, calc(100vw - 48px));
 }
 .tags {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  font: 500 12px/1 var(--font-sans);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.chip--more {
+  background: var(--surface-sunken);
+}
+.nowrap {
+  white-space: nowrap;
 }
 .page {
   display: flex;
