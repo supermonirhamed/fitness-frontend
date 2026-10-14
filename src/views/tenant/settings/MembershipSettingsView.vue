@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Settings → Memberships (US-06.10): how many days a renewal invoice may stay unpaid before the
-// membership is suspended (no booking or check-in until it is paid).
+// Settings → Memberships: how many days a renewal invoice may stay unpaid before the membership is
+// suspended (no booking or check-in until it is paid, US-06.10), and how many days before the end
+// the "membership expiring" notice goes out (US-06.14).
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
@@ -22,16 +23,22 @@ const auth = useStaffAuth()
 const canEdit = computed(() => auth.can('settings.update'))
 
 const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
-const saved = ref(7)
-const graceDays = ref(7)
+type Values = { grace_days: number; expiry_notice_days: number }
+const saved = ref<Values>({ grace_days: 7, expiry_notice_days: 7 })
+const form = ref<Values>({ ...saved.value })
 const saving = ref(false)
 const error = ref<string | null>(null)
-const dirty = computed(() => graceDays.value !== saved.value)
+const dirty = computed(
+  () =>
+    form.value.grace_days !== saved.value.grace_days ||
+    form.value.expiry_notice_days !== saved.value.expiry_notice_days,
+)
 
 async function load() {
   state.value = 'loading'
   try {
-    saved.value = graceDays.value = (await tenantApi.membershipSettings.get()).grace_days
+    saved.value = await tenantApi.membershipSettings.get()
+    form.value = { ...saved.value }
     state.value = 'ready'
   } catch (e) {
     state.value = statusOf(e) === 403 ? 'forbidden' : 'error'
@@ -43,9 +50,8 @@ async function save() {
   saving.value = true
   error.value = null
   try {
-    saved.value = graceDays.value = (
-      await tenantApi.membershipSettings.update({ grace_days: graceDays.value })
-    ).grace_days
+    saved.value = await tenantApi.membershipSettings.update(form.value)
+    form.value = { ...saved.value }
     toast.add({ severity: 'success', summary: t('membershipSettings.saved'), life: 3000 })
   } catch {
     error.value = t('common.genericError')
@@ -75,14 +81,35 @@ async function save() {
       <SettingRow
         :label="t('membershipSettings.graceLabel')"
         :help="t('membershipSettings.graceHelp')"
-        :example="t('membershipSettings.graceExample', { n: graceDays })"
+        :example="t('membershipSettings.graceExample', { n: form.grace_days })"
         label-for="membership-grace"
       >
         <InputNumber
-          v-model="graceDays"
+          v-model="form.grace_days"
           input-id="membership-grace"
           :min="0"
           :max="90"
+          :allow-empty="false"
+          :suffix="` ${t('plans.units.days')}`"
+          :disabled="!canEdit"
+          show-buttons
+          class="number"
+        />
+      </SettingRow>
+      <div class="settings-group" role="heading" aria-level="3">
+        {{ t('membershipSettings.expiry') }}
+      </div>
+      <SettingRow
+        :label="t('membershipSettings.noticeLabel')"
+        :help="t('membershipSettings.noticeHelp')"
+        :example="t('membershipSettings.noticeExample', { n: form.expiry_notice_days })"
+        label-for="membership-notice"
+      >
+        <InputNumber
+          v-model="form.expiry_notice_days"
+          input-id="membership-notice"
+          :min="0"
+          :max="60"
           :allow-empty="false"
           :suffix="` ${t('plans.units.days')}`"
           :disabled="!canEdit"
@@ -94,7 +121,7 @@ async function save() {
     <UnsavedBar
       v-if="canEdit && dirty"
       :saving="saving"
-      @discard="graceDays = saved"
+      @discard="form = { ...saved }"
       @save="save"
     />
   </form>

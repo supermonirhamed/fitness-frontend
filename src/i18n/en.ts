@@ -171,6 +171,11 @@ export default {
     },
   },
   today: {
+    uncoveredTitle:
+      'No bookings without cover | 1 upcoming booking without cover | {n} upcoming bookings without cover',
+    uncoveredHint:
+      'Their membership or package expired, was cancelled or ends first. Sell a renewal or settle them at the desk.',
+    endsOn: 'ends {date}',
     atBranch: '{date} · {branch}',
     title: 'Today',
     welcome: 'Welcome, {name}',
@@ -2119,6 +2124,8 @@ export default {
     alerts: {
       blocked: 'Blocked',
       unpaid: 'No unpaid bookings | 1 unpaid booking | {n} unpaid bookings',
+      uncovered:
+        'No bookings without cover | 1 booking no longer covered | {n} bookings no longer covered',
     },
     call: 'Call',
     email: 'Email',
@@ -2562,8 +2569,15 @@ export default {
     graceHelp:
       'Members keep access while a renewal invoice is unpaid, for this many days after it is due. After that the membership is suspended until it is paid.',
     graceExample: 'Suspended {n} days after the renewal date if still unpaid.',
+    expiry: 'Expiry',
+    noticeLabel: 'Expiring notice',
+    noticeHelp:
+      'Members whose membership or package ends and won’t renew are told this many days before (sent once notifications are set up).',
+    noticeExample: 'Sent {n} days before the last day.',
   },
   clientMemberships: {
+    uncovered:
+      'No upcoming bookings without cover | 1 upcoming booking is no longer covered: its membership or package ended | {n} upcoming bookings are no longer covered: their membership or package ended',
     actions: 'More',
     suspended: 'Suspended: an invoice is unpaid past the grace period. Paying it restores access.',
     period: 'Current period',

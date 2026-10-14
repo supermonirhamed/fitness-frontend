@@ -346,6 +346,13 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
               class="tag-sm"
               :value="t('clientProfile.alerts.unpaid', overview.alerts.unpaid_bookings)"
             />
+            <Tag
+              v-if="overview?.alerts.uncovered_bookings"
+              severity="warn"
+              icon="pi pi-id-card"
+              class="tag-sm"
+              :value="t('clientProfile.alerts.uncovered', overview.alerts.uncovered_bookings)"
+            />
           </div>
         </div>
         <div class="head__actions">

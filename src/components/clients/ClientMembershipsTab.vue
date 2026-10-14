@@ -25,7 +25,8 @@ import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
-import { tenantApi, type ClientEntitlement } from '@/api/tenant'
+import { tenantApi, type ClientEntitlement, type UncoveredBooking } from '@/api/tenant'
+import AffectedBookingsList from '@/components/memberships/AffectedBookingsList.vue'
 import { apiMessage } from '@/lib/apiErrors'
 import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
@@ -38,10 +39,19 @@ const sellOpen = ref(false)
 
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const rows = ref<ClientEntitlement[]>([])
+// Upcoming bookings their membership or package no longer covers (US-06.14).
+const uncovered = ref<UncoveredBooking[]>([])
 async function load() {
   state.value = 'loading'
   try {
-    rows.value = await tenantApi.clients.entitlements(props.clientId)
+    const [list, flagged] = await Promise.all([
+      tenantApi.clients.entitlements(props.clientId),
+      auth.can('bookings.view')
+        ? tenantApi.clients.uncoveredBookings(props.clientId).catch(() => [])
+        : Promise.resolve([]),
+    ])
+    rows.value = list
+    uncovered.value = flagged
     state.value = 'ready'
   } catch {
     state.value = 'error'
@@ -284,6 +294,11 @@ function openMenu(event: Event, e: ClientEntitlement) {
     <div v-if="auth.can('memberships.create')" class="toolbar">
       <Button icon="pi pi-shopping-cart" :label="t('sell.title')" @click="sellOpen = true" />
     </div>
+    <AffectedBookingsList
+      v-if="state === 'ready' && uncovered.length"
+      :bookings="uncovered"
+      :title="t('clientMemberships.uncovered', uncovered.length)"
+    />
     <div v-if="state === 'loading'" class="card pad">
       <Skeleton v-for="n in 2" :key="n" height="88px" class="sk" />
     </div>

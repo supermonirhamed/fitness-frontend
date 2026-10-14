@@ -687,7 +687,13 @@ export interface TimelineEvent {
 
 /** The client profile's alerts and overview (US-05.05). */
 export interface ClientOverview {
-  alerts: { blocked: boolean; health_note: boolean; unpaid_bookings: number }
+  alerts: {
+    blocked: boolean
+    health_note: boolean
+    unpaid_bookings: number
+    /** US-06.14: upcoming bookings their membership or package no longer covers. */
+    uncovered_bookings: number
+  }
   upcoming: Booking[]
   attendance: Record<
     'last_30' | 'last_90',
@@ -976,6 +982,20 @@ export interface CancellationPreview {
   /** The unused part that may be refunded (immediate only). */
   refundable: number
   bookings: AffectedBooking[]
+}
+
+/** Settings → Memberships: renewal grace days (US-06.10), expiry notice days (US-06.14). */
+export interface MembershipSettings {
+  grace_days: number
+  expiry_notice_days: number
+}
+
+/** An upcoming booking its membership or package no longer covers (US-06.14). */
+export interface UncoveredBooking extends AffectedBooking {
+  client_id: number
+  plan: string | null
+  entitlement_status: ClientEntitlement['status'] | null
+  ends_on: string | null
 }
 
 /** What moving to another plan would do (US-06.12). */
@@ -2173,6 +2193,9 @@ export const tenantApi = {
         await http.post(`/api/clients/${clientId}/entitlements/${entitlementId}/cancel`, input)
       ).data.data
     },
+    async uncoveredBookings(clientId: number): Promise<UncoveredBooking[]> {
+      return (await http.get(`/api/clients/${clientId}/uncovered-bookings`)).data.data
+    },
     async accountCredit(clientId: number): Promise<AccountCreditSummary> {
       return (await http.get(`/api/clients/${clientId}/account-credit`)).data.data
     },
@@ -2477,11 +2500,17 @@ export const tenantApi = {
   },
   /** Desk payments (US-04.15): never edited or deleted, only voided with a reason. */
   /** Settings → Memberships (US-06.10). */
+  /** The Today page: what needs the desk's attention at the current branch. */
+  dashboard: {
+    async uncoveredBookings(): Promise<UncoveredBooking[]> {
+      return (await http.get('/api/dashboard/uncovered-bookings')).data.data
+    },
+  },
   membershipSettings: {
-    async get(): Promise<{ grace_days: number }> {
+    async get(): Promise<MembershipSettings> {
       return (await http.get('/api/settings/memberships')).data.data
     },
-    async update(input: { grace_days: number }): Promise<{ grace_days: number }> {
+    async update(input: MembershipSettings): Promise<MembershipSettings> {
       return (await http.put('/api/settings/memberships', input)).data.data
     },
   },
