@@ -13,6 +13,7 @@ import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
+import SellMembershipDrawer from '@/components/memberships/SellMembershipDrawer.vue'
 import ActivityTimeline from '@/components/patterns/ActivityTimeline.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
@@ -51,6 +52,11 @@ async function load() {
 onMounted(load)
 watch(() => props.id, load)
 
+const sellOpen = ref(false)
+function onSold() {
+  load()
+  if (holders.value !== null) loadHolders(holdersPage.value)
+}
 const edit = () => router.push({ name: 'tenant.memberships.edit', params: { id: props.id } })
 const list = (names: string[]) => names.join(locale.value === 'ar' ? '، ' : ', ')
 const description = computed(() => {
@@ -181,6 +187,9 @@ const credits = (h: PlanHolder) =>
         <template #meta>
           <span>{{ summary.access(plan) }}</span>
           <span>{{ summary.billing(plan) }}</span>
+        </template>
+        <template v-if="auth.can('memberships.create') && plan.status === 'Published'" #primary>
+          <Button icon="pi pi-shopping-cart" :label="t('sell.sell')" @click="sellOpen = true" />
         </template>
         <template v-if="canManage" #actions>
           <Button
@@ -400,6 +409,7 @@ const credits = (h: PlanHolder) =>
           </TabPanel>
         </TabPanels>
       </Tabs>
+      <SellMembershipDrawer v-model:visible="sellOpen" :plan-id="plan.id" @sold="onSold" />
     </template>
   </div>
 </template>

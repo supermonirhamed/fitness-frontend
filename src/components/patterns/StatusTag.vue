@@ -33,6 +33,10 @@ const SEVERITY: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'seconda
     Pending: 'warn',
     Frozen: 'info',
     Exhausted: 'secondary',
+    Due: 'warn',
+    PartiallyPaid: 'warn',
+    Paid: 'success',
+    Void: 'secondary',
   }
 
 const props = defineProps<{ status: string; size?: 'sm' }>()

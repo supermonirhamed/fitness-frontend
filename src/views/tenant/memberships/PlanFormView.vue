@@ -74,6 +74,7 @@ const blank = (): MembershipPlanInput => ({
   activation: 'purchase',
   activation_max_wait_days: 30,
   intro_offer: null,
+  requires_payment: false,
   prices: [],
   rules: {
     services: {
@@ -818,6 +819,13 @@ const title = computed(() =>
               />
             </FormField>
           </div>
+          <div class="toggle">
+            <ToggleSwitch v-model="form.requires_payment" input-id="plan-requires-payment" />
+            <label for="plan-requires-payment"
+              >{{ t('plans.requiresPayment') }}
+              <small class="toggle__hint">{{ t('plans.requiresPaymentHint') }}</small></label
+            >
+          </div>
           <Message severity="secondary" :closable="false" icon="pi pi-info-circle" size="small">{{
             t('plans.expiryFromActivation')
           }}</Message>
@@ -1313,6 +1321,11 @@ const title = computed(() =>
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.toggle__hint {
+  display: block;
+  font: var(--text-small);
+  color: var(--text-muted);
 }
 .side {
   position: sticky;

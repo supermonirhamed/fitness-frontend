@@ -28,6 +28,7 @@ import Tag from 'primevue/tag'
 import BookingDetailsDrawer from '@/components/bookings/BookingDetailsDrawer.vue'
 import ClientFamilyTab from '@/components/clients/ClientFamilyTab.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
+import ClientInvoicesCard from '@/components/clients/ClientInvoicesCard.vue'
 import ClientMembershipsTab from '@/components/clients/ClientMembershipsTab.vue'
 import ClientNotesTab from '@/components/clients/ClientNotesTab.vue'
 import MergeClientsDialog from '@/components/clients/MergeClientsDialog.vue'
@@ -600,6 +601,12 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
           </TabPanel>
 
           <TabPanel value="payments">
+            <ClientInvoicesCard
+              v-if="tab === 'payments'"
+              :client-id="client.id"
+              class="invoices"
+              @paid="loadPayments"
+            />
             <div class="card">
               <DataTable :value="payments ?? []" :loading="payments === null" data-key="id">
                 <template #empty>
@@ -785,6 +792,9 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
 }
 .crumbs i {
   font-size: 10px;
+}
+.invoices {
+  margin-bottom: 16px;
 }
 .card {
   background: var(--surface-card);

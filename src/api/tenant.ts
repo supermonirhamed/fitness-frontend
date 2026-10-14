@@ -785,6 +785,8 @@ export interface MembershipPlan {
   activation_max_wait_days: number | null
   /** US-06.06: only for clients who never bought any product, or never this one. */
   intro_offer: 'new_clients' | 'first_time' | null
+  /** US-06.08: access waits until the invoice is paid in full. */
+  requires_payment: boolean
   rules: {
     services: {
       mode: 'all' | 'categories' | 'services' | 'programs'
@@ -869,7 +871,9 @@ export interface ClientEntitlement {
   billing: 'one_time' | 'recurring' | null
   billing_interval: 'month' | 'year' | null
   activation: PlanActivation
-  activated_by: 'purchase' | 'date' | 'booking' | 'check_in' | 'timeout' | null
+  activated_by: 'purchase' | 'date' | 'booking' | 'check_in' | 'timeout' | 'payment' | null
+  awaiting_payment: boolean
+  invoice: { id: number; number: string; status: Invoice['status'] } | null
   credits_total: number | null
   credits_used: number
   credits_left: number | null
@@ -1059,6 +1063,7 @@ export interface Payment {
   id: number
   receipt_number: string
   booking_id: number | null
+  invoice_id?: number | null
   client_id: number
   currency: string
   amount: number
@@ -1074,6 +1079,90 @@ export interface Payment {
   void_reason: string | null
   voided_by: string | null
   voided_at: string | null
+}
+
+/** An invoice (US-07.01, issued by membership and package sales, US-06.08); amounts in major units. */
+export interface Invoice {
+  id: number
+  number: string
+  status: 'Due' | 'PartiallyPaid' | 'Paid' | 'Void'
+  client: { id: number; name: string | null }
+  location: string | null
+  issued_on: string
+  due_on: string
+  overdue: boolean
+  currency: string
+  subtotal: number
+  discount: number
+  net: number
+  vat: number
+  vat_rate: string | null
+  total: number
+  paid: number
+  balance: number
+  created_by: string | null
+  lines?: {
+    id: number
+    kind: 'membership' | 'package' | 'membership_period' | 'joining_fee'
+    description: string
+    beneficiary: string | null
+    entitlement_id: number | null
+    period_starts_on: string | null
+    period_ends_on: string | null
+    quantity: number
+    unit_price: number
+    discount: number
+    discount_reason: string | null
+    net: number
+    vat: number
+    total: number
+  }[]
+  payments?: Payment[]
+}
+
+/** A membership or package sale at the desk (US-06.08). */
+export interface MembershipSaleInput {
+  client_id: number
+  payer_client_id?: number | null
+  plan_id: number
+  location_id: number
+  starts_on?: string | null
+  discount?: { type: 'percent' | 'amount'; value: number; reason?: string | null } | null
+  intro_override?: string | null
+  payment?: {
+    amount: number
+    method: PaymentMethod
+    reference?: string | null
+    note?: string | null
+  } | null
+}
+
+/** What a sale comes to, and what stands in its way (US-06.06/08). */
+export interface MembershipSaleQuote {
+  currency: string
+  lines: {
+    kind: string
+    description: string
+    unit_price: number
+    discount: number
+    net: number
+    vat: number
+    total: number
+  }[]
+  subtotal: number
+  discount: number
+  net: number
+  vat: number
+  vat_rate: string | null
+  prices_include_vat: boolean
+  total: number
+  intro_refusal: {
+    code: 'intro_new_clients_only' | 'intro_already_used'
+    plan: string | null
+  } | null
+  start_date_required: boolean
+  requires_payment: boolean
+  payer: { id: number; name: string } | null
 }
 
 /** What a booking costs at the desk and what was paid (US-04.15). */
@@ -2135,6 +2224,37 @@ export const tenantApi = {
     },
   },
   /** Desk payments (US-04.15): never edited or deleted, only voided with a reason. */
+  /** Selling memberships and packages (US-06.08); taking a payment with it needs payments.create. */
+  sales: {
+    async quote(input: MembershipSaleInput): Promise<MembershipSaleQuote> {
+      return (await http.post('/api/sales/membership/quote', input)).data.data
+    },
+    async sell(
+      input: MembershipSaleInput,
+    ): Promise<{ entitlement: ClientEntitlement; invoice: Invoice }> {
+      return (await http.post('/api/sales/membership', input)).data.data
+    },
+  },
+  invoices: {
+    async forClient(clientId: number): Promise<Invoice[]> {
+      return (await http.get(`/api/clients/${clientId}/invoices`)).data.data
+    },
+    async get(id: number): Promise<Invoice> {
+      return (await http.get(`/api/invoices/${id}`)).data.data
+    },
+    /** `amount` is VAT included, up to the balance. */
+    async pay(
+      id: number,
+      input: {
+        amount: number
+        method: PaymentMethod
+        reference?: string | null
+        note?: string | null
+      },
+    ): Promise<Payment> {
+      return (await http.post(`/api/invoices/${id}/payments`, input)).data.data
+    },
+  },
   payments: {
     async forBooking(bookingId: number): Promise<BookingPayments> {
       return (await http.get(`/api/bookings/${bookingId}/payments`)).data.data
