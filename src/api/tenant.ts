@@ -806,11 +806,54 @@ export interface MembershipPlan {
   }
   prices: { location_id: number; location: string; price: number }[]
   currency: string
+  /** US-06.07: clients holding it now, and sales since the first of the month. */
+  active_holders?: number | null
+  sales_this_month?: number | null
+}
+
+/** The plan details page (US-06.07): prices with VAT, rules by name. */
+export interface MembershipPlanDetails extends MembershipPlan {
+  pricing: {
+    location_id: number
+    location: string
+    price: number
+    vat_rate: string | null
+    prices_include_vat: boolean
+    net: number
+    vat: number
+    gross: number
+  }[]
+  rule_names: {
+    categories: string[]
+    services: string[]
+    programs: string[]
+    excluded: string[]
+    locations: string[]
+  }
+}
+
+/** A client holding a plan now (US-06.07). */
+export interface PlanHolder {
+  id: number
+  status: ClientEntitlement['status']
+  client: { id: number; name: string | null; member_id: string | null }
+  credits_total: number | null
+  credits_left: number | null
+  purchased_on: string
+  starts_on: string | null
+  ends_on: string | null
+  sold_at: string | null
 }
 
 export type MembershipPlanInput = Omit<
   MembershipPlan,
-  'id' | 'display_name' | 'prices' | 'currency' | 'drop_in_service'
+  | 'id'
+  | 'display_name'
+  | 'prices'
+  | 'currency'
+  | 'drop_in_service'
+  | 'active_holders'
+  | 'sales_this_month'
 > & {
   prices: { location_id: number; price: number }[]
 }
@@ -1908,13 +1951,22 @@ export const tenantApi = {
       return (await http.post(`/api/clients/${id}/photo`, body)).data.data
     },
   },
-  /** Membership plans (US-06.01); managing them needs memberships.update. */
+  /** Membership plans and packages (US-06.01/02/07); managing them needs memberships.update. */
   membershipPlans: {
     async list(params: { kind?: PlanKind } = {}): Promise<MembershipPlan[]> {
       return (await http.get('/api/membership-plans', { params })).data.data
     },
-    async get(id: number): Promise<MembershipPlan> {
+    async get(id: number): Promise<MembershipPlanDetails> {
       return (await http.get(`/api/membership-plans/${id}`)).data.data
+    },
+    async holders(
+      id: number,
+      page = 1,
+    ): Promise<{
+      data: PlanHolder[]
+      meta: { total: number; current_page: number; last_page: number }
+    }> {
+      return (await http.get(`/api/membership-plans/${id}/holders`, { params: { page } })).data
     },
     async create(input: MembershipPlanInput): Promise<MembershipPlan> {
       return (await http.post('/api/membership-plans', input)).data.data

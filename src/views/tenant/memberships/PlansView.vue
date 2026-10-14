@@ -1,12 +1,13 @@
 <script setup lang="ts">
-// Memberships → Plans & packages (US-06.01/02): every membership plan and credit package with what
-// it gives, how it is billed or how long it lasts, its prices per branch and status, filtered by kind
-// and status and searched by name. Only Published plans can be sold
-// (selling arrives with the next EP-06 stories). New and edit open the plan's own page.
+// Memberships → Plans & packages (US-06.01/02/07): every membership plan and credit package with
+// what it gives, how it is billed or how long it lasts, its prices per branch, status, clients
+// holding it and sales this month; filtered by kind, status and branch, and searched by name.
+// A card opens the plan's details page; New opens the editor.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -18,6 +19,7 @@ import StatusTag from '@/components/patterns/StatusTag.vue'
 import { tenantApi, type MembershipPlan, type PlanKind } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
+import { usePlanSummary } from '@/composables/usePlanSummary'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const { t } = useI18n()
@@ -39,6 +41,8 @@ async function load() {
 }
 onMounted(load)
 
+const branch = ref<number | null>(null)
+const branches = computed(() => auth.user?.switchable_locations ?? [])
 const search = ref('')
 const kind = ref<'all' | PlanKind>('all')
 const kindOptions = computed(() => [
@@ -61,6 +65,7 @@ const shown = computed(() => {
     (p) =>
       (status.value === 'all' || p.status === status.value) &&
       (kind.value === 'all' || p.kind === kind.value) &&
+      (branch.value === null || p.prices.some((x) => x.location_id === branch.value)) &&
       (!q ||
         [p.display_name, p.name.ar, p.name.en].some((n) => (n ?? '').toLowerCase().includes(q))),
   )
@@ -83,57 +88,10 @@ const stats = computed(() => [
 
 const create = () => router.push({ name: 'tenant.memberships.new' })
 const createPackage = () => router.push({ name: 'tenant.memberships.newPackage' })
-const edit = (p: MembershipPlan) =>
-  canManage.value && router.push({ name: 'tenant.memberships.edit', params: { id: p.id } })
+const open = (p: MembershipPlan) =>
+  router.push({ name: 'tenant.memberships.show', params: { id: p.id } })
 
-const access = (p: MembershipPlan) =>
-  p.kind === 'package'
-    ? p.drop_in_service_id
-      ? t('plans.dropInSummary', { service: p.drop_in_service ?? '–' })
-      : t('plans.creditsSummary', { n: p.credits })
-    : p.type === 'Unlimited'
-      ? t('plans.types.Unlimited')
-      : t('plans.limitedSummary', { n: p.visit_limit, per: t(`plans.per.${p.visit_period}`) })
-const billing = (p: MembershipPlan) =>
-  p.kind === 'package'
-    ? p.validity_mode === 'fixed_date'
-      ? t('plans.validUntilSummary', { date: p.valid_until ? format.date(p.valid_until) : '–' })
-      : t('plans.validDaysSummary', { n: p.validity_days })
-    : p.billing === 'recurring'
-      ? [
-          t(`plans.intervals.${p.billing_interval}`),
-          p.min_commitment_months
-            ? t('plans.commitmentSummary', { n: p.min_commitment_months })
-            : null,
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      : t('plans.durationSummary', {
-          n: p.duration_value,
-          unit: t(`plans.units.${p.duration_unit}`),
-        })
-const covers = (p: MembershipPlan) => {
-  const s = p.rules.services
-  if (s.mode === 'categories') return t('plans.coversCategories', { n: s.category_ids.length })
-  if (s.mode === 'services') return t('plans.coversServices', { n: s.service_ids.length })
-  if (s.mode === 'programs') return t('plans.coversPrograms', { n: s.program_ids?.length ?? 0 })
-  return s.exclude_service_ids?.length
-    ? t('plans.coversAllExcept', { n: s.exclude_service_ids.length })
-    : t('plans.coverModes.all')
-}
-const badge = (p: MembershipPlan) =>
-  p.kind === 'package'
-    ? { cls: 'package', icon: 'pi-ticket', label: t('plans.kindOne.package') }
-    : p.type === 'Unlimited'
-      ? { cls: 'unlimited', icon: 'pi-star', label: t('plans.types.Unlimited') }
-      : { cls: 'limited', icon: 'pi-ticket', label: t('plans.types.Limited') }
-const priceRange = (p: MembershipPlan) => {
-  const prices = p.prices.map((x) => x.price)
-  if (!prices.length) return null
-  const min = Math.min(...prices)
-  const max = Math.max(...prices)
-  return min === max ? format.money(min) : t('plans.fromPrice', { price: format.money(min) })
-}
+const { access, billing, covers, badge, priceRange, intro } = usePlanSummary()
 </script>
 
 <template>
@@ -202,6 +160,17 @@ const priceRange = (p: MembershipPlan) => {
           :allow-empty="false"
           :aria-label="t('plans.kinds.label')"
         />
+        <Select
+          v-if="branches.length > 1"
+          v-model="branch"
+          :options="branches"
+          option-label="name"
+          option-value="id"
+          show-clear
+          :placeholder="t('plans.allBranches')"
+          :aria-label="t('plans.branch')"
+          class="branch-filter"
+        />
         <SelectButton
           v-model="status"
           :options="statusOptions"
@@ -223,16 +192,12 @@ const priceRange = (p: MembershipPlan) => {
         <article
           v-for="p in shown"
           :key="p.id"
-          :class="[
-            'card',
-            'plan',
-            { 'plan--archived': p.status === 'Archived', 'plan--link': canManage },
-          ]"
-          :tabindex="canManage ? 0 : undefined"
-          :role="canManage ? 'link' : undefined"
-          :aria-label="canManage ? t('plans.editNamed', { name: p.display_name }) : undefined"
-          @click="edit(p)"
-          @keydown.enter="edit(p)"
+          :class="['card', 'plan', 'plan--link', { 'plan--archived': p.status === 'Archived' }]"
+          tabindex="0"
+          role="link"
+          :aria-label="t('plans.openNamed', { name: p.display_name })"
+          @click="open(p)"
+          @keydown.enter="open(p)"
         >
           <div class="plan__top">
             <span :class="['type', `type--${badge(p).cls}`]">
@@ -264,13 +229,7 @@ const priceRange = (p: MembershipPlan) => {
                 t('plans.feeSummary', { fee: format.money(p.joining_fee) })
               }}
             </li>
-            <li v-if="p.intro_offer">
-              <i class="pi pi-gift" aria-hidden="true" />{{
-                p.prices.length && p.prices.every((x) => x.price === 0)
-                  ? t('plans.freeTrial')
-                  : t(`plans.intros.${p.intro_offer}`)
-              }}
-            </li>
+            <li v-if="p.intro_offer"><i class="pi pi-gift" aria-hidden="true" />{{ intro(p) }}</li>
             <li v-if="p.rules.limits.hours">
               <i class="pi pi-clock" aria-hidden="true" />{{
                 t('plans.hoursSummary', p.rules.limits.hours)
@@ -286,8 +245,9 @@ const priceRange = (p: MembershipPlan) => {
                   : t('plans.branchCount', { n: p.prices.length })
               }}
             </span>
-            <span v-if="canManage" class="open">
-              {{ t('common.edit') }} <i class="pi pi-arrow-right pi-dir" aria-hidden="true" />
+            <span class="sold num">
+              {{ t('plans.holdersShort', { n: p.active_holders ?? 0 }) }} ·
+              {{ t('plans.soldThisMonth', { n: p.sales_this_month ?? 0 }) }}
             </span>
           </footer>
         </article>
@@ -451,13 +411,11 @@ const priceRange = (p: MembershipPlan) => {
 .branches .pi {
   margin-inline-end: 6px;
 }
-.open {
-  color: var(--primary-600);
-  font-weight: 500;
+.sold {
+  color: var(--text-secondary);
 }
-.open .pi {
-  font-size: 11px;
-  margin-inline-start: 4px;
+.branch-filter {
+  min-width: 180px;
 }
 @media (max-width: 900px) {
   .stats {

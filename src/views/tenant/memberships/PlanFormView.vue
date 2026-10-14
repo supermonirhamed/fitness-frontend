@@ -382,7 +382,7 @@ async function save() {
       summary: t('plans.saved', { name: saved.display_name }),
       life: 3000,
     })
-    router.push({ name: 'tenant.memberships' })
+    router.push({ name: 'tenant.memberships.show', params: { id: saved.id } })
   } catch (e) {
     errors.value = validationErrors(e)
     error.value = Object.keys(errors.value).length
@@ -393,7 +393,12 @@ async function save() {
     saving.value = false
   }
 }
-const cancel = () => router.push({ name: 'tenant.memberships' })
+const cancel = () =>
+  router.push(
+    plan.value
+      ? { name: 'tenant.memberships.show', params: { id: plan.value.id } }
+      : { name: 'tenant.memberships' },
+  )
 const title = computed(() =>
   plan.value ? plan.value.display_name : isPackage.value ? t('plans.newPackage') : t('plans.new'),
 )
