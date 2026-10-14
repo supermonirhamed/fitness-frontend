@@ -73,6 +73,7 @@ const blank = (): MembershipPlanInput => ({
   drop_in_service_id: null,
   activation: 'purchase',
   activation_max_wait_days: 30,
+  intro_offer: null,
   prices: [],
   rules: {
     services: {
@@ -194,6 +195,19 @@ const activationChoices = computed(() =>
     chosen_date: 'pi-calendar',
     first_use: 'pi-sign-in',
   }),
+)
+// Intro offers and free trials (US-06.06).
+const introChoices = computed(() =>
+  (['none', 'new_clients', 'first_time'] as const).map((k) => ({
+    value: k === 'none' ? null : k,
+    key: k,
+    label: t(`plans.intros.${k}`),
+    hint: t(`plans.introHints.${k}`),
+    icon: { none: 'pi-users', new_clients: 'pi-user-plus', first_time: 'pi-gift' }[k],
+  })),
+)
+const freeTrial = computed(
+  () => pricedBranches.value.length > 0 && pricedBranches.value.every((b) => b.price === 0),
 )
 // A drop-in is one credit for one service (US-06.02).
 function toggleDropIn(on: boolean) {
@@ -804,6 +818,40 @@ const title = computed(() =>
           }}</Message>
         </section>
 
+        <!-- Intro offer (US-06.06) -->
+        <section class="card section">
+          <header class="section__head">
+            <span class="section__icon"><i class="pi pi-gift" aria-hidden="true" /></span>
+            <div>
+              <h2>{{ t('plans.sections.intro') }}</h2>
+              <p>{{ t('plans.sectionHints.intro') }}</p>
+            </div>
+          </header>
+          <div class="choices choices--3" role="radiogroup" :aria-label="t('plans.sections.intro')">
+            <button
+              v-for="c in introChoices"
+              :key="c.key"
+              type="button"
+              role="radio"
+              :aria-checked="form.intro_offer === c.value"
+              :class="['choice', { 'choice--on': form.intro_offer === c.value }]"
+              @click="form.intro_offer = c.value"
+            >
+              <i :class="['pi', c.icon]" aria-hidden="true" />
+              <span class="choice__title">{{ c.label }}</span>
+              <span class="choice__hint">{{ c.hint }}</span>
+            </button>
+          </div>
+          <Message
+            v-if="freeTrial"
+            severity="info"
+            :closable="false"
+            icon="pi pi-gift"
+            size="small"
+            >{{ form.intro_offer ? t('plans.freeTrialNote') : t('plans.freeNoIntroNote') }}</Message
+          >
+        </section>
+
         <!-- 4. Prices -->
         <section class="card section">
           <header class="section__head">
@@ -1051,6 +1099,11 @@ const title = computed(() =>
             <li><i class="pi pi-th-large" aria-hidden="true" />{{ previewCovers }}</li>
             <li><i class="pi pi-map-marker" aria-hidden="true" />{{ previewWhere }}</li>
             <li><i class="pi pi-play" aria-hidden="true" />{{ previewActivation }}</li>
+            <li v-if="form.intro_offer">
+              <i class="pi pi-gift" aria-hidden="true" />{{
+                freeTrial ? t('plans.freeTrial') : t(`plans.intros.${form.intro_offer}`)
+              }}
+            </li>
             <li v-if="offPeak">
               <i class="pi pi-clock" aria-hidden="true" />{{ t('plans.hoursSummary', hours) }}
             </li>

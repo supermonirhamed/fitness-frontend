@@ -1740,6 +1740,16 @@ export default {
     tag: 'Recurring',
   },
   plans: {
+    intros: { none: 'Everyone', new_clients: 'New clients only', first_time: 'Once per client' },
+    introHints: {
+      none: 'Anyone can buy it, as often as they like.',
+      new_clients: 'Only clients who never bought a plan or package.',
+      first_time: 'Each client can buy it once.',
+    },
+    freeTrial: 'Free trial',
+    freeTrialNote: 'Free at every branch: this is a free trial.',
+    freeNoIntroNote:
+      'Free at every branch. Make it an intro offer so each client gets it only once.',
     kindOne: { membership: 'Membership', package: 'Package' },
     kinds: { all: 'All', membership: 'Memberships', package: 'Packages', label: 'Kind' },
     newPackage: 'New package',
@@ -1794,6 +1804,7 @@ export default {
     status: 'Status',
     statuses: { Draft: 'Draft', Published: 'Published (on sale)', Archived: 'Archived' },
     sections: {
+      intro: 'Intro offer',
       credits: 'Credits & validity',
       activation: 'When it starts',
       basics: 'Basics',
@@ -1891,6 +1902,7 @@ export default {
       one_time: 'Paid once, valid for a fixed duration.',
     },
     sectionHints: {
+      intro: 'Limit it to new clients: a first month at half price, or a free trial class.',
       credits: 'How many sessions the package gives, and how long it lasts.',
       activation: 'So clients don’t lose days before they use it.',
       basics: 'How the plan appears to staff and clients.',

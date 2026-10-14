@@ -264,6 +264,13 @@ const priceRange = (p: MembershipPlan) => {
                 t('plans.feeSummary', { fee: format.money(p.joining_fee) })
               }}
             </li>
+            <li v-if="p.intro_offer">
+              <i class="pi pi-gift" aria-hidden="true" />{{
+                p.prices.length && p.prices.every((x) => x.price === 0)
+                  ? t('plans.freeTrial')
+                  : t(`plans.intros.${p.intro_offer}`)
+              }}
+            </li>
             <li v-if="p.rules.limits.hours">
               <i class="pi pi-clock" aria-hidden="true" />{{
                 t('plans.hoursSummary', p.rules.limits.hours)

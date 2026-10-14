@@ -783,6 +783,8 @@ export interface MembershipPlan {
   drop_in_service?: string | null
   activation: PlanActivation
   activation_max_wait_days: number | null
+  /** US-06.06: only for clients who never bought any product, or never this one. */
+  intro_offer: 'new_clients' | 'first_time' | null
   rules: {
     services: {
       mode: 'all' | 'categories' | 'services' | 'programs'

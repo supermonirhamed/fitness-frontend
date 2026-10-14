@@ -1717,6 +1717,15 @@ const ar: typeof en = {
     tag: 'متكرر',
   },
   plans: {
+    intros: { none: 'الجميع', new_clients: 'العملاء الجدد فقط', first_time: 'مرة واحدة لكل عميل' },
+    introHints: {
+      none: 'يمكن لأي عميل شراؤه بلا حدود.',
+      new_clients: 'فقط العملاء الذين لم يشتروا خطة أو باقة من قبل.',
+      first_time: 'يشتريه كل عميل مرة واحدة.',
+    },
+    freeTrial: 'تجربة مجانية',
+    freeTrialNote: 'مجاني في كل الفروع: هذه تجربة مجانية.',
+    freeNoIntroNote: 'مجاني في كل الفروع. اجعله عرضًا تعريفيًا ليحصل عليه كل عميل مرة واحدة.',
     kindOne: { membership: 'عضوية', package: 'باقة' },
     kinds: { all: 'الكل', membership: 'العضويات', package: 'الباقات', label: 'النوع' },
     newPackage: 'باقة جديدة',
@@ -1770,6 +1779,7 @@ const ar: typeof en = {
     status: 'الحالة',
     statuses: { Draft: 'مسودة', Published: 'منشورة (للبيع)', Archived: 'مؤرشفة' },
     sections: {
+      intro: 'عرض تعريفي',
       credits: 'الرصيد والصلاحية',
       activation: 'متى تبدأ',
       basics: 'الأساسيات',
@@ -1867,6 +1877,7 @@ const ar: typeof en = {
       one_time: 'تُدفع مرة واحدة وتصلح لمدة محددة.',
     },
     sectionHints: {
+      intro: 'اقصره على العملاء الجدد: شهر أول بنصف السعر، أو حصة تجريبية مجانية.',
       credits: 'كم حصة تمنحها الباقة، وكم تدوم.',
       activation: 'حتى لا يخسر العميل أيامًا قبل أن يستخدمها.',
       basics: 'كيف تظهر الخطة للموظفين والعملاء.',
