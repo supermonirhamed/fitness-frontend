@@ -2202,7 +2202,7 @@ export interface Roster {
     booking_id: number
     client: { id: number; name: string; member_id: string | null; photo_url: string | null } | null
     status: string
-    mark: 'present' | 'late' | 'absent' | null
+    mark: 'present' | 'late' | 'absent' | 'excused' | null
     alerts: { first_visit: boolean; health_note: boolean; waiver_missing: boolean }
     checked_in: { at: string; by: string | null; override: boolean } | null
   }[]
@@ -2226,6 +2226,37 @@ export interface AttendanceSettings {
   closes_minutes_after: number
   undo_minutes: number
   coach_edit_hours: number
+  low_rate_threshold: number
+  min_sessions: number
+}
+
+/** One visit in a client's attendance history (US-08.09). */
+export interface AttendanceEntry {
+  type: 'session' | 'open_access'
+  id: number
+  at: string
+  date: string
+  time: string
+  title: string | null
+  service: string | null
+  location: string | null
+  coach: string | null
+  status: 'attended' | 'late' | 'excused' | 'no_show' | 'late_cancel'
+  method: string | null
+}
+/** Attendance rates (US-08.10). */
+export interface AttendanceRates {
+  rows: {
+    id: number
+    name: string
+    attended: number
+    no_shows: number
+    excused: number
+    rate: number | null
+    low: boolean
+  }[]
+  threshold: number
+  min_sessions: number
 }
 
 export const tenantApi = {
@@ -2693,6 +2724,10 @@ export const tenantApi = {
       },
     ): Promise<Payment> {
       return (await http.post(`/api/clients/${clientId}/payments`, input)).data.data
+    },
+    /** Attendance history (US-08.09). */
+    async attendance(clientId: number): Promise<AttendanceEntry[]> {
+      return (await http.get(`/api/clients/${clientId}/attendance`)).data.data
     },
     async accountCredit(clientId: number): Promise<AccountCreditSummary> {
       return (await http.get(`/api/clients/${clientId}/account-credit`)).data.data
@@ -3180,6 +3215,22 @@ export const tenantApi = {
       return (await http.post(`/api/check-ins/${id}/undo`, { reason })).data.data
     },
   },
+  /** Attendance rates (US-08.10). */
+  attendance: {
+    async rates(params: {
+      group_by: 'client' | 'coach' | 'series'
+      from?: string
+      to?: string
+      location_id?: number
+      below?: boolean
+    }): Promise<AttendanceRates> {
+      return (
+        await http.get('/api/attendance/rates', {
+          params: { ...params, below: params.below ? 1 : undefined },
+        })
+      ).data.data
+    },
+  },
   /** A session's roster and the coach's delivery marks (US-08.04, US-08.07). */
   roster: {
     async get(sessionId: number): Promise<Roster> {
@@ -3188,7 +3239,7 @@ export const tenantApi = {
     async mark(
       sessionId: number,
       bookingId: number,
-      mark: 'present' | 'late' | 'absent',
+      mark: 'present' | 'late' | 'absent' | 'excused',
     ): Promise<Roster> {
       return (await http.post(`/api/sessions/${sessionId}/roster/${bookingId}/mark`, { mark })).data
         .data

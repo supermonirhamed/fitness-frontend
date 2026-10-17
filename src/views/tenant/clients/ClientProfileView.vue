@@ -45,6 +45,7 @@ import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import {
   tenantApi,
+  type AttendanceEntry,
   type Booking,
   type Client,
   type ClientOverview,
@@ -213,7 +214,14 @@ const yesterday = () => {
 }
 const when = ref<'upcoming' | 'past'>('upcoming')
 const bookings = ref<Booking[] | null>(null)
-const attendance = ref<Booking[] | null>(null)
+const attendance = ref<AttendanceEntry[] | null>(null)
+const ATTENDANCE_SEVERITY: Record<string, string> = {
+  attended: 'success',
+  late: 'warn',
+  excused: 'info',
+  no_show: 'danger',
+  late_cancel: 'secondary',
+}
 const payments = ref<Payment[] | null>(null)
 async function loadBookings() {
   bookings.value = null
@@ -230,11 +238,7 @@ async function loadBookings() {
   ).data
 }
 async function loadAttendance() {
-  attendance.value = (
-    await tenantApi.bookings
-      .list({ client_id: id.value, status: ['Attended', 'NoShow'], order: 'desc', per_page: 50 })
-      .catch(() => ({ data: [] }))
-  ).data
+  attendance.value = await tenantApi.clients.attendance(id.value).catch(() => [])
 }
 async function loadPayments() {
   payments.value = await tenantApi.clients.payments(id.value).catch(() => [])
@@ -606,8 +610,13 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
           </TabPanel>
 
           <TabPanel value="attendance">
+            <!-- Attendance history (US-08.09) -->
             <div class="card">
-              <DataTable :value="attendance ?? []" :loading="attendance === null" data-key="id">
+              <DataTable
+                :value="attendance ?? []"
+                :loading="attendance === null"
+                :data-key="(r: AttendanceEntry) => `${r.type}-${r.id}`"
+              >
                 <template #empty>
                   <EmptyState
                     compact
@@ -617,18 +626,33 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
                 </template>
                 <Column :header="t('bookings.columns.when')">
                   <template #body="{ data }">
-                    <span class="num"
-                      >{{ data.session?.local.date }} {{ data.session?.local.start }}</span
-                    >
+                    <span class="num">{{ format.date(data.date) }} {{ data.time }}</span>
                   </template>
                 </Column>
                 <Column :header="t('bookings.columns.session')">
-                  <template #body="{ data }">{{ data.session?.service }}</template>
+                  <template #body="{ data }">
+                    {{ data.title }}
+                    <div v-if="data.coach" class="muted">{{ data.coach }}</div>
+                  </template>
+                </Column>
+                <Column :header="t('invoices.branch')">
+                  <template #body="{ data }">{{ data.location }}</template>
                 </Column>
                 <Column :header="t('bookings.columns.status')">
-                  <template #body="{ data }"
-                    ><StatusTag :status="data.status" size="sm"
-                  /></template>
+                  <template #body="{ data }">
+                    <Tag
+                      class="tag-sm"
+                      :severity="ATTENDANCE_SEVERITY[data.status] ?? 'secondary'"
+                      :value="t(`attendanceHistory.status.${data.status}`)"
+                    />
+                  </template>
+                </Column>
+                <Column :header="t('attendanceHistory.method')">
+                  <template #body="{ data }">
+                    <span class="muted">{{
+                      data.method ? t(`attendanceHistory.methods.${data.method}`, data.method) : '—'
+                    }}</span>
+                  </template>
                 </Column>
               </DataTable>
             </div>

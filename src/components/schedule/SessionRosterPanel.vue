@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The session's roster for taking attendance (US-08.04), made for the coach's phone: each booked
-// client with photo and alerts (first visit, health note, waiver), marked Present, Late or Absent,
+// client with photo and alerts (first visit, health note, waiver), marked Present, Late, Absent or Excused (left out of attendance rates),
 // "Mark all present", and a walk-in added subject to eligibility and capacity. Clients checked in
 // at the desk are already Present. Coaches edit until the organization's limit after the session;
 // later only managers. The coach starts and delivers the session here (US-08.07).
@@ -56,9 +56,12 @@ async function act(action: () => Promise<Roster>) {
   }
 }
 const marks = computed(() =>
-  (['present', 'late', 'absent'] as const).map((m) => ({ value: m, label: t(`roster.${m}`) })),
+  (['present', 'late', 'absent', 'excused'] as const).map((m) => ({
+    value: m,
+    label: t(`roster.${m}`),
+  })),
 )
-const mark = (bookingId: number, value: 'present' | 'late' | 'absent' | null) =>
+const mark = (bookingId: number, value: 'present' | 'late' | 'absent' | 'excused' | null) =>
   value && act(() => tenantApi.roster.mark(props.sessionId, bookingId, value))
 const markAll = () => act(() => tenantApi.roster.markAll(props.sessionId))
 const deliver = (action: 'start' | 'deliver') =>
@@ -235,7 +238,9 @@ const isCoach = computed(
           :disabled="!roster.can_edit || busy"
           :aria-label="c.client?.name"
           class="marks"
-          @update:model-value="(v: 'present' | 'late' | 'absent' | null) => mark(c.booking_id, v)"
+          @update:model-value="
+            (v: 'present' | 'late' | 'absent' | 'excused' | null) => mark(c.booking_id, v)
+          "
         />
       </li>
     </ul>

@@ -126,6 +126,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'payments.view' },
       },
       {
+        // Attendance rates (US-08.10).
+        path: 'attendance',
+        name: 'tenant.attendance',
+        component: () => import('@/views/tenant/attendance/AttendanceRatesView.vue'),
+        meta: { permission: 'attendance.view' },
+      },
+      {
         // The check-in desk (EP-08).
         path: 'check-in',
         name: 'tenant.checkIn',
