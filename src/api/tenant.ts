@@ -2259,6 +2259,151 @@ export interface AttendanceRates {
   min_sessions: number
 }
 
+/** A staff member (US-09.01/02). */
+export interface StaffMember {
+  id: number
+  name: string
+  email: string | null
+  phone: string | null
+  photo_url: string | null
+  status: 'Invited' | 'Active' | 'Deactivated'
+  employment_type: 'employee' | 'contractor'
+  has_login: boolean
+  roles: string[]
+  owner: boolean
+  is_me: boolean
+  all_locations: boolean
+  location_ids: number[]
+  services?: { id: number; name: string }[]
+  bio: { ar: string | null; en: string | null }
+  specialties: string[]
+  certifications: { name: string; expires_on: string | null }[]
+  certifications_expiring: { name: string; expires_on: string | null }[]
+  show_on_app: boolean
+  deactivated_at: string | null
+}
+export interface StaffProfile extends StaffMember {
+  availability: { location_id: number; weekly: WeeklyHours }[]
+  schedule: {
+    id: number
+    title: string
+    starts_at: string
+    ends_at: string | null
+    location: string | null
+    timezone: string | null
+  }[]
+  activity: { action: string; at: string | null; by: string | null }[]
+}
+export type StaffInput = Partial<
+  Pick<
+    StaffMember,
+    | 'name'
+    | 'email'
+    | 'phone'
+    | 'employment_type'
+    | 'has_login'
+    | 'roles'
+    | 'all_locations'
+    | 'location_ids'
+    | 'bio'
+    | 'specialties'
+    | 'certifications'
+    | 'show_on_app'
+  >
+>
+/** Sessions of a coach taken off a service, to reassign (US-09.03). */
+export interface ReassignSession {
+  id: number
+  title: string
+  starts_at: string
+  coach_id: number
+  coach: string
+}
+/** A coach's availability and time off (US-09.04). */
+export interface StaffAvailabilityData {
+  weekly: { location_id: number; weekly: WeeklyHours }[]
+  overrides: {
+    id: number
+    location_id: number
+    date: string
+    ranges: TimeRange[]
+    reason: string | null
+  }[]
+  time_off: {
+    id: number
+    starts_at: string
+    ends_at: string
+    all_day: boolean
+    reason: string | null
+    status: 'Approved' | 'Pending'
+    created_by: string | null
+    sessions: number
+  }[]
+  approval_required: boolean
+}
+export interface TimeOffInput {
+  starts_on: string
+  ends_on: string
+  all_day: boolean
+  start_time?: string | null
+  end_time?: string | null
+  reason?: string | null
+}
+export interface StaffHoursRow {
+  user_id: number
+  name: string
+  sessions: number
+  appointments: number
+  session_minutes: number
+  session_hours: number
+  attendees: number
+  attendees_per_session: number | null
+  substitutions: number
+  delivered: number
+  shift_minutes: number
+  shift_hours: number
+}
+export interface PayRate {
+  id: number
+  type: 'hourly' | 'per_session' | 'per_attendee' | 'revenue_percent'
+  applies_to: 'sessions' | 'shifts'
+  amount: number | null
+  percent: number | null
+  min_amount: number | null
+  max_amount: number | null
+  location_id: number | null
+  location: string | null
+  service_id: number | null
+  service: string | null
+  series_id: number | null
+  scheduled_session_id: number | null
+}
+export type PayRateInput = Omit<PayRate, 'id' | 'location' | 'service'>
+export interface PayReport {
+  currency: string
+  total: number
+  rows: {
+    user_id: number
+    name: string
+    amount: number
+    unpriced: number
+    lines: {
+      kind: 'session' | 'shift'
+      session_id: number | null
+      title: string | null
+      starts_at: string
+      attendees?: number
+      minutes?: number
+      rate: PayRate | null
+      amount: number | null
+    }[]
+  }[]
+}
+export interface StaffSettings {
+  time_off_approval: boolean
+  travel_buffer_minutes: number
+}
+
 export const tenantApi = {
   async organization(): Promise<Organization> {
     return (await http.get('/api/organization')).data.data
@@ -3279,6 +3424,157 @@ export const tenantApi = {
     },
     async update(input: AttendanceSettings): Promise<AttendanceSettings> {
       return (await http.put('/api/settings/attendance', input)).data.data
+    },
+  },
+  /** Staff members (EP-09). */
+  staff: {
+    async list(params: {
+      q?: string
+      role?: string
+      location_id?: number
+      service_id?: number
+      status?: string
+    }): Promise<{ data: StaffMember[]; roles: { id: number; name: string }[] }> {
+      return (await http.get('/api/staff', { params })).data
+    },
+    async get(id: number): Promise<StaffProfile> {
+      return (await http.get(`/api/staff/${id}`)).data.data
+    },
+    async create(input: StaffInput): Promise<StaffMember> {
+      return (await http.post('/api/staff', input)).data.data
+    },
+    async update(id: number, input: StaffInput): Promise<StaffMember> {
+      return (await http.put(`/api/staff/${id}`, input)).data.data
+    },
+    async invite(id: number): Promise<void> {
+      await http.post(`/api/staff/${id}/invite`)
+    },
+    async services(
+      id: number,
+      serviceIds: number[],
+    ): Promise<{ data: StaffMember; reassign: ReassignSession[] }> {
+      return (await http.put(`/api/staff/${id}/services`, { service_ids: serviceIds })).data
+    },
+    async uploadPhoto(id: number, file: File): Promise<StaffMember> {
+      const form = new FormData()
+      form.append('photo', file)
+      return (await http.post(`/api/users/${id}/photo`, form)).data.data
+    },
+    async deletePhoto(id: number): Promise<void> {
+      await http.delete(`/api/users/${id}/photo`)
+    },
+    /** A coach's availability and time off: `userId` null = the signed-in user's own. */
+    async availability(userId: number | null): Promise<StaffAvailabilityData> {
+      return (
+        await http.get(userId ? `/api/staff/${userId}/availability` : '/api/account/availability')
+      ).data.data
+    },
+    async setWeekly(
+      userId: number | null,
+      locationId: number,
+      weekly: WeeklyHours | null,
+    ): Promise<StaffAvailabilityData> {
+      const url = userId
+        ? `/api/staff/${userId}/availability/${locationId}`
+        : `/api/account/availability/${locationId}`
+      return (await http.put(url, { weekly })).data.data
+    },
+    async addOverride(
+      userId: number | null,
+      input: { location_id: number; date: string; ranges: TimeRange[]; reason?: string | null },
+    ): Promise<StaffAvailabilityData> {
+      const url = userId
+        ? `/api/staff/${userId}/availability-overrides`
+        : '/api/account/availability-overrides'
+      return (await http.post(url, input)).data.data
+    },
+    async deleteOverride(id: number): Promise<void> {
+      await http.delete(`/api/account/availability-overrides/${id}`)
+    },
+    async addTimeOff(
+      userId: number | null,
+      input: TimeOffInput,
+    ): Promise<{
+      time_off: StaffAvailabilityData['time_off'][number]
+      sessions: { id: number; title: string; starts_at: string; location: string | null }[]
+    }> {
+      const url = userId ? `/api/staff/${userId}/time-off` : '/api/account/time-off'
+      return (await http.post(url, input)).data.data
+    },
+    async deleteTimeOff(id: number): Promise<void> {
+      await http.delete(`/api/account/time-off/${id}`)
+    },
+    async decideTimeOff(id: number, approve: boolean): Promise<void> {
+      await http.post(`/api/time-off/${id}/decide`, { approve })
+    },
+    async pendingTimeOff(): Promise<
+      {
+        id: number
+        user: { id: number; name: string }
+        starts_at: string
+        ends_at: string
+        all_day: boolean
+        reason: string | null
+        sessions: number
+      }[]
+    > {
+      return (await http.get('/api/time-off/pending')).data.data
+    },
+    async hours(params: {
+      from?: string
+      to?: string
+      location_id?: number
+    }): Promise<StaffHoursRow[]> {
+      return (await http.get('/api/staff/hours', { params })).data.data
+    },
+    hoursExportUrl(params: { from?: string; to?: string; location_id?: number }): string {
+      const query = new URLSearchParams(cleanParams(params) as Record<string, string>)
+      return `/api/staff/hours/export?${query}`
+    },
+    async hoursFor(
+      id: number,
+      params: { from?: string; to?: string },
+    ): Promise<{
+      summary: StaffHoursRow | null
+      sessions: {
+        id: number
+        title: string
+        starts_at: string
+        ends_at: string
+        location: string | null
+        minutes: number
+        attendees: number
+        substitute_for: string | null
+      }[]
+    }> {
+      return (await http.get(`/api/staff/${id}/hours`, { params })).data.data
+    },
+    async payRates(id: number): Promise<PayRate[]> {
+      return (await http.get(`/api/staff/${id}/pay-rates`)).data.data
+    },
+    async addPayRate(id: number, input: Partial<PayRateInput>): Promise<PayRate> {
+      return (await http.post(`/api/staff/${id}/pay-rates`, input)).data.data
+    },
+    async updatePayRate(rateId: number, input: Partial<PayRateInput>): Promise<PayRate> {
+      return (await http.put(`/api/pay-rates/${rateId}`, input)).data.data
+    },
+    async deletePayRate(rateId: number): Promise<void> {
+      await http.delete(`/api/pay-rates/${rateId}`)
+    },
+    async payReport(params: {
+      from?: string
+      to?: string
+      location_id?: number
+    }): Promise<PayReport> {
+      return (await http.get('/api/staff/pay-report', { params })).data.data
+    },
+  },
+  staffSettings: {
+    async get(): Promise<StaffSettings> {
+      return (await http.get('/api/settings/staff')).data.data
+    },
+    async update(input: StaffSettings): Promise<StaffSettings> {
+      return (await http.put('/api/settings/staff', input)).data.data
     },
   },
   invoices: {

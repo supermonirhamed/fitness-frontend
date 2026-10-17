@@ -73,6 +73,16 @@ const userMenu = computed(() => [
         },
       ]
     : []),
+  // Coaches set their own availability and time off (US-09.04).
+  ...(auth.user?.roles.some((r) => COACHING_ROLES.includes(r))
+    ? [
+        {
+          label: t('staffAvailability.myTitle'),
+          icon: 'pi pi-calendar-clock',
+          command: () => router.push({ name: 'tenant.availability' }),
+        },
+      ]
+    : []),
   {
     label: t('shell.profile'),
     icon: 'pi pi-user',

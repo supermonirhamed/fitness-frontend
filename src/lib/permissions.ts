@@ -45,6 +45,12 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     permission: 'settings.view',
   },
   {
+    name: 'tenant.settings.staff',
+    key: 'staff',
+    icon: 'pi-users',
+    permission: 'settings.view',
+  },
+  {
     name: 'tenant.settings.attendance',
     key: 'attendance',
     icon: 'pi-check-square',
@@ -67,6 +73,9 @@ export const SETTINGS_PAGES: SettingsPage[] = [
 
 /** Staff sub-pages (tabs), in order. */
 export const STAFF_PAGES: SettingsPage[] = [
+  { name: 'tenant.staff.team', key: 'team', icon: 'pi-id-card', permission: 'staff.view' },
+  { name: 'tenant.staff.hours', key: 'hours', icon: 'pi-clock', permission: 'staff.view' },
+  { name: 'tenant.staff.pay', key: 'pay', icon: 'pi-money-bill', permission: 'staff.pay_rates' },
   { name: 'tenant.staff.users', key: 'users', icon: 'pi-users', permission: 'staff.view' },
   { name: 'tenant.staff.roles', key: 'roles', icon: 'pi-key', permission: 'roles.view' },
 ]

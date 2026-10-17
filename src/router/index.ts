@@ -239,6 +239,12 @@ const tenantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/tenant/account/ProfileView.vue'),
       },
       {
+        // A coach's own availability and time off (US-09.04).
+        path: 'account/availability',
+        name: 'tenant.availability',
+        component: () => import('@/views/tenant/account/AvailabilityView.vue'),
+      },
+      {
         path: 'account/security',
         name: 'tenant.security',
         component: () => import('@/views/tenant/account/SecurityView.vue'),
@@ -336,6 +342,13 @@ const tenantRoutes: RouteRecordRaw[] = [
             meta: { permission: 'settings.view' },
           },
           {
+            // Staff & scheduling (EP-09).
+            path: 'staff',
+            name: 'tenant.settings.staff',
+            component: () => import('@/views/tenant/settings/StaffSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
             // Check-in & attendance (EP-08).
             path: 'attendance',
             name: 'tenant.settings.attendance',
@@ -367,6 +380,31 @@ const tenantRoutes: RouteRecordRaw[] = [
         name: 'tenant.staff',
         component: () => import('@/views/tenant/staff/StaffLayout.vue'),
         children: [
+          {
+            // The team and staff profiles (EP-09).
+            path: 'team',
+            name: 'tenant.staff.team',
+            component: () => import('@/views/tenant/staff/TeamView.vue'),
+            meta: { permission: 'staff.view' },
+          },
+          {
+            path: 'members/:id(\\d+)',
+            name: 'tenant.staff.member',
+            component: () => import('@/views/tenant/staff/StaffProfileView.vue'),
+            meta: { permission: 'staff.view' },
+          },
+          {
+            path: 'hours',
+            name: 'tenant.staff.hours',
+            component: () => import('@/views/tenant/staff/StaffHoursView.vue'),
+            meta: { permission: 'staff.view' },
+          },
+          {
+            path: 'pay',
+            name: 'tenant.staff.pay',
+            component: () => import('@/views/tenant/staff/PayReportView.vue'),
+            meta: { permission: 'staff.pay_rates' },
+          },
           {
             path: 'users',
             name: 'tenant.staff.users',

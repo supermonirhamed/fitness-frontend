@@ -24,6 +24,7 @@ describe('permissions helpers', () => {
       'booking',
       'memberships',
       'payments',
+      'staff',
       'attendance',
       'security',
       'waivers',
@@ -36,9 +37,14 @@ describe('permissions helpers', () => {
     const can = (granted: string[]) => (p: string) => granted.includes(p)
     expect(allowedPages(STAFF_PAGES, can(['roles.view'])).map((p) => p.key)).toEqual(['roles'])
     expect(allowedPages(STAFF_PAGES, can(['staff.view', 'roles.view'])).map((p) => p.key)).toEqual([
+      'team',
+      'hours',
       'users',
       'roles',
     ])
+    expect(
+      allowedPages(STAFF_PAGES, can(['staff.view', 'staff.pay_rates'])).map((p) => p.key),
+    ).toContain('pay')
   })
 })
 
