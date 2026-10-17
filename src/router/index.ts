@@ -126,6 +126,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'payments.view' },
       },
       {
+        // Transactions and daily close (US-07.10).
+        path: 'transactions',
+        name: 'tenant.transactions',
+        component: () => import('@/views/tenant/transactions/TransactionsView.vue'),
+        meta: { permission: 'payments.view' },
+      },
+      {
         // Point of sale (US-07.02).
         path: 'pos',
         name: 'tenant.pos',

@@ -2016,6 +2016,74 @@ function cleanParams(params: object): Record<string, string | number> {
   )
 }
 
+/** A money movement (US-07.10). Amounts are signed: voids and refunds are negative. */
+export interface Transaction {
+  type: 'payment' | 'void' | 'refund' | 'credit'
+  id: number
+  kind: string | null
+  at: string
+  date: string
+  location_id: number | null
+  location: string | null
+  client: { id: number; name: string } | null
+  method: PaymentMethod | null
+  amount: number
+  receipt_number: string | null
+  payment_id: number | null
+  reference: string | null
+  staff: string | null
+  staff_id: number | null
+  note: string | null
+  status: 'Recorded' | 'Voided' | null
+}
+export interface TransactionFilters {
+  location_id?: number
+  method?: PaymentMethod
+  user_id?: number
+  from?: string
+  to?: string
+  type?: Transaction['type'][]
+}
+export interface TransactionTotals {
+  count: number
+  payments: number
+  voids: number
+  refunds: number
+  net: number
+  by_method: Partial<Record<PaymentMethod, number>>
+}
+/** A daily close (US-07.10). */
+export interface DayClose {
+  id: number
+  location_id: number
+  date: string
+  user: { id: number; name: string } | null
+  expected: Record<string, number>
+  counted: Record<string, number>
+  expected_total: number
+  counted_total: number
+  difference: number
+  note: string | null
+  closed_by: string | null
+  closed_at: string
+  reopened_by: string | null
+  reopened_at: string | null
+  reopen_reason: string | null
+}
+export interface DaySummary {
+  location_id: number
+  date: string
+  user_id: number | null
+  currency: string
+  methods: PaymentMethod[]
+  expected: Record<string, number>
+  expected_total: number
+  payments: number
+  refunds: number
+  closes: DayClose[]
+  can_reopen: boolean
+}
+
 export const tenantApi = {
   async organization(): Promise<Organization> {
     return (await http.get('/api/organization')).data.data
@@ -2867,6 +2935,45 @@ export const tenantApi = {
       input: MembershipSaleInput,
     ): Promise<{ entitlement: ClientEntitlement; invoice: Invoice }> {
       return (await http.post('/api/sales/membership', input)).data.data
+    },
+  },
+  /** Transactions and daily close (US-07.10). */
+  transactions: {
+    async list(params: TransactionFilters & { page?: number; per_page?: number }): Promise<{
+      data: Transaction[]
+      meta: { total: number; current_page: number; last_page: number }
+      totals: TransactionTotals
+    }> {
+      return (await http.get('/api/transactions', { params })).data
+    },
+    /** The filtered list as CSV (payments.export); opened as a download link. */
+    exportUrl(filters: TransactionFilters): string {
+      const params = new URLSearchParams()
+      for (const [key, value] of Object.entries(filters)) {
+        if (value === undefined || value === null || value === '') continue
+        if (Array.isArray(value)) value.forEach((v) => params.append(`${key}[]`, String(v)))
+        else params.append(key, String(value))
+      }
+      return `/api/transactions/export?${params}`
+    },
+    async day(params: {
+      location_id: number
+      date: string
+      user_id?: number | null
+    }): Promise<DaySummary> {
+      return (await http.get('/api/day-close', { params })).data.data
+    },
+    async close(input: {
+      location_id: number
+      date: string
+      user_id?: number | null
+      counted: Record<string, number | null>
+      note?: string | null
+    }): Promise<DayClose> {
+      return (await http.post('/api/day-close', input)).data.data
+    },
+    async reopen(id: number, reason: string): Promise<DayClose> {
+      return (await http.post(`/api/day-close/${id}/reopen`, { reason })).data.data
     },
   },
   invoices: {
