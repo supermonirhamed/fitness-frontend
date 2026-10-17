@@ -794,6 +794,7 @@ const ar: typeof en = {
     reactivatedToast: 'أصبح {name} نشطًا مجددًا',
   },
   audit: {
+    financialOnly: 'المالية فقط',
     allActors: 'الجميع',
     allActions: 'كل الإجراءات',
     allEntities: 'كل السجلات',
@@ -820,6 +821,12 @@ const ar: typeof en = {
       changes: 'ما تغيّر',
     },
     actions: {
+      account_credit_changed: 'تغيير رصيد الحساب',
+      day_closed: 'إقفال اليوم',
+      day_reopened: 'إعادة فتح اليوم',
+      transactions_exported: 'تصدير المعاملات',
+      payment_reminder_sent: 'إرسال تذكير بالدفع',
+      discount_manual_applied: 'خصم يدوي',
       service_archived: 'أرشفة خدمة',
       service_restored: 'استعادة خدمة',
       service_created: 'إنشاء خدمة',

@@ -1961,6 +1961,8 @@ export interface AuditFilters {
   entity_id?: string | number | null
   from?: string | null
   to?: string | null
+  /** US-07.14: only financial actions. */
+  financial?: 1 | null
 }
 
 export interface AuditFilterOptions {

@@ -799,6 +799,7 @@ export default {
     reactivatedToast: '{name} is active again',
   },
   audit: {
+    financialOnly: 'Financial only',
     allActors: 'Everyone',
     allActions: 'All actions',
     allEntities: 'All records',
@@ -819,6 +820,12 @@ export default {
     no: 'No',
     columns: { time: 'Time', actor: 'Who', action: 'Action', entity: 'Record', changes: 'Changed' },
     actions: {
+      account_credit_changed: 'Account credit changed',
+      day_closed: 'Day closed',
+      day_reopened: 'Day reopened',
+      transactions_exported: 'Transactions exported',
+      payment_reminder_sent: 'Payment reminder sent',
+      discount_manual_applied: 'Manual discount given',
       service_archived: 'Service archived',
       service_restored: 'Service restored',
       service_created: 'Service created',

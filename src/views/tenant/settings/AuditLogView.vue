@@ -7,6 +7,7 @@ import DataTable, { type DataTablePageEvent } from 'primevue/datatable'
 import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
+import ToggleSwitch from 'primevue/toggleswitch'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
@@ -38,6 +39,8 @@ const actor = ref<number | null>(null)
 const action = ref<string | null>(null)
 const entityType = ref<string | null>(null)
 const range = ref<(Date | null)[] | null>(null)
+// The financial audit trail (US-07.14).
+const financial = ref(false)
 
 const filters = computed<AuditFilters>(() => ({
   actor: actor.value,
@@ -45,6 +48,7 @@ const filters = computed<AuditFilters>(() => ({
   entity_type: entityType.value,
   from: range.value?.[0] ? isoDay(range.value[0]) : null,
   to: range.value?.[1] ? isoDay(range.value[1]) : range.value?.[0] ? isoDay(range.value[0]) : null,
+  financial: financial.value ? 1 : null,
 }))
 const filtered = computed(() => Object.values(filters.value).some((v) => v !== null))
 
@@ -105,6 +109,7 @@ function clearFilters() {
   action.value = null
   entityType.value = null
   range.value = null
+  financial.value = false
 }
 
 function exportCsv() {
@@ -197,6 +202,10 @@ function summary(entry: AuditEntry): string {
         class="filters__item"
         :aria-label="t('audit.dateRange')"
       />
+      <label class="filters__toggle">
+        <ToggleSwitch v-model="financial" input-id="audit-financial" />
+        <span>{{ t('audit.financialOnly') }}</span>
+      </label>
       <span class="filters__spacer" />
       <Button
         v-if="auth.can('audit.export')"
@@ -349,6 +358,12 @@ function summary(entry: AuditEntry): string {
 </template>
 
 <style scoped>
+.filters__toggle {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font: var(--text-small);
+}
 .list {
   display: flex;
   flex-direction: column;
