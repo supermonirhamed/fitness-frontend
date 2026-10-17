@@ -2119,6 +2119,115 @@ export interface CollectionRow {
   last_reminded_at: string | null
 }
 
+/** A check-in denial (US-08.03). */
+export interface CheckInDenial {
+  code: string
+  message: string
+}
+/** A check-in at the desk (EP-08). */
+export interface CheckInRecord {
+  id: number
+  kind: 'session' | 'open_access'
+  method: string
+  client: { id: number; name: string; photo_url: string | null } | null
+  session: { id: number; title: string; starts_at: string } | null
+  service: string | null
+  booking_id: number | null
+  credits_used: number
+  override: boolean
+  override_codes: string[] | null
+  override_reason: string | null
+  checked_in_at: string
+  checked_in_by: string | null
+  undone_at: string | null
+  undone_by: string | null
+  undo_reason: string | null
+  undo_until: string
+}
+/** What the desk shows for a client (US-08.01). */
+export interface CheckInCard {
+  client: {
+    id: number
+    name: string
+    member_id: string | null
+    photo_url: string | null
+    status: string
+    status_reason: string | null
+  }
+  alerts: {
+    blocked: boolean
+    waivers_missing: string[]
+    health_note: boolean
+    expiring: { name: string; ends_on: string } | null
+    balance: ClientBalance | null
+  }
+  bookings: {
+    id: number
+    status: string
+    session: { id: number; title: string; starts_at: string; ends_at: string | null }
+    window: { opens_at: string; closes_at: string }
+    check_in: CheckInRecord | null
+    denials: CheckInDenial[]
+  }[]
+  open_access: {
+    service: { id: number; name: string }
+    entitlement: { id: number; name: string; kind: string; credits_left: number | null } | null
+    denials: CheckInDenial[]
+  }[]
+  bookable: { id: number; title: string; starts_at: string; spots_left: number | null }[]
+}
+export interface CheckInSearchResult {
+  id: number
+  name: string
+  member_id: string | null
+  photo_url: string | null
+  status: string
+  exact: boolean
+}
+/** A session's roster (US-08.04). */
+export interface Roster {
+  session: {
+    id: number
+    title: string
+    starts_at: string
+    ends_at: string | null
+    capacity: number | null
+    status: string
+  }
+  can_edit: boolean
+  edit_until: string
+  delivery: { started_at: string; ended_at: string | null; by: string | null } | null
+  counts: { booked: number; present: number; absent: number }
+  clients: {
+    booking_id: number
+    client: { id: number; name: string; member_id: string | null; photo_url: string | null } | null
+    status: string
+    mark: 'present' | 'late' | 'absent' | null
+    alerts: { first_visit: boolean; health_note: boolean; waiver_missing: boolean }
+    checked_in: { at: string; by: string | null; override: boolean } | null
+  }[]
+}
+export interface StaffAttendanceDay {
+  records: {
+    id: number
+    kind: 'session' | 'shift'
+    user: { id: number; name: string | null }
+    session: { id: number; title: string } | null
+    started_at: string
+    ended_at: string | null
+    minutes: number | null
+    recorded_by: string | null
+    note: string | null
+  }[]
+  staff: { id: number; name: string }[]
+}
+export interface AttendanceSettings {
+  opens_minutes_before: number
+  closes_minutes_after: number
+  undo_minutes: number
+  coach_edit_hours: number
+}
+
 export const tenantApi = {
   async organization(): Promise<Organization> {
     return (await http.get('/api/organization')).data.data
@@ -3027,6 +3136,98 @@ export const tenantApi = {
       clientIds: number[],
     ): Promise<{ sent: number; skipped: { id: number; reason: string }[] }> {
       return (await http.post('/api/collections/remind', { client_ids: clientIds })).data.data
+    },
+  },
+  /** The check-in desk (EP-08). */
+  checkIn: {
+    async search(q: string): Promise<CheckInSearchResult[]> {
+      return (await http.get('/api/check-in/search', { params: { q } })).data.data
+    },
+    async card(clientId: number, locationId?: number | null): Promise<CheckInCard> {
+      return (
+        await http.get(`/api/check-in/clients/${clientId}`, {
+          params: { location_id: locationId ?? undefined },
+        })
+      ).data.data
+    },
+    async booking(
+      bookingId: number,
+      input: { location_id?: number | null; override?: boolean; reason?: string | null } = {},
+    ): Promise<CheckInRecord> {
+      return (await http.post(`/api/check-in/bookings/${bookingId}`, input)).data.data
+    },
+    async bookAndCheckIn(
+      sessionId: number,
+      input: { client_id: number; location_id?: number | null; entitlement_source?: string | null },
+    ): Promise<CheckInRecord> {
+      return (await http.post(`/api/check-in/sessions/${sessionId}`, input)).data.data
+    },
+    async openAccess(input: {
+      client_id: number
+      service_id?: number | null
+      location_id?: number | null
+      override?: boolean
+      reason?: string | null
+    }): Promise<CheckInRecord> {
+      return (await http.post('/api/check-in/open-access', input)).data.data
+    },
+    async recent(locationId?: number | null): Promise<CheckInRecord[]> {
+      return (
+        await http.get('/api/check-in/recent', { params: { location_id: locationId ?? undefined } })
+      ).data.data
+    },
+    async undo(id: number, reason?: string | null): Promise<CheckInRecord> {
+      return (await http.post(`/api/check-ins/${id}/undo`, { reason })).data.data
+    },
+  },
+  /** A session's roster and the coach's delivery marks (US-08.04, US-08.07). */
+  roster: {
+    async get(sessionId: number): Promise<Roster> {
+      return (await http.get(`/api/sessions/${sessionId}/roster`)).data.data
+    },
+    async mark(
+      sessionId: number,
+      bookingId: number,
+      mark: 'present' | 'late' | 'absent',
+    ): Promise<Roster> {
+      return (await http.post(`/api/sessions/${sessionId}/roster/${bookingId}/mark`, { mark })).data
+        .data
+    },
+    async markAll(sessionId: number): Promise<Roster> {
+      return (await http.post(`/api/sessions/${sessionId}/roster/mark-all`)).data.data
+    },
+    async walkIn(
+      sessionId: number,
+      input: { client_id: number; entitlement_source: string; entitlement_id?: number | null },
+    ): Promise<Roster> {
+      return (await http.post(`/api/sessions/${sessionId}/roster/walk-in`, input)).data.data
+    },
+    async delivery(sessionId: number, action: 'start' | 'deliver'): Promise<Roster> {
+      return (await http.post(`/api/sessions/${sessionId}/delivery`, { action })).data.data
+    },
+  },
+  /** Staff clock in/out at the desk (US-08.07). */
+  staffAttendance: {
+    async day(locationId: number, date?: string): Promise<StaffAttendanceDay> {
+      return (
+        await http.get('/api/staff-attendance', { params: { location_id: locationId, date } })
+      ).data.data
+    },
+    async clock(input: {
+      user_id: number
+      location_id: number
+      action: 'in' | 'out'
+      note?: string | null
+    }): Promise<void> {
+      await http.post('/api/staff-attendance/clock', input)
+    },
+  },
+  attendanceSettings: {
+    async get(): Promise<AttendanceSettings> {
+      return (await http.get('/api/settings/attendance')).data.data
+    },
+    async update(input: AttendanceSettings): Promise<AttendanceSettings> {
+      return (await http.put('/api/settings/attendance', input)).data.data
     },
   },
   invoices: {

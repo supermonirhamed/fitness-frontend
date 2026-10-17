@@ -126,6 +126,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'payments.view' },
       },
       {
+        // The check-in desk (EP-08).
+        path: 'check-in',
+        name: 'tenant.checkIn',
+        component: () => import('@/views/tenant/CheckInView.vue'),
+        meta: { permission: 'attendance.create' },
+      },
+      {
         // Unpaid and overdue follow-up (US-07.11).
         path: 'collections',
         name: 'tenant.collections',
@@ -319,6 +326,13 @@ const tenantRoutes: RouteRecordRaw[] = [
             path: 'payments',
             name: 'tenant.settings.payments',
             component: () => import('@/views/tenant/settings/PaymentSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
+            // Check-in & attendance (EP-08).
+            path: 'attendance',
+            name: 'tenant.settings.attendance',
+            component: () => import('@/views/tenant/settings/AttendanceSettingsView.vue'),
             meta: { permission: 'settings.view' },
           },
           {

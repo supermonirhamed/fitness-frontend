@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Session details (US-03.08), as the design's SessionScreen (ui_kits/admin/SessionScreen.jsx): the
 // header with time, facility, coach and capacity; actions by permission (edit, substitute coach,
-// duplicate, cancel, add booking (US-04.02); check-in and messages come with EP-08/12); tabs for roster,
+// duplicate, cancel, add booking (US-04.02); check-in opens the attendance tab (EP-08); messages come with EP-12); tabs for roster,
 // waitlist, attendance, details and activity.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -21,6 +21,7 @@ import type { MenuItem } from 'primevue/menuitem'
 import BookingDrawer from '@/components/bookings/BookingDrawer.vue'
 import CancelBookingDialog from '@/components/bookings/CancelBookingDialog.vue'
 import WaitlistPanel from '@/components/bookings/WaitlistPanel.vue'
+import SessionRosterPanel from '@/components/schedule/SessionRosterPanel.vue'
 import RescheduleBookingDialog from '@/components/bookings/RescheduleBookingDialog.vue'
 import ConfirmActionDialog from '@/components/patterns/ConfirmActionDialog.vue'
 import OverrideDialog from '@/components/patterns/OverrideDialog.vue'
@@ -519,12 +520,12 @@ const moreItems = computed<MenuItem[]>(() => {
             :cancelled="cancelled"
           />
           <Button
-            v-tooltip.bottom="t('sessionPage.later')"
-            icon="pi pi-qrcode"
+            v-if="auth.can('attendance.view')"
+            icon="pi pi-check-square"
             :label="t('sessionPage.checkIn')"
             severity="secondary"
             variant="outlined"
-            disabled
+            @click="tab = 'attendance'"
           />
           <Button
             v-if="canEdit"
@@ -720,11 +721,11 @@ const moreItems = computed<MenuItem[]>(() => {
             <WaitlistPanel :session="session" @changed="load" />
           </TabPanel>
           <TabPanel value="attendance">
-            <EmptyState
-              class="panel"
-              icon="pi-check-square"
-              :title="t('sessionPage.attendanceSoon')"
-              :body="t('sessionPage.attendanceHint')"
+            <!-- Taking attendance (US-08.04) -->
+            <SessionRosterPanel
+              v-if="tab === 'attendance'"
+              :session-id="session.id"
+              @changed="load"
             />
           </TabPanel>
           <TabPanel value="details">

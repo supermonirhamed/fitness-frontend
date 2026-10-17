@@ -45,6 +45,12 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     permission: 'settings.view',
   },
   {
+    name: 'tenant.settings.attendance',
+    key: 'attendance',
+    icon: 'pi-check-square',
+    permission: 'settings.view',
+  },
+  {
     name: 'tenant.settings.security',
     key: 'security',
     icon: 'pi-shield',

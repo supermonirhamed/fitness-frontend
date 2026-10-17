@@ -24,6 +24,7 @@ describe('permissions helpers', () => {
       'booking',
       'memberships',
       'payments',
+      'attendance',
       'security',
       'waivers',
       'audit',
