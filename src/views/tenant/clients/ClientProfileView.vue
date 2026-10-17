@@ -28,6 +28,7 @@ import Tag from 'primevue/tag'
 import BookingDetailsDrawer from '@/components/bookings/BookingDetailsDrawer.vue'
 import ClientFamilyTab from '@/components/clients/ClientFamilyTab.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
+import ClientAccountCreditCard from '@/components/clients/ClientAccountCreditCard.vue'
 import ClientInvoicesCard from '@/components/clients/ClientInvoicesCard.vue'
 import ClientMembershipsTab from '@/components/clients/ClientMembershipsTab.vue'
 import ClientPaymentsCard from '@/components/clients/ClientPaymentsCard.vue'
@@ -622,6 +623,12 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
 
           <TabPanel value="payments">
             <div class="payments-tab">
+              <ClientAccountCreditCard
+                v-if="tab === 'payments' && auth.can('payments.view')"
+                :key="`credit-${invoicesKey}`"
+                :client-id="client.id"
+                @changed="invoicesKey++"
+              />
               <ClientInvoicesCard
                 v-if="tab === 'payments'"
                 :key="invoicesKey"

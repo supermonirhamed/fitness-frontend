@@ -94,18 +94,26 @@ async function search(event: AutoCompleteCompleteEvent) {
     await tenantApi.clients.list({ q: event.query, per_page: 8 }).catch(() => ({ data: [] }))
   ).data
 }
+// The payer's account credit (US-07.09), offered as a payment method when there is some.
+const credit = ref(0)
 async function choose(picked: Client) {
   client.value = picked
   walkIn.value = false
   children.value = []
-  const family = await tenantApi.clients.family(picked.id).catch(() => null)
+  credit.value = 0
+  const [family, account] = await Promise.all([
+    tenantApi.clients.family(picked.id).catch(() => null),
+    tenantApi.clients.accountCredit(picked.id).catch(() => null),
+  ])
   if (client.value?.id !== picked.id) return
+  credit.value = account?.balance ?? 0
   children.value = (family?.dependents ?? [])
     .filter((d) => d.can_pay && d.client)
     .map((d) => ({ id: d.client!.id, name: d.client!.name }))
 }
 function useWalkIn() {
   client.value = null
+  credit.value = 0
   walkIn.value = true
   children.value = []
   query.value = ''
@@ -113,6 +121,7 @@ function useWalkIn() {
 }
 function changeClient() {
   client.value = null
+  credit.value = 0
   walkIn.value = false
   children.value = []
   query.value = ''
@@ -283,7 +292,20 @@ type PayRow = { method: PaymentMethod; amount: number | null; reference: string 
 const payRows = ref<PayRow[]>([{ method: 'cash', amount: null, reference: '' }])
 const methods: PaymentMethod[] = ['cash', 'card_terminal', 'bank_transfer', 'other']
 const methodOptions = computed(() =>
-  methods.map((m) => ({ value: m, label: t(`payments.methods.${m}`) })),
+  [...methods, ...(client.value && credit.value > 0 ? (['account_credit'] as const) : [])].map(
+    (m) => ({
+      value: m,
+      label:
+        m === 'account_credit'
+          ? t('pos.creditMethod', { amount: format.money(credit.value) })
+          : t(`payments.methods.${m}`),
+    }),
+  ),
+)
+const creditUsed = computed(() =>
+  payRows.value
+    .filter((r) => r.method === 'account_credit')
+    .reduce((sum, r) => sum + (r.amount ?? 0), 0),
 )
 const needsReference = (m: PaymentMethod) => m === 'bank_transfer' || m === 'card_terminal'
 const paying = computed(() => payRows.value.reduce((sum, r) => sum + (r.amount ?? 0), 0))
@@ -315,6 +337,7 @@ const ready = computed(
     (!!client.value || (walkIn.value && !hasPlans.value)) &&
     (!walkIn.value || remaining.value <= 0) &&
     remaining.value >= 0 &&
+    creditUsed.value <= credit.value + 0.0001 &&
     cart.value.every(
       (i, index) =>
         (!i.discountOn || !i.discount.value || !!i.discount.reason.trim()) &&
@@ -800,6 +823,11 @@ function newSale() {
               class="pay__ref"
               :invalid="!!row.amount && !row.reference.trim()"
             />
+            <small
+              v-if="row.method === 'account_credit' && creditUsed > credit"
+              class="pay__over"
+              >{{ t('pos.creditTooLow', { amount: format.money(credit) }) }}</small
+            >
             <Button
               v-if="remaining > 0"
               :label="t('pos.payRest')"
@@ -1109,6 +1137,10 @@ function newSale() {
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
+}
+.pay__over {
+  color: var(--sev-danger-fg, var(--red-600));
+  font: var(--text-small);
 }
 .pay__method {
   width: 150px;

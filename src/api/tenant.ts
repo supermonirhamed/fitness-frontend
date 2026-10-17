@@ -1026,14 +1026,20 @@ export interface PlanChangePreview {
 export interface AccountCreditSummary {
   balance: number
   currency: string
+  /** payments.adjust_credit (US-07.09). */
+  can_adjust: boolean
+  /** Guardians who pay for this client, with their credit. */
+  payers: { id: number; name: string; balance: number }[]
   entries: {
     id: number
-    kind: 'plan_change' | 'refund' | 'adjusted' | 'used'
+    kind: 'plan_change' | 'refund' | 'adjusted' | 'used' | 'overpayment' | string
     change: number
     balance_after: number
     reason: string | null
     actor: string | null
     at: string | null
+    payment_id: number | null
+    invoice_id: number | null
   }[]
 }
 
@@ -2478,6 +2484,15 @@ export const tenantApi = {
     },
     async accountCredit(clientId: number): Promise<AccountCreditSummary> {
       return (await http.get(`/api/clients/${clientId}/account-credit`)).data.data
+    },
+    /** Adds (positive) or takes (negative) account credit with a reason (US-07.09). */
+    async adjustCredit(
+      clientId: number,
+      amount: number,
+      reason: string,
+    ): Promise<{ balance: number; change: number }> {
+      return (await http.post(`/api/clients/${clientId}/account-credit/adjust`, { amount, reason }))
+        .data.data
     },
     async family(id: number): Promise<ClientFamily> {
       return (await http.get(`/api/clients/${id}/family`)).data.data
