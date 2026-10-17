@@ -158,6 +158,7 @@ export default {
     darkMode: 'Dark mode',
     lightMode: 'Light mode',
     nav: {
+      collections: 'Unpaid & overdue',
       transactions: 'Transactions',
       today: 'Today',
       promotions: 'Promotions',
@@ -2165,6 +2166,7 @@ export default {
     noTagsYet: 'No tags yet: add them under Clients → Tags & segments.',
     later: 'Available in a later release',
     alerts: {
+      overdue: 'Overdue {amount}',
       blocked: 'Blocked',
       unpaid: 'No unpaid bookings | 1 unpaid booking | {n} unpaid bookings',
       uncovered:
@@ -2714,6 +2716,10 @@ export default {
     voidBanner: 'Void: {reason} · {by} · {date}',
   },
   paymentSettings: {
+    overdue: 'Overdue balances',
+    overdueBlocksLabel: 'Block bookings when a client has an overdue balance',
+    overdueBlocksHelp:
+      'Otherwise the balance is only flagged at booking and check-in. Staff who can override bookings may still book, with a reason.',
     loadError: "Payment settings couldn't be loaded.",
     saved: 'Payment settings saved',
     voiding: 'Voiding',
@@ -3047,8 +3053,10 @@ export default {
   },
   eligibility: {
     title: 'Eligibility',
+    balanceFlag: 'Overdue balance {amount} since {date}',
     overridden: 'overridden',
     checks: {
+      balance: 'Balance',
       session: 'Session open for booking',
       window: 'Booking window',
       client: 'Client status',
@@ -3061,6 +3069,7 @@ export default {
       cancellation_window: 'Free cancellation window',
     },
     passed: {
+      balance: 'No overdue balance',
       session: 'Session open for booking',
       window: 'Inside the booking window',
       client: 'Client is active',
@@ -3425,5 +3434,27 @@ export default {
     reopenReason: 'Reason for reopening',
     reopened: 'Reopened',
     reopenedBy: '{name} reopened it on {at}: {reason}',
+  },
+  collections: {
+    title: 'Unpaid & overdue',
+    subtitle: 'Clients who owe money, oldest first',
+    which: { overdue: 'Overdue', all: 'All unpaid' },
+    search: 'Search by name, member ID or mobile',
+    clients: 'Clients',
+    owed: 'Owed',
+    overdue: 'Overdue',
+    overdueAmount: '{amount} overdue',
+    oldestDue: 'Oldest due',
+    invoices: 'No invoices | 1 invoice | {n} invoices',
+    memberships: 'For',
+    lastReminder: 'Last reminder',
+    never: 'Never',
+    remind: 'Remind',
+    remindSelected: 'Send reminder ({n})',
+    noEmail: 'No email address on file',
+    sent: 'No reminders sent | 1 reminder sent | {n} reminders sent',
+    skipped: '{n} skipped: no email address or nothing owed.',
+    empty: 'Nobody owes money',
+    emptyHint: 'Clients with open invoices appear here.',
   },
 }

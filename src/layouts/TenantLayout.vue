@@ -35,6 +35,9 @@ const nav = computed<NavItem[]>(() => [
   ...(auth.can('payments.create') ? [{ key: 'pos', icon: 'pi-shopping-cart', to: '/pos' }] : []),
   ...(auth.can('payments.view') ? [{ key: 'invoices', icon: 'pi-file', to: '/invoices' }] : []),
   ...(auth.can('payments.view')
+    ? [{ key: 'collections', icon: 'pi-exclamation-circle', to: '/collections' }]
+    : []),
+  ...(auth.can('payments.view')
     ? [{ key: 'transactions', icon: 'pi-arrow-right-arrow-left', to: '/transactions' }]
     : []),
   ...(auth.can('marketing.view')

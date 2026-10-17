@@ -1,12 +1,15 @@
 <script setup lang="ts">
 // The booking drawer's eligibility box (ui_kits/admin/BookingDrawer.jsx, US-04.01): every check in
 // order, a tick when it passes, and the server's localized reason when it doesn't. A check staff
-// overrode stays visible, marked as overridden.
+// overrode stays visible, marked as overridden. An overdue balance (US-07.11) is flagged even when
+// the organization lets it book.
 import { useI18n } from 'vue-i18n'
 import type { BookingEligibility } from '@/api/tenant'
+import { useFormat } from '@/composables/useFormat'
 
 defineProps<{ result: BookingEligibility }>()
 const { t } = useI18n()
+const format = useFormat()
 
 type Check = BookingEligibility['checks'][number]
 
@@ -30,7 +33,17 @@ const icon = (check: Check) =>
         ]"
       >
         <i :class="['pi', icon(check)]" aria-hidden="true"></i>
-        <span v-if="check.passed">{{ t(`eligibility.passed.${check.check}`) }}</span>
+        <span
+          v-if="check.passed && check.check === 'balance' && (result.balance?.overdue ?? 0) > 0"
+          class="eligibility__flag"
+          >{{
+            t('eligibility.balanceFlag', {
+              amount: format.money(result.balance!.overdue),
+              date: format.date(result.balance!.oldest_due_on!),
+            })
+          }}</span
+        >
+        <span v-else-if="check.passed">{{ t(`eligibility.passed.${check.check}`) }}</span>
         <span v-else-if="check.overridden">
           {{ t(`eligibility.checks.${check.check}`) }} ·
           <strong>{{ t('eligibility.overridden') }}</strong>
@@ -44,6 +57,9 @@ const icon = (check: Check) =>
 </template>
 
 <style scoped>
+.eligibility__flag {
+  color: var(--sev-warn-fg, var(--orange-700));
+}
 .eligibility {
   border: 1px solid var(--border-default);
   border-radius: 8px;

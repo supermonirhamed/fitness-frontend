@@ -126,6 +126,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'payments.view' },
       },
       {
+        // Unpaid and overdue follow-up (US-07.11).
+        path: 'collections',
+        name: 'tenant.collections',
+        component: () => import('@/views/tenant/invoices/CollectionsView.vue'),
+        meta: { permission: 'payments.view' },
+      },
+      {
         // Transactions and daily close (US-07.10).
         path: 'transactions',
         name: 'tenant.transactions',

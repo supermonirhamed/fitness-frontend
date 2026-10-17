@@ -52,6 +52,7 @@ import {
   type Tag as TagItem,
 } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
+import { useFormat } from '@/composables/useFormat'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const route = useRoute()
@@ -59,6 +60,7 @@ const router = useRouter()
 const { t } = useI18n()
 const toast = useToast()
 const auth = useStaffAuth()
+const format = useFormat()
 
 const state = ref<'loading' | 'ready' | 'missing' | 'error'>('loading')
 const client = ref<Client | null>(null)
@@ -359,6 +361,17 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
               icon="pi pi-wallet"
               class="tag-sm"
               :value="t('clientProfile.alerts.unpaid', overview.alerts.unpaid_bookings)"
+            />
+            <Tag
+              v-if="overview?.alerts.balance?.overdue"
+              severity="danger"
+              icon="pi pi-exclamation-triangle"
+              class="tag-sm"
+              :value="
+                t('clientProfile.alerts.overdue', {
+                  amount: format.money(overview.alerts.balance.overdue),
+                })
+              "
             />
             <Tag
               v-if="overview?.alerts.uncovered_bookings"

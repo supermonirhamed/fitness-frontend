@@ -160,6 +160,7 @@ const ar: typeof en = {
     darkMode: 'الوضع الداكن',
     lightMode: 'الوضع الفاتح',
     nav: {
+      collections: 'المستحقات والمتأخرات',
       transactions: 'المعاملات',
       today: 'اليوم',
       promotions: 'العروض',
@@ -2135,6 +2136,7 @@ const ar: typeof en = {
     noTagsYet: 'لا توجد وسوم بعد: أضفها من العملاء ← الوسوم والشرائح.',
     later: 'متاح في إصدار لاحق',
     alerts: {
+      overdue: 'متأخر {amount}',
       blocked: 'محظور',
       unpaid: 'لا حجوزات غير مدفوعة | حجز غير مدفوع | {n} حجوزات غير مدفوعة',
       uncovered: 'لا حجوزات بلا تغطية | حجز لم يعد مغطى | {n} حجوزات لم تعد مغطاة',
@@ -2680,6 +2682,10 @@ const ar: typeof en = {
     voidBanner: 'ملغاة: {reason} · {by} · {date}',
   },
   paymentSettings: {
+    overdue: 'الأرصدة المتأخرة',
+    overdueBlocksLabel: 'منع الحجز عند وجود رصيد متأخر على العميل',
+    overdueBlocksHelp:
+      'وإلا يظهر الرصيد كتنبيه فقط عند الحجز وتسجيل الحضور. يمكن لمن يملك صلاحية تجاوز الحجز أن يحجز مع ذكر السبب.',
     loadError: 'تعذّر تحميل إعدادات المدفوعات.',
     saved: 'تم حفظ إعدادات المدفوعات',
     voiding: 'الإلغاء',
@@ -3005,8 +3011,10 @@ const ar: typeof en = {
   },
   eligibility: {
     title: 'الأهلية',
+    balanceFlag: 'رصيد متأخر {amount} منذ {date}',
     overridden: 'تم التجاوز',
     checks: {
+      balance: 'الرصيد المستحق',
       session: 'الحصة متاحة للحجز',
       window: 'فترة الحجز',
       client: 'حالة العميل',
@@ -3019,6 +3027,7 @@ const ar: typeof en = {
       cancellation_window: 'مهلة الإلغاء المجاني',
     },
     passed: {
+      balance: 'لا يوجد رصيد متأخر',
       session: 'الحصة متاحة للحجز',
       window: 'ضمن فترة الحجز',
       client: 'العميل نشط',
@@ -3370,6 +3379,28 @@ const ar: typeof en = {
     reopenReason: 'سبب إعادة الفتح',
     reopened: 'أُعيد فتحه',
     reopenedBy: 'أعاد {name} فتحه في {at}: {reason}',
+  },
+  collections: {
+    title: 'المستحقات والمتأخرات',
+    subtitle: 'العملاء الذين عليهم مبالغ، الأقدم أولًا',
+    which: { overdue: 'متأخرة', all: 'كل غير المدفوع' },
+    search: 'ابحث بالاسم أو رقم العضوية أو الجوال',
+    clients: 'العملاء',
+    owed: 'المستحق',
+    overdue: 'المتأخر',
+    overdueAmount: '{amount} متأخرة',
+    oldestDue: 'أقدم استحقاق',
+    invoices: 'لا فواتير | فاتورة واحدة | {n} فواتير',
+    memberships: 'مقابل',
+    lastReminder: 'آخر تذكير',
+    never: 'أبدًا',
+    remind: 'تذكير',
+    remindSelected: 'إرسال تذكير ({n})',
+    noEmail: 'لا يوجد بريد إلكتروني مسجل',
+    sent: 'لم يُرسل أي تذكير | أُرسل تذكير واحد | أُرسلت {n} تذكيرات',
+    skipped: 'تم تخطي {n}: لا بريد إلكتروني أو لا مبالغ مستحقة.',
+    empty: 'لا أحد عليه مبالغ',
+    emptyHint: 'يظهر هنا العملاء الذين لديهم فواتير مفتوحة.',
   },
 }
 

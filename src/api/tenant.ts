@@ -693,6 +693,8 @@ export interface ClientOverview {
     unpaid_bookings: number
     /** US-06.14: upcoming bookings their membership or package no longer covers. */
     uncovered_bookings: number
+    /** US-07.11: what they owe on invoices (payments.view). */
+    balance: ClientBalance | null
   }
   upcoming: Booking[]
   attendance: Record<
@@ -1208,9 +1210,18 @@ export type EligibilityCheck =
   | 'overlap'
   | 'waivers'
   | 'entitlement'
+  | 'balance'
 
 /** The checks staff with bookings.override may bypass, with a reason. */
-export type OverridableCheck = 'capacity' | 'window' | 'waivers' | 'entitlement'
+export type OverridableCheck = 'capacity' | 'window' | 'waivers' | 'entitlement' | 'balance'
+
+/** What a client owes on invoices (US-07.11). */
+export interface ClientBalance {
+  owed: number
+  overdue: number
+  oldest_due_on: string | null
+  invoices: number
+}
 
 export type EntitlementSource =
   'membership' | 'package' | 'drop_in' | 'complimentary' | 'pay_at_desk' | 'guest_pass'
@@ -1402,6 +1413,8 @@ export interface PaymentSettings {
   self_void_same_day: boolean
   /** US-07.08: what happens to desk payments when the club cancels a session. */
   session_cancel_refund: 'account_credit' | 'original' | 'none'
+  /** US-07.11: an overdue balance blocks new bookings (staff with bookings.override can still book). */
+  overdue_blocks_booking: boolean
   /** Role name → most it may take off by hand, in percent. */
   manual_discount_limits: Record<string, number>
   roles: string[]
@@ -1749,6 +1762,8 @@ export interface BookingEligibility {
   entitlement_options?: EntitlementOption[]
   /** Why the client's memberships/packages can't pay for it (US-06.04/05), when they hold some. */
   entitlement_note?: { code: string; message: string } | null
+  /** What they owe (US-07.11), flagged even when it doesn't block. */
+  balance?: ClientBalance | null
 }
 
 /** A membership or package that can pay for a booking (US-06.16). */
@@ -2082,6 +2097,24 @@ export interface DaySummary {
   refunds: number
   closes: DayClose[]
   can_reopen: boolean
+}
+
+/** A client who owes money (US-07.11). */
+export interface CollectionRow {
+  client: {
+    id: number
+    name: string
+    member_id: string | null
+    photo_url: string | null
+    mobile: string | null
+    has_email: boolean
+  } | null
+  owed: number
+  overdue: number
+  oldest_due_on: string | null
+  invoices: number
+  memberships: { id: number; name: string; status: string }[]
+  last_reminded_at: string | null
 }
 
 export const tenantApi = {
@@ -2974,6 +3007,24 @@ export const tenantApi = {
     },
     async reopen(id: number, reason: string): Promise<DayClose> {
       return (await http.post(`/api/day-close/${id}/reopen`, { reason })).data.data
+    },
+  },
+  /** Unpaid and overdue follow-up (US-07.11). */
+  collections: {
+    async list(params: { q?: string; location_id?: number; overdue?: boolean }): Promise<{
+      data: CollectionRow[]
+      totals: { clients: number; owed: number; overdue: number }
+    }> {
+      return (
+        await http.get('/api/collections', {
+          params: { ...params, overdue: params.overdue ? 1 : undefined },
+        })
+      ).data
+    },
+    async remind(
+      clientIds: number[],
+    ): Promise<{ sent: number; skipped: { id: number; reason: string }[] }> {
+      return (await http.post('/api/collections/remind', { client_ids: clientIds })).data.data
     },
   },
   invoices: {

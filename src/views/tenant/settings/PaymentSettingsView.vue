@@ -27,6 +27,7 @@ const canEdit = computed(() => auth.can('settings.update'))
 type Form = {
   self_void_same_day: boolean
   session_cancel_refund: PaymentSettings['session_cancel_refund']
+  overdue_blocks_booking: boolean
   manual_discount_limits: Record<string, number | null>
 }
 const state = ref<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
@@ -34,6 +35,7 @@ const roles = ref<string[]>([])
 const form = ref<Form>({
   self_void_same_day: false,
   session_cancel_refund: 'account_credit',
+  overdue_blocks_booking: false,
   manual_discount_limits: {},
 })
 const saved = ref('')
@@ -45,6 +47,7 @@ function apply(data: PaymentSettings) {
   form.value = {
     self_void_same_day: data.self_void_same_day,
     session_cancel_refund: data.session_cancel_refund,
+    overdue_blocks_booking: data.overdue_blocks_booking,
     manual_discount_limits: Object.fromEntries(
       data.roles.map((r) => [r, data.manual_discount_limits[r] ?? null]),
     ),
@@ -72,6 +75,7 @@ async function save() {
       await tenantApi.paymentSettings.update({
         self_void_same_day: form.value.self_void_same_day,
         session_cancel_refund: form.value.session_cancel_refund,
+        overdue_blocks_booking: form.value.overdue_blocks_booking,
         manual_discount_limits: limits,
       }),
     )
@@ -129,6 +133,20 @@ const roleName = (r: string) => {
           option-value="value"
           :disabled="!canEdit"
           class="select"
+        />
+      </SettingRow>
+      <div class="settings-group" role="heading" aria-level="3">
+        {{ t('paymentSettings.overdue') }}
+      </div>
+      <SettingRow
+        :label="t('paymentSettings.overdueBlocksLabel')"
+        :help="t('paymentSettings.overdueBlocksHelp')"
+        label-for="overdue-blocks"
+      >
+        <ToggleSwitch
+          v-model="form.overdue_blocks_booking"
+          input-id="overdue-blocks"
+          :disabled="!canEdit"
         />
       </SettingRow>
       <div class="settings-group" role="heading" aria-level="3">

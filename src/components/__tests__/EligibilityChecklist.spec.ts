@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { mount } from '@vue/test-utils'
 import { i18n, setLocale } from '@/i18n'
 import EligibilityChecklist from '../bookings/EligibilityChecklist.vue'
@@ -14,6 +15,7 @@ const ORDER: EligibilityCheck[] = [
   'overlap',
   'waivers',
   'entitlement',
+  'balance',
 ]
 
 const result = (
@@ -40,13 +42,15 @@ const render = (props: { result: BookingEligibility }) =>
   mount(EligibilityChecklist, { props, global: { plugins: [i18n] } })
 
 describe('EligibilityChecklist', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
   it('lists every check in order, with the server reason when one fails (US-04.01)', () => {
     setLocale('en')
     const items = render({
       result: result({ client: 'This client is blocked and can’t book.' }),
     }).findAll('li')
 
-    expect(items).toHaveLength(9)
+    expect(items).toHaveLength(10)
     expect(items[0]!.text()).toBe('Session open for booking')
     expect(items[2]!.classes()).toContain('is-failed')
     expect(items[2]!.text()).toBe('This client is blocked and can’t book.')
@@ -61,5 +65,18 @@ describe('EligibilityChecklist', () => {
 
     expect(capacity.classes()).toContain('is-overridden')
     expect(capacity.text()).toBe('Capacity · overridden')
+  })
+
+  it('flags an overdue balance that does not block the booking (US-07.11)', () => {
+    setLocale('en')
+    const balance = render({
+      result: {
+        ...result({}),
+        balance: { owed: 300, overdue: 200, oldest_due_on: '2026-10-01', invoices: 2 },
+      },
+    }).findAll('li')[9]!
+
+    expect(balance.classes()).toContain('is-passed')
+    expect(balance.text()).toContain('Overdue balance')
   })
 })
