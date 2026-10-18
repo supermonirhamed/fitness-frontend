@@ -3158,6 +3158,49 @@ export interface StaffSettings {
   travel_buffer_minutes: number
 }
 
+/** What clients may do in the client app (US-11.01/02). */
+export interface ClientAppSettings {
+  enabled: boolean
+  self_registration: boolean
+  online_booking: boolean
+  online_sales: boolean
+  show_prices: boolean
+  show_coaches: boolean
+  book_before_payment: boolean
+  self_freeze: boolean
+  online_academy_enrollment: boolean
+  otp_sign_in: boolean
+  primary_color: string
+  deletion_days: number
+  terms_url: string | null
+  privacy_url: string | null
+}
+
+export interface ClientAppAdmin {
+  settings: ClientAppSettings
+  services: {
+    id: number
+    name: string | null
+    activity_type: string
+    status: string
+    online_booking: boolean
+  }[]
+  plans: { id: number; name: string; kind: string; status: string; online_sale: boolean }[]
+}
+
+/** A client's request to delete their account (US-11.06). */
+export interface ClientDeletionRequest {
+  id: number
+  status: 'Pending' | 'Completed' | 'Cancelled'
+  reason: string | null
+  due_on: string
+  created_at: string | null
+  overdue: boolean
+  client: { id: number; name: string | null; member_id: string | null }
+  processed_by: string | null
+  processed_at: string | null
+}
+
 export const tenantApi = {
   async organization(): Promise<Organization> {
     return (await http.get('/api/organization')).data.data
@@ -5282,6 +5325,29 @@ export const tenantApi = {
       return (
         await http.put('/api/settings/security', { two_factor_required_roles: requiredRoles })
       ).data.data
+    },
+  },
+  // The client app (EP-11): its settings (US-11.01/02) and account deletion requests (US-11.06).
+  clientApp: {
+    async settings(): Promise<ClientAppAdmin> {
+      return (await http.get('/api/settings/client-app')).data.data
+    },
+    async updateSettings(input: ClientAppSettings): Promise<ClientAppAdmin> {
+      return (await http.put('/api/settings/client-app', input)).data.data
+    },
+    async updateProducts(input: {
+      services?: { id: number; online_booking: boolean }[]
+      plans?: { id: number; online_sale: boolean }[]
+    }): Promise<ClientAppAdmin> {
+      return (await http.put('/api/settings/client-app/products', input)).data.data
+    },
+    async deletionRequests(
+      status: 'Pending' | 'Completed' | 'Cancelled' = 'Pending',
+    ): Promise<ClientDeletionRequest[]> {
+      return (await http.get('/api/client-deletion-requests', { params: { status } })).data.data
+    },
+    async completeDeletion(id: number): Promise<void> {
+      await http.post(`/api/client-deletion-requests/${id}/complete`)
     },
   },
 }

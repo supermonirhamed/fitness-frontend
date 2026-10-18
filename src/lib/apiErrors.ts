@@ -40,3 +40,10 @@ export function apiMessage(error: unknown): string | undefined {
     ? (error as AxiosError<{ message?: string }>).response?.data?.message
     : undefined
 }
+
+/** The first field message (validation 422 or throttling 429), else the API's message for its code. */
+export function firstMessage(error: unknown): string | undefined {
+  if (!(error instanceof AxiosError)) return undefined
+  const errors = (error.response?.data as { errors?: Record<string, string[]> } | undefined)?.errors
+  return Object.values(errors ?? {})[0]?.[0] ?? apiMessage(error)
+}

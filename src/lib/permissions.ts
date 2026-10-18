@@ -63,6 +63,12 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     permission: 'settings.view',
   },
   {
+    name: 'tenant.settings.clientApp',
+    key: 'clientApp',
+    icon: 'pi-mobile',
+    permission: 'settings.view',
+  },
+  {
     name: 'tenant.settings.security',
     key: 'security',
     icon: 'pi-shield',

@@ -1,7 +1,13 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory,
+  type RouteLocationNormalized,
+  type RouteRecordRaw,
+} from 'vue-router'
 import { resolveAppContext } from '@/lib/appContext'
 import { usePlatformAuth } from '@/stores/platformAuth'
 import { useOrganization } from '@/stores/organization'
+import { useClientApp } from '@/stores/clientApp'
 import { useStaffAuth } from '@/stores/staffAuth'
 import { onUnauthenticated } from '@/lib/http'
 import { allowedPages, SETTINGS_PAGES, STAFF_PAGES } from '@/lib/permissions'
@@ -399,6 +405,13 @@ const tenantRoutes: RouteRecordRaw[] = [
             meta: { permission: 'settings.view' },
           },
           {
+            // The members' app (EP-11): on/off, brand, what clients may do (US-11.01/02).
+            path: 'client-app',
+            name: 'tenant.settings.clientApp',
+            component: () => import('@/views/tenant/settings/ClientAppSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
             path: 'security',
             name: 'tenant.settings.security',
             component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),
@@ -469,6 +482,62 @@ const tenantRoutes: RouteRecordRaw[] = [
       },
     ],
   },
+  // The client app (EP-11) at /app on the organization's subdomain: members and parents, with their
+  // own sign-in. Staff pages stay at the root.
+  {
+    path: '/app',
+    component: () => import('@/layouts/ClientAppLayout.vue'),
+    meta: { clientApp: true },
+    children: [
+      { path: '', name: 'app.home', component: () => import('@/views/app/AppHomeView.vue') },
+      {
+        path: 'closed',
+        name: 'app.closed',
+        component: () => import('@/views/app/AppClosedView.vue'),
+        meta: { clientGuest: true, clientOpen: true },
+      },
+      {
+        path: 'sign-in',
+        name: 'app.signin',
+        component: () => import('@/views/app/AppSignInView.vue'),
+        meta: { clientGuest: true },
+      },
+      {
+        path: 'sign-up',
+        name: 'app.signup',
+        component: () => import('@/views/app/AppSignUpView.vue'),
+        meta: { clientGuest: true },
+      },
+      {
+        path: 'forgot-password',
+        name: 'app.forgot',
+        component: () => import('@/views/app/AppForgotView.vue'),
+        meta: { clientGuest: true },
+      },
+      {
+        path: 'verify',
+        name: 'app.verify',
+        component: () => import('@/views/app/AppVerifyView.vue'),
+        meta: { clientGuest: true, clientUnverified: true },
+      },
+      {
+        path: 'schedule',
+        name: 'app.schedule',
+        component: () => import('@/views/app/AppScheduleView.vue'),
+      },
+      {
+        path: 'sessions/:id(\\d+)',
+        name: 'app.session',
+        component: () => import('@/views/app/AppSessionView.vue'),
+        meta: { tab: 'app.schedule' },
+      },
+      {
+        path: 'account',
+        name: 'app.account',
+        component: () => import('@/views/app/AppAccountView.vue'),
+      },
+    ],
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
@@ -491,6 +560,7 @@ if (context.kind === 'tenant') {
     // The organization must exist and be active before anything else (US-00.02 / US-00.03).
     const state = await useOrganization().load()
     if (state !== 'ready') return to.name === 'tenant.status' ? true : { name: 'tenant.status' }
+    if (to.matched.some((r) => r.meta.clientApp)) return clientGuard(to)
     if (to.meta.public) return { name: 'tenant.today' }
     if (to.meta.link) return true
 
@@ -519,11 +589,35 @@ if (context.kind === 'tenant') {
 
   // A session that ends server-side (expired, deactivated) sends the user back to sign in.
   onUnauthenticated(() => {
+    if (router.currentRoute.value.matched.some((r) => r.meta.clientApp)) {
+      const app = useClientApp()
+      if (!app.signedIn) return
+      app.forget()
+      router.replace({ name: 'app.signin' })
+      return
+    }
     const auth = useStaffAuth()
     if (!auth.signedIn) return
     auth.forget()
     router.replace({ name: 'tenant.signin', query: { expired: '1' } })
   })
+}
+
+/**
+ * The client app's pages (EP-11): closed when the owner turned it off (US-11.01); guests sign in or
+ * up; an account verifies its email or mobile before anything else (US-11.03).
+ */
+async function clientGuard(to: RouteLocationNormalized) {
+  const app = useClientApp()
+  const config = await app.loadConfig().catch(() => null)
+  if (!config?.enabled) return to.name === 'app.closed' ? true : { name: 'app.closed' }
+  if (to.meta.clientOpen) return true
+  const signedIn = await app.check()
+  if (!signedIn)
+    return to.meta.clientGuest ? true : { name: 'app.signin', query: { redirect: to.fullPath } }
+  if (!app.verified) return to.meta.clientUnverified ? true : { name: 'app.verify' }
+  if (to.meta.clientGuest) return { name: 'app.home' }
+  return true
 }
 
 export default router

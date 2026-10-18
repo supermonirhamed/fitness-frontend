@@ -3,6 +3,7 @@
 // by name, mobile, email or member ID, and the clients the user can see (their branches, US-00.09;
 // coaches only clients booked with them). Filters, last visit, upcoming bookings and CSV export
 // (US-05.04); tags, segments and messages join with US-05.12 and EP-12.
+import ClientDeletionRequestsDrawer from '@/components/clients/ClientDeletionRequestsDrawer.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -121,6 +122,7 @@ function exportCsv() {
 }
 
 // Header "more" menu: import, tags & segments, export (design: ClientsScreen).
+const deletionsOpen = ref(false)
 const moreItems = computed<MenuItem[]>(
   () =>
     [
@@ -138,6 +140,12 @@ const moreItems = computed<MenuItem[]>(
         label: t('bookings.export'),
         icon: 'pi pi-download',
         command: exportCsv,
+      },
+      // Account deletion requests from the client app (US-11.06).
+      auth.can('clients.delete') && {
+        label: t('deletionRequests.title'),
+        icon: 'pi pi-user-minus',
+        command: () => (deletionsOpen.value = true),
       },
     ].filter(Boolean) as MenuItem[],
 )
@@ -309,6 +317,7 @@ function onSaved(client: Client) {
 
 <template>
   <div class="page">
+    <ClientDeletionRequestsDrawer v-model:visible="deletionsOpen" />
     <PageHeader :title="t('clients.title')" :more-items="moreItems">
       <template v-if="state === 'ready' || clients.length" #meta>
         <span>{{ filtered ? t('clients.matches', total) : t('clients.count', total) }}</span>
