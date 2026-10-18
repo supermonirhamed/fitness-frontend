@@ -1,19 +1,36 @@
 <script setup lang="ts">
-// Program page from the design (ServicesScreen.jsx ProgramDetails): header with enrollment and ages,
-// the Academy note, and a facts card. Levels and groups come with the Academy module.
-import { computed, onMounted, ref } from 'vue'
+// Program page from the design (ServicesScreen.jsx ProgramDetails): header with enrollment and ages
+// and a facts card, then the Academy (EP-10): levels, age groups, terms (term programs) and groups.
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
-import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
+import AgeGroupsPanel from '@/components/academy/AgeGroupsPanel.vue'
+import GroupFormDrawer from '@/components/academy/GroupFormDrawer.vue'
+import GroupsTable from '@/components/academy/GroupsTable.vue'
+import LevelsPanel from '@/components/academy/LevelsPanel.vue'
+import TermsPanel from '@/components/academy/TermsPanel.vue'
 import BranchChips from '@/components/patterns/BranchChips.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import ProgramFormDrawer from '@/components/services/ProgramFormDrawer.vue'
-import { tenantApi, type Location, type Program, type ServiceCategory } from '@/api/tenant'
+import {
+  tenantApi,
+  type AcademyGroup,
+  type AcademyTerm,
+  type Location,
+  type Program,
+  type ServiceCategory,
+} from '@/api/tenant'
 import { programEnrollment } from '@/lib/catalog'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
@@ -25,6 +42,11 @@ const toast = useToast()
 const format = useFormat()
 const auth = useStaffAuth()
 const canUpdate = computed(() => auth.can('services.update'))
+const academy = computed(() => auth.can('academy.view'))
+const route = useRoute()
+const router = useRouter()
+const tab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'overview')
+watch(tab, (value) => router.replace({ query: { ...route.query, tab: value } }))
 
 const state = ref<'loading' | 'ready' | 'error' | 'missing'>('loading')
 const program = ref<Program | null>(null)
@@ -41,6 +63,46 @@ async function load() {
   }
 }
 onMounted(load)
+
+// Academy: terms feed the age-group check and the group form; groups list the program's.
+const terms = ref<AcademyTerm[]>([])
+const groups = ref<AcademyGroup[]>([])
+const groupsState = ref<'loading' | 'ready' | 'error'>('loading')
+async function loadTerms() {
+  if (program.value?.enrollment_mode === 'Term')
+    terms.value = await tenantApi.academy.terms.list(props.id).catch(() => [])
+}
+async function loadGroups() {
+  groupsState.value = 'loading'
+  try {
+    groups.value = await tenantApi.academy.groups.list({ program_id: props.id })
+    groupsState.value = 'ready'
+  } catch {
+    groupsState.value = 'error'
+  }
+}
+watch(
+  () => program.value?.id,
+  (id) => {
+    if (id && academy.value) {
+      loadTerms()
+      loadGroups()
+    }
+  },
+)
+function onTermsChanged() {
+  loadTerms()
+  loadGroups()
+}
+const groupOpen = ref(false)
+function onGroupSaved(saved: AcademyGroup) {
+  toast.add({
+    severity: 'success',
+    summary: t('academy.groups.saved', { name: saved.display_name }),
+    life: 3000,
+  })
+  router.push({ name: 'tenant.academy.group', params: { id: saved.id } })
+}
 
 const ages = computed(() => {
   const p = program.value
@@ -116,30 +178,86 @@ function onSaved(saved: Program) {
         </template>
       </PageHeader>
 
-      <Message severity="info" icon="pi pi-sitemap" :closable="false">
-        <strong>{{ t('programs.academyTitle') }}</strong>
-        <div>{{ t('programs.academyNote') }}</div>
-      </Message>
-
-      <div class="card facts">
-        <span class="facts__label">{{ t('catalog.columns.branches') }}</span>
-        <BranchChips :names="(program.locations ?? []).map((l) => l.name)" :max="4" />
-        <span class="facts__label">{{ t('catalog.genderLabel') }}</span>
-        <span>{{ t(`catalog.gender.${program.gender}`) }}</span>
-        <span class="facts__label">{{ t('programs.category') }}</span>
-        <span class="facts__category">
-          <i
-            :class="['pi', program.category?.icon]"
-            :style="{ color: program.category?.color }"
-            aria-hidden="true"
-          />{{ program.category?.display_name }}
-        </span>
-        <template v-if="program.description?.ar || program.description?.en">
-          <span class="facts__label">{{ t('catalog.description') }}</span>
-          <span>{{ program.description?.ar || program.description?.en }}</span>
-        </template>
-      </div>
+      <Tabs v-model:value="tab" scrollable>
+        <TabList>
+          <Tab value="overview">{{ t('academy.tabs.overview') }}</Tab>
+          <template v-if="academy">
+            <Tab value="groups">{{ t('academy.tabs.groups') }}</Tab>
+            <Tab value="levels">{{ t('academy.tabs.levels') }}</Tab>
+            <Tab value="age-groups">{{ t('academy.tabs.ageGroups') }}</Tab>
+            <Tab v-if="program.enrollment_mode === 'Term'" value="terms">{{
+              t('academy.tabs.terms')
+            }}</Tab>
+          </template>
+        </TabList>
+        <TabPanels>
+          <TabPanel value="overview">
+            <div class="card facts">
+              <span class="facts__label">{{ t('catalog.columns.branches') }}</span>
+              <BranchChips :names="(program.locations ?? []).map((l) => l.name)" :max="4" />
+              <span class="facts__label">{{ t('catalog.genderLabel') }}</span>
+              <span>{{ t(`catalog.gender.${program.gender}`) }}</span>
+              <span class="facts__label">{{ t('programs.category') }}</span>
+              <span class="facts__category">
+                <i
+                  :class="['pi', program.category?.icon]"
+                  :style="{ color: program.category?.color }"
+                  aria-hidden="true"
+                />{{ program.category?.display_name }}
+              </span>
+              <template v-if="program.description?.ar || program.description?.en">
+                <span class="facts__label">{{ t('catalog.description') }}</span>
+                <span>{{ program.description?.ar || program.description?.en }}</span>
+              </template>
+            </div>
+          </TabPanel>
+          <template v-if="academy">
+            <TabPanel value="groups">
+              <div class="card">
+                <header class="card__head">
+                  <div>
+                    <h2>{{ t('academy.tabs.groups') }}</h2>
+                    <p class="muted">{{ t('academy.groups.hint') }}</p>
+                  </div>
+                  <Button
+                    v-if="auth.can('academy.create')"
+                    :label="t('academy.groups.new')"
+                    icon="pi pi-plus"
+                    size="small"
+                    @click="groupOpen = true"
+                  />
+                </header>
+                <ErrorState v-if="groupsState === 'error'" compact @retry="loadGroups" />
+                <EmptyState
+                  v-else-if="groupsState === 'ready' && !groups.length"
+                  compact
+                  icon="pi-sitemap"
+                  :title="t('academy.groups.none')"
+                  :body="t('academy.groups.noneProgramHint')"
+                />
+                <GroupsTable v-else :groups="groups" :loading="groupsState === 'loading'" />
+              </div>
+            </TabPanel>
+            <TabPanel value="levels"><LevelsPanel :program-id="program.id" /></TabPanel>
+            <TabPanel value="age-groups">
+              <AgeGroupsPanel :program-id="program.id" :terms="terms" />
+            </TabPanel>
+            <TabPanel v-if="program.enrollment_mode === 'Term'" value="terms">
+              <TermsPanel :program-id="program.id" :terms="terms" @changed="onTermsChanged" />
+            </TabPanel>
+          </template>
+        </TabPanels>
+      </Tabs>
     </template>
+
+    <GroupFormDrawer
+      v-if="program"
+      v-model:visible="groupOpen"
+      :group="null"
+      :programs="[program]"
+      :program-id="program.id"
+      @saved="onGroupSaved"
+    />
 
     <ProgramFormDrawer
       v-if="program"
@@ -168,6 +286,24 @@ function onSaved(saved: Program) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-default);
+}
+.card__head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.card__head p {
+  margin: 4px 0 0;
+}
+.muted {
+  color: var(--text-secondary);
 }
 .facts {
   padding: 20px;

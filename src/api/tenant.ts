@@ -376,6 +376,169 @@ export interface Program {
   locations?: { id: number; name: string }[]
 }
 
+// Academy (EP-10): levels, age groups, terms (US-10.01–10.03), groups and coaches (US-10.04/05).
+export interface ProgramLevel {
+  id: number
+  program_id: number
+  name: Translated
+  display_name: string | null
+  description: Translated
+  entry_requirements: Translated
+  position: number
+  archived: boolean
+  in_use: boolean
+}
+
+export interface ProgramLevelInput {
+  name: Translated
+  description: Translated | null
+  entry_requirements: Translated | null
+}
+
+export type AgeRule = 'today' | 'cutoff'
+
+export interface AgeGroup {
+  id: number
+  program_id: number | null
+  name: Translated
+  display_name: string | null
+  min_age: number
+  max_age: number
+  age_rule: AgeRule
+  cutoff_month: number | null
+  cutoff_day: number | null
+  archived: boolean
+  in_use: boolean
+}
+
+export interface AgeGroupInput {
+  name: Translated
+  program_id?: number | null
+  min_age: number | null
+  max_age: number | null
+  age_rule: AgeRule
+  cutoff_month: number | null
+  cutoff_day: number | null
+}
+
+export interface ExcludedDate {
+  date: string
+  reason: string | null
+}
+
+export interface AcademyTerm {
+  id: number
+  program_id: number
+  name: Translated
+  display_name: string | null
+  starts_on: string
+  ends_on: string
+  enrollment_opens_on: string
+  enrollment_closes_on: string
+  enrollment_open: boolean
+  excluded_dates: ExcludedDate[]
+  copied_from_id: number | null
+  groups_count: number | null
+  archived: boolean
+  excluded_by_location?: {
+    location_id: number
+    location: string
+    dates: (ExcludedDate & { source: 'term' | 'closure' })[]
+  }[]
+}
+
+export interface AcademyTermInput {
+  name: Translated
+  starts_on: string | null
+  ends_on: string | null
+  enrollment_opens_on: string | null
+  enrollment_closes_on: string | null
+  excluded_dates: ExcludedDate[]
+}
+
+export type AcademyGroupStatus = 'Draft' | 'Published' | 'Full' | 'Archived'
+
+interface Named {
+  id: number
+  display_name: string | null
+}
+
+export interface AcademyGroup {
+  id: number
+  name: Translated
+  display_name: string | null
+  program_id: number
+  program?: Named & { enrollment_mode: EnrollmentMode }
+  service_id: number
+  service?: Named | null
+  level_id: number | null
+  level?: Named | null
+  age_group_id: number | null
+  age_group?: (Named & { min_age: number; max_age: number }) | null
+  location_id: number
+  location?: { id: number; name: string }
+  facility_id: number | null
+  facility?: { id: number; name: string; capacity: number | null } | null
+  term_id: number | null
+  term?: (Named & { starts_on: string; ends_on: string }) | null
+  capacity: number
+  gender: GenderRestriction
+  status: AcademyGroupStatus
+  copied_from_id: number | null
+  coaches?: { id: number; name: string; role: 'head' | 'assistant' }[]
+  enrolled: number
+}
+
+export interface AcademyTraining {
+  id: number
+  starts_at: string
+  ends_at: string
+  status: string
+  facility: string | null
+  coaches: string[]
+  booked: number
+  capacity: number | null
+}
+
+export interface AcademyGroupDetails extends AcademyGroup {
+  attendance: {
+    trainings: number
+    upcoming: number
+    attended: number
+    no_shows: number
+    rate: number | null
+  }
+  upcoming: AcademyTraining[]
+  recent: AcademyTraining[]
+  roster: unknown[]
+  activity: { action: string; user: string | null; at: string | null; changed: string[] }[]
+}
+
+export interface AcademyGroupInput {
+  name: Translated
+  program_id?: number
+  service_id: number | null
+  level_id: number | null
+  age_group_id: number | null
+  location_id: number | null
+  facility_id: number | null
+  term_id: number | null
+  capacity: number | null
+  gender: GenderRestriction
+  status?: AcademyGroupStatus
+  head_coach_id?: number | null
+  assistant_ids?: number[]
+}
+
+export interface AcademyGroupOptions {
+  services: (Named & { default_capacity: number | null })[]
+  levels: Named[]
+  age_groups: (Named & { min_age: number; max_age: number })[]
+  terms: (Named & { starts_on: string; ends_on: string })[]
+  facilities: { id: number; name: string; capacity: number | null; parent_id: number | null }[]
+  coaches: { id: number; name: string }[]
+}
+
 export interface ProgramInput {
   name: Translated
   description: Translated | null
@@ -3877,6 +4040,116 @@ export const tenantApi = {
     },
     async get(id: number): Promise<ScheduledEventDetails> {
       return (await http.get(`/api/events/${id}`)).data.data
+    },
+  },
+  academy: {
+    levels: {
+      async list(programId: number): Promise<ProgramLevel[]> {
+        return (await http.get(`/api/programs/${programId}/levels`)).data.data
+      },
+      async create(programId: number, input: ProgramLevelInput): Promise<ProgramLevel> {
+        return (await http.post(`/api/programs/${programId}/levels`, input)).data.data
+      },
+      async update(id: number, input: ProgramLevelInput): Promise<ProgramLevel> {
+        return (await http.put(`/api/program-levels/${id}`, input)).data.data
+      },
+      async reorder(programId: number, ids: number[]): Promise<ProgramLevel[]> {
+        return (await http.put(`/api/programs/${programId}/levels/order`, { ids })).data.data
+      },
+      async archive(id: number, archived: boolean): Promise<ProgramLevel> {
+        return (await http.post(`/api/program-levels/${id}/archive`, { archived })).data.data
+      },
+      async remove(id: number): Promise<void> {
+        await http.delete(`/api/program-levels/${id}`)
+      },
+    },
+    ageGroups: {
+      async list(programId: number): Promise<AgeGroup[]> {
+        return (await http.get(`/api/programs/${programId}/age-groups`)).data.data
+      },
+      async create(input: AgeGroupInput): Promise<AgeGroup> {
+        return (await http.post('/api/age-groups', input)).data.data
+      },
+      async update(id: number, input: AgeGroupInput): Promise<AgeGroup> {
+        return (await http.put(`/api/age-groups/${id}`, input)).data.data
+      },
+      async archive(id: number, archived: boolean): Promise<AgeGroup> {
+        return (await http.post(`/api/age-groups/${id}/archive`, { archived })).data.data
+      },
+      async remove(id: number): Promise<void> {
+        await http.delete(`/api/age-groups/${id}`)
+      },
+      async suggest(
+        programId: number,
+        params: { client_id?: number; date_of_birth?: string; term_id?: number },
+      ): Promise<{
+        date_of_birth: string | null
+        groups: { id: number; age: number; fits: boolean }[]
+      }> {
+        return (await http.get(`/api/programs/${programId}/age-groups/suggest`, { params })).data
+          .data
+      },
+    },
+    terms: {
+      async list(programId: number): Promise<AcademyTerm[]> {
+        return (await http.get(`/api/programs/${programId}/terms`)).data.data
+      },
+      async get(id: number): Promise<AcademyTerm> {
+        return (await http.get(`/api/academy-terms/${id}`)).data.data
+      },
+      async create(programId: number, input: AcademyTermInput): Promise<AcademyTerm> {
+        return (await http.post(`/api/programs/${programId}/terms`, input)).data.data
+      },
+      async update(id: number, input: AcademyTermInput): Promise<AcademyTerm> {
+        return (await http.put(`/api/academy-terms/${id}`, input)).data.data
+      },
+      async copy(id: number, input: AcademyTermInput): Promise<AcademyTerm> {
+        return (await http.post(`/api/academy-terms/${id}/copy`, input)).data.data
+      },
+      async archive(id: number, archived: boolean): Promise<AcademyTerm> {
+        return (await http.post(`/api/academy-terms/${id}/archive`, { archived })).data.data
+      },
+    },
+    groups: {
+      async list(
+        params: {
+          program_id?: number
+          location_id?: number
+          term_id?: number
+          status?: AcademyGroupStatus
+          coach_id?: number
+        } = {},
+      ): Promise<AcademyGroup[]> {
+        return (await http.get('/api/academy/groups', { params })).data.data
+      },
+      async get(id: number): Promise<AcademyGroupDetails> {
+        return (await http.get(`/api/academy/groups/${id}`)).data.data
+      },
+      async create(input: AcademyGroupInput): Promise<AcademyGroup> {
+        return (await http.post('/api/academy/groups', input)).data.data
+      },
+      async update(id: number, input: AcademyGroupInput): Promise<AcademyGroup> {
+        return (await http.put(`/api/academy/groups/${id}`, input)).data.data
+      },
+      async coaches(
+        id: number,
+        input: {
+          head_coach_id: number
+          assistant_ids: number[]
+          from: string | null
+          confirm_warnings?: boolean
+        },
+      ): Promise<{ group: AcademyGroup; trainingsUpdated: number }> {
+        const { data } = await http.put(`/api/academy/groups/${id}/coaches`, input)
+        return { group: data.data, trainingsUpdated: data.meta.trainings_updated }
+      },
+      async options(params: {
+        program_id: number
+        location_id?: number | null
+        service_id?: number | null
+      }): Promise<AcademyGroupOptions> {
+        return (await http.get('/api/academy/group-options', { params })).data.data
+      },
     },
   },
   programs: {

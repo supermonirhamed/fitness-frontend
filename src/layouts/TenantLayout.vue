@@ -35,6 +35,7 @@ const nav = computed<NavItem[]>(() => [
     ? [{ key: 'attendance', icon: 'pi-chart-line', to: '/attendance' }]
     : []),
   ...(auth.can('services.view') ? [{ key: 'services', icon: 'pi-th-large', to: '/services' }] : []),
+  ...(auth.can('academy.view') ? [{ key: 'academy', icon: 'pi-sitemap', to: '/academy' }] : []),
   ...(auth.can('memberships.view')
     ? [{ key: 'memberships', icon: 'pi-id-card', to: '/memberships' }]
     : []),

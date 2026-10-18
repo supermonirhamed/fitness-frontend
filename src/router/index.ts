@@ -268,6 +268,20 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'services.create' },
       },
       {
+        // The Academy (EP-10): groups of every program; coaches see their own.
+        path: 'academy',
+        name: 'tenant.academy',
+        component: () => import('@/views/tenant/academy/AcademyGroupsView.vue'),
+        meta: { permission: 'academy.view' },
+      },
+      {
+        path: 'academy/groups/:id(\\d+)',
+        name: 'tenant.academy.group',
+        component: () => import('@/views/tenant/academy/AcademyGroupView.vue'),
+        meta: { permission: 'academy.view' },
+        props: (route) => ({ id: Number(route.params.id) }),
+      },
+      {
         path: 'services/programs/:id(\\d+)',
         name: 'tenant.programs.show',
         component: () => import('@/views/tenant/ProgramDetailsView.vue'),

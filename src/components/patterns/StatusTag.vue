@@ -7,6 +7,7 @@ import Tag from 'primevue/tag'
 const SEVERITY: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast'> =
   {
     Draft: 'secondary',
+    Full: 'warn',
     Published: 'success',
     Active: 'success',
     Inactive: 'secondary',
