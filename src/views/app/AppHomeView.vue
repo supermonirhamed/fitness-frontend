@@ -186,12 +186,16 @@ onMounted(load)
         <ul v-if="home.offers.length" class="ca-list offers">
           <li v-for="o in home.offers" :key="o.id" class="ca-spread">
             <span><Tag severity="success" :value="t('app.home.offer')" /> {{ o.name }}</span>
-            <strong v-if="o.price !== null" class="ca-num">{{
-              o.price === 0 ? t('app.price.free') : format.money(o.price)
-            }}</strong>
+            <span class="ca-row">
+              <strong v-if="o.price !== null" class="ca-num">{{
+                o.price === 0 ? t('app.price.free') : format.money(o.price)
+              }}</strong>
+              <RouterLink :to="{ name: 'app.checkout', params: { id: o.id } }" class="ca-small">{{
+                t('app.shop.buy')
+              }}</RouterLink>
+            </span>
           </li>
         </ul>
-        <p v-if="home.offers.length" class="ca-muted ca-small">{{ t('app.home.offersHint') }}</p>
       </section>
       <RouterLink v-else :to="{ name: 'app.schedule' }" custom v-slot="{ navigate }">
         <Button

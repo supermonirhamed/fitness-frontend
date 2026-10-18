@@ -536,7 +536,72 @@ const tenantRoutes: RouteRecordRaw[] = [
         name: 'app.account',
         component: () => import('@/views/app/AppAccountView.vue'),
       },
+      {
+        path: 'bookings',
+        name: 'app.bookings',
+        component: () => import('@/views/app/AppBookingsView.vue'),
+      },
+      {
+        path: 'appointments',
+        name: 'app.appointments',
+        component: () => import('@/views/app/AppAppointmentsView.vue'),
+        meta: { tab: 'app.schedule' },
+      },
+      {
+        path: 'events',
+        name: 'app.events',
+        component: () => import('@/views/app/AppEventsView.vue'),
+        meta: { tab: 'app.schedule' },
+      },
+      {
+        path: 'events/:id(\\d+)',
+        name: 'app.event',
+        component: () => import('@/views/app/AppEventView.vue'),
+        meta: { tab: 'app.schedule' },
+      },
+      {
+        path: 'shop',
+        name: 'app.shop',
+        component: () => import('@/views/app/AppShopView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'shop/:id(\\d+)',
+        name: 'app.checkout',
+        component: () => import('@/views/app/AppCheckoutView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'payments',
+        name: 'app.payments',
+        component: () => import('@/views/app/AppPaymentsView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'memberships',
+        name: 'app.memberships',
+        component: () => import('@/views/app/AppMembershipsView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'inbox',
+        name: 'app.inbox',
+        component: () => import('@/views/app/AppInboxView.vue'),
+      },
     ],
+  },
+  // A client's invoice or receipt to print or save as PDF (US-11.14), outside the app shell.
+  {
+    path: '/app/print/invoices/:id(\\d+)',
+    name: 'app.print.invoice',
+    component: () => import('@/views/tenant/invoices/InvoicePrintView.vue'),
+    meta: { clientApp: true, clientDocument: true },
+  },
+  {
+    path: '/app/print/receipts/:id(\\d+)',
+    name: 'app.print.receipt',
+    component: () => import('@/views/tenant/ReceiptView.vue'),
+    meta: { clientApp: true, clientDocument: true },
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

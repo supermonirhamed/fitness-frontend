@@ -7,6 +7,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
+import { clientApi } from '@/api/clientApp'
 import { tenantApi, type InvoiceDocument } from '@/api/tenant'
 import { useFormat } from '@/composables/useFormat'
 import en from '@/i18n/en'
@@ -28,7 +29,10 @@ const kind = (k: string) => (te(`invoices.kinds.${k}`) ? t(`invoices.kinds.${k}`
 
 onMounted(async () => {
   try {
-    doc.value = await tenantApi.invoices.details(Number(route.params.id))
+    // From the client app (US-11.14): the client's own invoice.
+    doc.value = route.meta.clientDocument
+      ? await clientApi.invoice(Number(route.params.id))
+      : await tenantApi.invoices.details(Number(route.params.id))
     lang.value = doc.value.language
   } catch {
     failed.value = true

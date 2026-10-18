@@ -2,6 +2,7 @@
 // A payment's receipt (US-04.15, US-07.04), on its own page so it prints cleanly: 80 mm thermal or
 // A4, in the client's language (switchable). "Download PDF" prints A4 to PDF in the browser;
 // "Email" sends it to the client (or an address given) in their language.
+import { clientApi } from '@/api/clientApp'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -71,7 +72,10 @@ async function send() {
 
 onMounted(async () => {
   try {
-    receipt.value = await tenantApi.payments.receipt(Number(route.params.id))
+    // From the client app (US-11.14): the client's own receipt.
+    receipt.value = route.meta.clientDocument
+      ? await clientApi.receipt(Number(route.params.id))
+      : await tenantApi.payments.receipt(Number(route.params.id))
     lang.value = receipt.value.language ?? 'ar'
     email.value = receipt.value.client.email ?? ''
   } catch {
@@ -113,6 +117,7 @@ onMounted(async () => {
         @click="downloadPdf"
       />
       <Button
+        v-if="!route.meta.clientDocument"
         icon="pi pi-envelope"
         :label="tu('payments.email')"
         severity="secondary"

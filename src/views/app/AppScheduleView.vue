@@ -14,6 +14,7 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import BookTabs from '@/components/app/BookTabs.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormField from '@/components/patterns/FormField.vue'
@@ -123,6 +124,7 @@ const options = (items: { id: number; name: string | null }[] | undefined) =>
         @click="filtersOpen = true"
       />
     </div>
+    <BookTabs />
     <IconField>
       <InputIcon class="pi pi-search" />
       <InputText v-model="filters.q" :placeholder="t('app.schedule.search')" fluid />

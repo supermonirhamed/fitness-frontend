@@ -207,6 +207,25 @@ async function savePrefs() {
   }
 }
 
+// The personal calendar feed (US-11.19): shown once when created; a new link revokes the old.
+const feedUrl = ref<string | null>(null)
+async function rotateFeed() {
+  try {
+    feedUrl.value = await clientApi.calendarFeed.rotate()
+  } catch (e) {
+    failed(e)
+  }
+}
+async function revokeFeed() {
+  await clientApi.calendarFeed.revoke().catch(failed)
+  feedUrl.value = null
+  saved(t('app.calendar.revoked'))
+}
+async function copyFeed() {
+  await navigator.clipboard?.writeText(feedUrl.value ?? '').catch(() => null)
+  saved(t('app.calendar.copied'))
+}
+
 const qrOpen = ref(false)
 async function signOut() {
   await app.logout()
@@ -294,6 +313,57 @@ onMounted(async () => {
           size="small"
           @click="qrOpen = true"
         />
+      </section>
+
+      <nav class="ca-card menu" :aria-label="t('app.nav.account')">
+        <RouterLink :to="{ name: 'app.memberships' }"
+          ><i class="pi pi-id-card" aria-hidden="true" />{{ t('app.account.memberships')
+          }}<i class="pi pi-angle-right pi-dir" aria-hidden="true"
+        /></RouterLink>
+        <RouterLink :to="{ name: 'app.payments' }"
+          ><i class="pi pi-wallet" aria-hidden="true" />{{ t('app.payments.title')
+          }}<i class="pi pi-angle-right pi-dir" aria-hidden="true"
+        /></RouterLink>
+        <RouterLink v-if="app.config?.features.online_sales" :to="{ name: 'app.shop' }"
+          ><i class="pi pi-shopping-bag" aria-hidden="true" />{{ t('app.shop.title')
+          }}<i class="pi pi-angle-right pi-dir" aria-hidden="true"
+        /></RouterLink>
+      </nav>
+
+      <section class="ca-card ca-form">
+        <h2 class="ca-subtitle">{{ t('app.calendar.title') }}</h2>
+        <p class="ca-muted ca-small">{{ t('app.calendar.hint') }}</p>
+        <div v-if="feedUrl" class="ca-row feed">
+          <InputText
+            :model-value="feedUrl"
+            readonly
+            dir="ltr"
+            class="grow"
+            :aria-label="t('app.calendar.title')"
+          />
+          <Button
+            icon="pi pi-copy"
+            variant="outlined"
+            :aria-label="t('app.calendar.copy')"
+            @click="copyFeed"
+          />
+        </div>
+        <div class="ca-row">
+          <Button
+            :label="feedUrl ? t('app.calendar.newLink') : t('app.calendar.create')"
+            icon="pi pi-link"
+            size="small"
+            variant="outlined"
+            @click="rotateFeed"
+          />
+          <Button
+            :label="t('app.calendar.revoke')"
+            size="small"
+            variant="text"
+            severity="secondary"
+            @click="revokeFeed"
+          />
+        </div>
       </section>
 
       <form class="ca-card ca-form" @submit.prevent="saveProfile">
@@ -627,6 +697,29 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.menu {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 16px;
+}
+.menu a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.menu a + a {
+  border-top: 1px solid var(--border-default);
+}
+.menu a > i:last-child {
+  margin-inline-start: auto;
+  color: var(--text-muted);
+}
+.feed .grow {
+  flex: 1;
+}
 .member {
   display: flex;
   align-items: center;

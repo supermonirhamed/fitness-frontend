@@ -13,6 +13,12 @@ export const useClientApp = defineStore('clientApp', () => {
   const config = ref<ClientAppConfig | null>(null)
   const account = ref<ClientAccount | null>(null)
   const checked = ref(false)
+  /** Unread inbox messages (US-11.20), for the badge. */
+  const unread = ref(0)
+  async function refreshUnread() {
+    if (!account.value?.verified) return
+    unread.value = await clientApi.inbox.unread().catch(() => unread.value)
+  }
   const signedIn = computed(() => account.value !== null)
   const verified = computed(() => account.value?.verified ?? false)
   const firstName = computed(
@@ -66,6 +72,8 @@ export const useClientApp = defineStore('clientApp', () => {
     signedIn,
     verified,
     firstName,
+    unread,
+    refreshUnread,
     loadConfig,
     check,
     adopt,

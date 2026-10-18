@@ -298,12 +298,17 @@ async function joinWaitlist() {
               ><Tag v-if="p.intro_offer" severity="success" :value="t('app.home.offer')" />
               {{ p.name }}</span
             >
-            <strong v-if="p.price !== null" class="ca-num">{{
-              p.price === 0 ? t('app.price.free') : format.money(p.price)
-            }}</strong>
+            <span class="ca-row">
+              <strong v-if="p.price !== null" class="ca-num">{{
+                p.price === 0 ? t('app.price.free') : format.money(p.price)
+              }}</strong>
+              <RouterLink :to="{ name: 'app.checkout', params: { id: p.id } }" class="ca-small">{{
+                t('app.shop.buy')
+              }}</RouterLink>
+            </span>
           </li>
         </ul>
-        <p class="ca-muted ca-small">{{ t('app.session.buyAtDesk') }}</p>
+        <p class="ca-muted ca-small">{{ t('app.session.buyThenBook') }}</p>
       </section>
 
       <section v-if="description || session.equipment_notes" class="ca-card">

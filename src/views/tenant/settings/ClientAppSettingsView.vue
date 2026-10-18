@@ -40,6 +40,7 @@ const EMPTY: ClientAppSettings = {
   otp_sign_in: false,
   primary_color: '#0b55d9',
   deletion_days: 30,
+  waitlist_notify_top: 0,
   terms_url: null,
   privacy_url: null,
 }
@@ -183,6 +184,22 @@ async function toggleProduct(kind: 'services' | 'plans', id: number, value: bool
           :max="90"
           :allow-empty="false"
           :suffix="` ${t('clientAppSettings.days')}`"
+          :disabled="!canEdit"
+          show-buttons
+          class="number"
+        />
+      </SettingRow>
+      <SettingRow
+        :label="t('clientAppSettings.waitlistTopLabel')"
+        :help="t('clientAppSettings.waitlistTopHelp')"
+        label-for="ca-waitlist-top"
+      >
+        <InputNumber
+          v-model="form.waitlist_notify_top"
+          input-id="ca-waitlist-top"
+          :min="0"
+          :max="100"
+          :allow-empty="false"
           :disabled="!canEdit"
           show-buttons
           class="number"

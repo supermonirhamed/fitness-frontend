@@ -3172,6 +3172,8 @@ export interface ClientAppSettings {
   otp_sign_in: boolean
   primary_color: string
   deletion_days: number
+  /** Manual waitlist: how many waiting clients hear a place opened (US-04.12; 0 = all). */
+  waitlist_notify_top: number
   terms_url: string | null
   privacy_url: string | null
 }

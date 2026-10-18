@@ -1,5 +1,5 @@
 import { http } from '@/lib/http'
-import type { Translated } from '@/api/tenant'
+import type { InvoiceDocument, Receipt, Translated } from '@/api/tenant'
 
 // The client app's API (EP-11): /api/app/* on the organization's subdomain, with the client's own
 // cookie session (separate from staff sign-in).
@@ -229,6 +229,229 @@ export type ScheduleFilters = {
   q?: string | null
 }
 
+export interface MyBooking {
+  id: number
+  status: string
+  entitlement_source: string
+  credits_used: number | null
+  penalty: string | null
+  penalty_fee: number | null
+  cancel_reason: string | null
+  event_registration_id: number | null
+  session: {
+    id: number
+    starts_at: string
+    date: string
+    time: string
+    timezone: string | null
+    service: string
+    location: string | null
+    facility: string | null
+    coach: string | null
+    cancelled: boolean
+  }
+  can_change: boolean
+}
+
+export interface MyWaitlistEntry {
+  id: number
+  position: number | null
+  session: {
+    id: number
+    starts_at: string
+    date: string
+    time: string
+    service: string
+    location: string | null
+  }
+}
+
+export interface CancelTerms {
+  late: boolean
+  free_until: string
+  penalty: 'none' | 'consume_credit' | 'fixed_fee'
+  fee: number | null
+  source: string
+  credits: number | null
+  outcome: 'free' | 'credit_returned' | 'credit_used' | 'fee'
+}
+
+export interface SessionBrief {
+  id: number
+  starts_at: string
+  date: string
+  time: string
+  service: string | null
+  location: string | null
+  coach: string | null
+}
+
+export interface AppointmentService {
+  id: number
+  name: string | null
+  description: Translated | null
+  duration: number
+  locations: { id: number; name: string; timezone: string; price: number | null }[]
+  trainers: { id: number; name: string }[]
+  free: boolean
+}
+
+export interface AppointmentDay {
+  date: string
+  slots: {
+    start: string
+    end: string
+    starts_at: string
+    coaches: { id: number; name: string }[]
+  }[]
+}
+
+export interface AppEvent {
+  id: number
+  name: string | null
+  description: Translated | null
+  location: { id: number; name: string | null }
+  capacity: number
+  seats_left: number
+  price: number | null
+  open: boolean
+  reason: string | null
+  reason_code: string | null
+  registration_closes_on: string | null
+  registered: boolean
+  sessions: { id: number; starts_at: string; date: string; time: string; ends: string }[]
+}
+
+export interface ShopProduct {
+  id: number
+  name: string
+  kind: 'membership' | 'package'
+  type: string | null
+  description: Translated | null
+  billing: string | null
+  billing_interval: string | null
+  duration_value: number | null
+  duration_unit: string | null
+  credits: number | null
+  validity_days: number | null
+  visit_limit: number | null
+  visit_period: string | null
+  joining_fee: number | null
+  min_commitment_months: number | null
+  activation: 'purchase' | 'chosen_date' | 'first_use'
+  requires_payment: boolean
+  intro_offer: boolean
+  covers: {
+    all_services: boolean
+    categories: string[]
+    services: string[]
+    programs: string[]
+    excluded: string[]
+    locations: string[]
+  }
+  prices: { location_id: number; location: string; price: number | null }[]
+}
+
+export interface ShopQuote {
+  currency: string
+  lines: {
+    kind: string
+    description: string
+    unit_price: number
+    discount: number
+    net: number
+    vat: number
+    total: number
+  }[]
+  subtotal: number
+  discount: number
+  net: number
+  vat: number
+  vat_rate: string | null
+  prices_include_vat: boolean
+  total: number
+  intro_refusal: { code: string } | null
+  start_date_required: boolean
+  requires_payment: boolean
+  coupon: { code: string; name: string; amount: number } | null
+}
+
+export interface MyInvoice {
+  id: number
+  number: string
+  status: string
+  issued_on: string
+  due_on: string
+  total: number
+  paid: number
+  balance: number
+  overdue: boolean
+}
+
+export interface MyEntitlement {
+  id: number
+  name: string
+  kind: 'membership' | 'package'
+  status: string
+  awaiting_payment: boolean
+  starts_on: string | null
+  ends_on: string | null
+  credits_total: number | null
+  credits_left: number | null
+  location: string | null
+  auto_renew: boolean
+  recurring: boolean
+  renews_on: string | null
+  renewal_amount: number | null
+  currency: string
+  cancelled: boolean
+}
+
+export interface MyMembership extends MyEntitlement {
+  history: { kind: string; change: number; balance_after: number; at: string | null }[]
+  covers: ShopProduct['covers']
+  freeze: { id: number; starts_on: string; ends_on: string; status: string } | null
+  freeze_policy: {
+    min_days?: number
+    max_days?: number
+    max_per_year?: number
+    fee?: number
+  } | null
+  can: { auto_renew: boolean; freeze: boolean; cancel: boolean; upgrade: boolean }
+}
+
+export interface MyPayments {
+  currency: string
+  owed: number
+  account_credit: number
+  invoices: MyInvoice[]
+  payments: {
+    id: number
+    receipt_number: string
+    date: string | null
+    method: string
+    amount: number
+    status: string
+  }[]
+  refunds: {
+    id: number
+    date: string | null
+    amount: number
+    destination: string
+    method: string
+  }[]
+}
+
+export interface InboxItem {
+  id: number
+  type: string
+  kind: string
+  data: Record<string, unknown>
+  read: boolean
+  about: string | null
+  at: string | null
+}
+
 export const clientApi = {
   async config(): Promise<ClientAppConfig> {
     return (await http.get('/api/app/config')).data.data
@@ -362,8 +585,191 @@ export const clientApi = {
   async joinWaitlist(id: number): Promise<{ id: number; position: number | null }> {
     return (await http.post(`/api/app/sessions/${id}/waitlist`, {})).data.data
   },
+  bookings: {
+    async list(
+      scope: 'upcoming' | 'past',
+      clientId?: number | null,
+    ): Promise<{ bookings: MyBooking[]; waitlist: MyWaitlistEntry[] }> {
+      return (
+        await http.get('/api/app/bookings', {
+          params: { scope, ...(clientId ? { client_id: clientId } : {}) },
+        })
+      ).data.data
+    },
+    async cancelTerms(id: number): Promise<CancelTerms> {
+      return (await http.get(`/api/app/bookings/${id}/cancel-terms`)).data.data
+    },
+    async cancel(
+      id: number,
+    ): Promise<{ id: number; status: string; penalty: string | null; penalty_fee: number | null }> {
+      return (await http.post(`/api/app/bookings/${id}/cancel`)).data.data
+    },
+    async rescheduleOptions(id: number): Promise<SessionBrief[]> {
+      return (await http.get(`/api/app/bookings/${id}/reschedule-options`)).data.data
+    },
+    async reschedule(id: number, sessionId: number): Promise<{ id: number; session_id: number }> {
+      return (await http.post(`/api/app/bookings/${id}/reschedule`, { session_id: sessionId })).data
+        .data
+    },
+  },
+  waitlist: {
+    async leave(id: number): Promise<void> {
+      await http.post(`/api/app/waitlist/${id}/leave`)
+    },
+    async claim(id: number): Promise<{ booking_id: number; session_id: number }> {
+      return (await http.post(`/api/app/waitlist/${id}/claim`)).data.data
+    },
+  },
+  appointments: {
+    async services(): Promise<AppointmentService[]> {
+      return (await http.get('/api/app/appointments/services')).data.data
+    },
+    async slots(params: {
+      service_id: number
+      location_id: number
+      from: string
+      coach_id?: number | null
+    }): Promise<AppointmentDay[]> {
+      return (await http.get('/api/app/appointments/slots', { params })).data.data
+    },
+    async book(input: {
+      service_id: number
+      location_id: number
+      starts_at: string
+      coach_id?: number | null
+    }): Promise<BookingResult> {
+      return (await http.post('/api/app/appointments', input)).data.data
+    },
+  },
+  events: {
+    async list(): Promise<AppEvent[]> {
+      return (await http.get('/api/app/events')).data.data
+    },
+    async get(id: number): Promise<AppEvent> {
+      return (await http.get(`/api/app/events/${id}`)).data.data
+    },
+    async register(
+      id: number,
+    ): Promise<{ id: number; invoice_id: number | null; event: AppEvent }> {
+      return (await http.post(`/api/app/events/${id}/register`)).data.data
+    },
+  },
+  shop: {
+    async list(): Promise<ShopProduct[]> {
+      return (await http.get('/api/app/shop')).data.data
+    },
+    async quote(
+      planId: number,
+      input: { location_id: number; coupon?: string | null },
+    ): Promise<ShopQuote> {
+      return (await http.post(`/api/app/shop/${planId}/quote`, input)).data.data
+    },
+    async buy(
+      planId: number,
+      input: {
+        location_id: number
+        coupon?: string | null
+        starts_on?: string | null
+        accept_terms: boolean
+      },
+    ): Promise<{
+      entitlement: MyEntitlement
+      invoice: MyInvoice
+      pay_at: { location: string; address: string | null }
+    }> {
+      return (await http.post(`/api/app/shop/${planId}/buy`, input)).data.data
+    },
+  },
+  async payments(): Promise<MyPayments> {
+    return (await http.get('/api/app/payments')).data.data
+  },
+  memberships: {
+    async list(): Promise<MyMembership[]> {
+      return (await http.get('/api/app/memberships')).data.data
+    },
+    async autoRenew(id: number, on: boolean): Promise<MyMembership[]> {
+      return (await http.post(`/api/app/memberships/${id}/auto-renew`, { on })).data.data
+    },
+    async freezePreview(
+      id: number,
+      input: { starts_on: string; ends_on: string },
+    ): Promise<{ days: number; fee: number; ends_on: string | null; bookings: unknown[] }> {
+      return (await http.post(`/api/app/memberships/${id}/freeze/preview`, input)).data.data
+    },
+    async freeze(
+      id: number,
+      input: { starts_on: string; ends_on: string; cancel_bookings: boolean },
+    ): Promise<MyMembership[]> {
+      return (await http.post(`/api/app/memberships/${id}/freeze`, input)).data.data
+    },
+    async cancel(
+      id: number,
+      input: { reason: string; note: string | null },
+    ): Promise<MyMembership[]> {
+      return (await http.post(`/api/app/memberships/${id}/cancel`, input)).data.data
+    },
+    async upgrade(id: number, note: string | null): Promise<void> {
+      await http.post(`/api/app/memberships/${id}/upgrade`, { note })
+    },
+  },
+  inbox: {
+    async list(): Promise<{
+      data: InboxItem[]
+      meta: { unread: number; push_key: string | null }
+    }> {
+      return (await http.get('/api/app/notifications')).data
+    },
+    async unread(): Promise<number> {
+      return (await http.get('/api/app/notifications/unread')).data.data.unread
+    },
+    async read(ids?: number[]): Promise<number> {
+      return (await http.post('/api/app/notifications/read', ids ? { ids } : {})).data.data.unread
+    },
+    async subscribe(subscription: PushSubscriptionJSON): Promise<void> {
+      await http.post('/api/app/push-subscriptions', subscription)
+    },
+  },
+  calendarFeed: {
+    async rotate(): Promise<string> {
+      return (await http.post('/api/app/calendar-feed')).data.data.url
+    },
+    async revoke(): Promise<void> {
+      await http.delete('/api/app/calendar-feed')
+    },
+  },
+  async invoice(id: number): Promise<InvoiceDocument> {
+    return (await http.get(`/api/app/invoices/${id}`)).data.data
+  },
+  async receipt(id: number): Promise<Receipt> {
+    return (await http.get(`/api/app/payments/${id}/receipt`)).data.data
+  },
   calendarUrl(bookingId: number): string {
     return `/api/app/bookings/${bookingId}/calendar.ics`
+  },
+  /** "Add to Google Calendar" for a session (US-11.19). */
+  googleCalendarUrl(input: {
+    title: string
+    starts_at: string
+    ends_at?: string
+    minutes?: number
+    location?: string | null
+  }): string {
+    const fmt = (d: Date) =>
+      d
+        .toISOString()
+        .replace(/[-:]/g, '')
+        .replace(/\.\d{3}/, '')
+    const start = new Date(input.starts_at)
+    const end = input.ends_at
+      ? new Date(input.ends_at)
+      : new Date(start.getTime() + (input.minutes ?? 60) * 60000)
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: input.title,
+      dates: `${fmt(start)}/${fmt(end)}`,
+      location: input.location ?? '',
+    })
+    return `https://calendar.google.com/calendar/render?${params}`
   },
   photoUrl(): string {
     return '/api/app/profile/photo'

@@ -2,7 +2,7 @@
 // The client app's shell (US-11.01): the organization's logo and name, a language switch, the
 // page, and the bottom navigation of the design system's BottomNav — Home, Schedule, Account.
 // Mobile-first; on wide screens it stays a phone-width column.
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
@@ -14,9 +14,17 @@ const route = useRoute()
 const app = useClientApp()
 const nav = computed(() => [
   { name: 'app.home', icon: 'pi-home', label: t('app.nav.home') },
-  { name: 'app.schedule', icon: 'pi-calendar', label: t('app.nav.schedule') },
+  { name: 'app.schedule', icon: 'pi-calendar-plus', label: t('app.nav.schedule') },
+  { name: 'app.bookings', icon: 'pi-calendar', label: t('app.nav.bookings') },
+  { name: 'app.inbox', icon: 'pi-bell', label: t('app.nav.inbox'), badge: app.unread },
   { name: 'app.account', icon: 'pi-user', label: t('app.nav.account') },
 ])
+// The inbox badge follows each page change (US-11.20).
+onMounted(() => app.refreshUnread())
+watch(
+  () => route.fullPath,
+  () => app.refreshUnread(),
+)
 const active = (name: string) => route.matched.some((r) => r.name === name || r.meta.tab === name)
 const showNav = computed(() => app.signedIn && app.verified && !route.meta.clientGuest)
 const toggleLanguage = () => setLocale(locale.value === 'ar' ? 'en' : 'ar', true)
@@ -52,7 +60,12 @@ const toggleLanguage = () => setLocale(locale.value === 'ar' ? 'en' : 'ar', true
         class="bottom-nav__item"
         :aria-current="active(item.name) ? 'page' : undefined"
       >
-        <i :class="['pi', item.icon]" aria-hidden="true" />
+        <span class="bottom-nav__icon">
+          <i :class="['pi', item.icon]" aria-hidden="true" />
+          <span v-if="item.badge" class="bottom-nav__badge">{{
+            item.badge > 9 ? '9+' : item.badge
+          }}</span>
+        </span>
         {{ item.label }}
       </RouterLink>
     </nav>
@@ -142,6 +155,22 @@ const toggleLanguage = () => setLocale(locale.value === 'ar' ? 'en' : 'ar', true
 }
 .bottom-nav__item i {
   font-size: 20px;
+}
+.bottom-nav__icon {
+  position: relative;
+}
+.bottom-nav__badge {
+  position: absolute;
+  top: -6px;
+  inset-inline-start: 12px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--sev-danger-solid, #dc2626);
+  color: #fff;
+  font: 600 10px/16px var(--font-sans);
+  text-align: center;
 }
 .bottom-nav__item[aria-current='page'] {
   color: var(--primary);
