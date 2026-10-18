@@ -703,6 +703,319 @@ export interface AcademyOrganizationSettings {
   sibling_discount_percent: number
   waitlist_offer_hours: number
   notify_absence: boolean
+  /** Smaller published groups are flagged on the overview (US-10.22). */
+  min_group_size: number
+}
+
+export type AcademyNoteCategory = 'technical' | 'behaviour' | 'fitness' | 'injury' | 'general'
+
+/** A coach's note about a player (US-10.17). */
+export interface AcademyNote {
+  id: number
+  client: { id: number; name?: string }
+  group: Named | null
+  session: { id: number; starts_at: string } | null
+  category: AcademyNoteCategory
+  visibility: 'internal' | 'shared'
+  body: string
+  author: { id: number; name: string } | null
+  created_at: string | null
+  updated_at: string | null
+  resolved_at: string | null
+  can_edit: boolean
+}
+
+export type EvaluationScale = '1-5' | '1-10' | 'levels' | 'measure'
+
+export interface EvaluationCriterion {
+  key?: string
+  name: Translated
+  scale: EvaluationScale
+  unit?: string | null
+  lower_is_better?: boolean
+}
+
+export interface EvaluationSection {
+  key?: string
+  name: Translated
+  criteria: EvaluationCriterion[]
+}
+
+/** A program's evaluation template (US-10.18): its current version's sections. */
+export interface EvaluationTemplate {
+  id: number
+  program_id: number
+  name: Translated
+  display_name: string | null
+  version: number
+  archived: boolean
+  sections: EvaluationSection[]
+}
+
+export type EvaluationValue = number | string | null
+
+export interface AcademyEvaluation {
+  id: number
+  client_id: number
+  academy_group_id: number
+  period: string
+  template_version_id: number
+  scores: Record<string, EvaluationValue>
+  comment: string | null
+  /** The coach's level for the next term (US-10.20). */
+  recommended_level_id: number | null
+  status: 'Draft' | 'Published'
+  published_at: string | null
+  updated_at: string | null
+  author: string | null
+}
+
+export interface EvaluationSheet {
+  template: EvaluationTemplate
+  can_edit: boolean
+  periods: string[]
+  players: {
+    enrollment_id: number
+    client: { id: number; name: string; age: number | null }
+    evaluation: (AcademyEvaluation & { sections: EvaluationSection[] | null }) | null
+  }[]
+}
+
+export interface EvaluationReport extends AcademyEvaluation {
+  template: { id: number; display_name: string | null; version: number }
+  sections: EvaluationSection[]
+  group: Named
+  client: { id: number; name: string; age: number | null }
+}
+
+export interface EvaluationHistory {
+  evaluations: (AcademyEvaluation & { template: string | null; group: Named })[]
+  progress: {
+    key: string
+    name: string | null
+    section: string | null
+    scale: EvaluationScale
+    unit: string | null
+    lower_is_better: boolean
+    template: string | null
+    points: {
+      evaluation_id: number
+      date: string
+      period: string
+      value: number
+      raw: EvaluationValue
+    }[]
+  }[]
+}
+
+export interface AttendanceSummary {
+  attended: number
+  absent: number
+  excused: number
+  /** Excused absences left out; null before any training. */
+  rate: number | null
+}
+
+/** A child's academy profile (US-10.23); null sections are hidden from this viewer. */
+export interface AcademyProfile {
+  enrollments: {
+    id: number
+    status: string
+    display_status: string
+    current: boolean
+    program: Named
+    group: Named
+    level: string | null
+    term: string | null
+    location: string | null
+    head_coach: string | null
+    starts_on: string
+    ends_on: string | null
+    attendance: AttendanceSummary
+  }[]
+  upcoming: {
+    session_id: number
+    starts_at: string
+    group: string | null
+    location: string | null
+  }[]
+  attendance: AttendanceSummary & {
+    recent: {
+      date: string
+      time: string
+      status: 'attended' | 'absent' | 'excused'
+      group: string | null
+    }[]
+  }
+  notes: {
+    id: number
+    category: AcademyNoteCategory
+    visibility: 'internal' | 'shared'
+    body: string
+    group: string | null
+    author: string | null
+    created_at: string | null
+    open_injury: boolean
+  }[]
+  evaluations:
+    | {
+        id: number
+        period: string
+        status: 'Draft' | 'Published'
+        template: string | null
+        group: string | null
+        author: string | null
+        date: string | null
+      }[]
+    | null
+  progress: EvaluationHistory['progress'] | null
+  fees: {
+    outstanding: number
+    overdue: number
+    invoices: {
+      id: number
+      number: string
+      status: string
+      due_on: string
+      group: string | null
+      total: number
+      paid: number
+      balance: number
+      overdue: boolean
+    }[]
+  } | null
+  guardians: {
+    id: number
+    name: string | null
+    relation: string | null
+    mobile: string | null
+    email: string | null
+    permissions: Record<
+      'can_book' | 'can_pay' | 'can_view_performance' | 'receives_notifications',
+      boolean
+    >
+  }[]
+  emergency_contacts: { name: string; relation: string; phone: string }[]
+}
+
+/** A child's progress report for a term (US-10.20). */
+export interface ProgressReport {
+  organization: string | null
+  child: { id: number; name: string; age: number | null }
+  term: {
+    id: number
+    display_name: string | null
+    starts_on: string
+    ends_on: string | null
+  } | null
+  terms: { id: number; display_name: string | null; program_id: number }[]
+  attendance: AttendanceSummary
+  groups: {
+    program: string | null
+    group: string | null
+    level: string | null
+    coach: string | null
+    status: string
+    attendance: AttendanceSummary
+  }[]
+  evaluations: {
+    id: number
+    period: string
+    template: string | null
+    sections: EvaluationSection[]
+    scores: Record<string, EvaluationValue>
+    comment: string | null
+    author: string | null
+    date: string | null
+    group: string | null
+  }[]
+  notes: {
+    id: number
+    category: AcademyNoteCategory
+    body: string
+    author: string | null
+    date: string | null
+  }[]
+  recommendation: { level: string | null; by: string | null; period: string } | null
+}
+
+/** An announcement to groups' guardians (US-10.21). */
+export interface AcademyAnnouncement {
+  id: number
+  title: string
+  body: string
+  audience: 'groups' | 'program' | 'age_group'
+  channels: ('email' | 'sms' | 'push')[]
+  groups: Named[]
+  program: Named | null
+  age_group: Named | null
+  recipients_count: number
+  author: string | null
+  created_at: string | null
+}
+
+export interface AcademyOverviewGroup {
+  id: number
+  display_name: string | null
+  program_id: number
+  location: string | null
+  term: string | null
+  status: AcademyGroupStatus
+  head_coach: string | null
+  capacity: number
+  enrolled: number
+  free: number
+  waiting: number
+  attendance_rate: number | null
+  /** Null without payments.view. */
+  unpaid: number | null
+  overdue: number | null
+}
+
+/** The academy overview (US-10.22). */
+export interface AcademyOverview {
+  totals: {
+    groups: number
+    enrolled: number
+    capacity: number
+    waiting: number
+    unpaid: number | null
+    overdue: number | null
+  }
+  programs: {
+    id: number
+    display_name: string | null
+    enrolled: number
+    capacity: number
+    waiting: number
+    unpaid: number | null
+    overdue: number | null
+    groups: AcademyOverviewGroup[]
+  }[]
+  alerts: {
+    min_group_size: number
+    small_groups: {
+      id: number
+      display_name: string | null
+      location: string | null
+      enrolled: number
+      capacity: number
+    }[]
+    low_attendance: {
+      client: { id: number; name: string }
+      group: Named
+      rate: number
+      trainings: number
+    }[]
+    threshold: number
+    no_guardian_contact: { client: { id: number; name: string }; groups: Named[] }[]
+    overdue_fees: {
+      client: { id: number; name: string }
+      amount: number
+      oldest_due_on: string
+      payer_id: number | null
+    }[]
+  }
 }
 
 export interface AcademyWaitlistEntry {
@@ -1130,6 +1443,8 @@ export interface ClientOverview {
     uncovered_bookings: number
     /** US-07.11: what they owe on invoices (payments.view). */
     balance: ClientBalance | null
+    /** US-10.17: open injury notes from coaches. */
+    injuries: { id: number; body: string; author: string | null; at: string | null }[]
   }
   upcoming: Booking[]
   attendance: Record<
@@ -4608,6 +4923,131 @@ export const tenantApi = {
       ): Promise<{ id: number; status: string; new_enrollment_id: number | null }> {
         return (await http.put(`/api/academy/reenrollment-offers/${offerId}`, input)).data.data
       },
+    },
+    notes: {
+      async forClient(clientId: number): Promise<AcademyNote[]> {
+        return (await http.get(`/api/clients/${clientId}/academy-notes`)).data.data
+      },
+      async forGroup(groupId: number): Promise<AcademyNote[]> {
+        return (await http.get(`/api/academy/groups/${groupId}/notes`)).data.data
+      },
+      async create(input: {
+        client_id: number
+        academy_group_id?: number | null
+        scheduled_session_id?: number | null
+        category: AcademyNoteCategory
+        visibility: 'internal' | 'shared'
+        body: string
+      }): Promise<AcademyNote> {
+        return (await http.post('/api/academy/notes', input)).data.data
+      },
+      async update(
+        id: number,
+        input: { category: AcademyNoteCategory; visibility: 'internal' | 'shared'; body: string },
+      ): Promise<AcademyNote> {
+        return (await http.put(`/api/academy/notes/${id}`, input)).data.data
+      },
+      async resolve(id: number): Promise<AcademyNote> {
+        return (await http.post(`/api/academy/notes/${id}/resolve`)).data.data
+      },
+    },
+    evaluations: {
+      async templates(programId: number): Promise<EvaluationTemplate[]> {
+        return (await http.get(`/api/programs/${programId}/evaluation-templates`)).data.data
+      },
+      async createTemplate(
+        programId: number,
+        input: { name: Translated; sections: EvaluationSection[] },
+      ): Promise<EvaluationTemplate> {
+        return (await http.post(`/api/programs/${programId}/evaluation-templates`, input)).data.data
+      },
+      async updateTemplate(
+        id: number,
+        input: { name: Translated; sections: EvaluationSection[] },
+      ): Promise<EvaluationTemplate> {
+        return (await http.put(`/api/evaluation-templates/${id}`, input)).data.data
+      },
+      async archiveTemplate(id: number, archived: boolean): Promise<EvaluationTemplate> {
+        return (await http.post(`/api/evaluation-templates/${id}/archive`, { archived })).data.data
+      },
+      async sheet(groupId: number, templateId: number, period: string): Promise<EvaluationSheet> {
+        return (
+          await http.get(`/api/academy/groups/${groupId}/evaluations`, {
+            params: { template_id: templateId, period },
+          })
+        ).data.data
+      },
+      async save(
+        groupId: number,
+        input: {
+          template_id: number
+          period: string
+          client_id: number
+          scores: Record<string, EvaluationValue>
+          comment: string | null
+          publish: boolean
+          recommended_level_id?: number | null
+        },
+      ): Promise<AcademyEvaluation> {
+        return (await http.put(`/api/academy/groups/${groupId}/evaluations`, input)).data.data
+      },
+      async get(id: number): Promise<EvaluationReport> {
+        return (await http.get(`/api/academy/evaluations/${id}`)).data.data
+      },
+      async history(clientId: number): Promise<EvaluationHistory> {
+        return (await http.get(`/api/clients/${clientId}/evaluations`)).data.data
+      },
+    },
+    profile: {
+      async get(clientId: number): Promise<AcademyProfile> {
+        return (await http.get(`/api/clients/${clientId}/academy`)).data.data
+      },
+      async progressReport(clientId: number, termId?: number | null): Promise<ProgressReport> {
+        return (
+          await http.get(`/api/clients/${clientId}/academy/progress-report`, {
+            params: termId ? { term_id: termId } : {},
+          })
+        ).data.data
+      },
+      async emailProgressReport(
+        clientId: number,
+        input: { term_id?: number | null; email?: string | null },
+      ): Promise<{ sent: number; sent_to: string[] | null }> {
+        return (await http.post(`/api/clients/${clientId}/academy/progress-report/email`, input))
+          .data.data
+      },
+    },
+    announcements: {
+      async list(): Promise<AcademyAnnouncement[]> {
+        return (await http.get('/api/academy/announcements')).data.data
+      },
+      async forGroup(groupId: number): Promise<AcademyAnnouncement[]> {
+        return (await http.get(`/api/academy/groups/${groupId}/announcements`)).data.data
+      },
+      async send(input: {
+        title: string
+        body: string
+        audience: AcademyAnnouncement['audience']
+        group_ids?: number[]
+        program_id?: number | null
+        age_group_id?: number | null
+        channels: AcademyAnnouncement['channels']
+      }): Promise<AcademyAnnouncement> {
+        return (await http.post('/api/academy/announcements', input)).data.data
+      },
+      async get(
+        id: number,
+      ): Promise<AcademyAnnouncement & { recipients: { id: number; name: string }[] }> {
+        return (await http.get(`/api/academy/announcements/${id}`)).data.data
+      },
+    },
+    async overview(params: {
+      location_id?: number | null
+      term_id?: number | null
+      program_id?: number | null
+      coach_id?: number | null
+    }): Promise<AcademyOverview> {
+      return (await http.get('/api/academy/overview', { params })).data.data
     },
     settings: {
       async get(): Promise<AcademyOrganizationSettings> {

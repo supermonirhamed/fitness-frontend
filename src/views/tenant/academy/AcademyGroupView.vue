@@ -2,9 +2,9 @@
 // A group's page (US-10.04): who it is for (program, level, age group, term, branch, facility,
 // places), its coaches (US-10.05), and tabs for the roster (enroll, pause, withdraw, transfer —
 // US-10.08–10.13), the training schedule (US-10.06), the waiting list (US-10.11), trials
-// (US-10.15), the attendance summary and the activity log. Coach notes and announcements come with
-// their own stories.
-import { computed, onMounted, ref } from 'vue'
+// (US-10.15), coach notes (US-10.17), evaluations (US-10.19), announcements to guardians
+// (US-10.21), the attendance summary and the activity log.
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
@@ -18,6 +18,10 @@ import Tabs from 'primevue/tabs'
 import Tag from 'primevue/tag'
 import Message from 'primevue/message'
 import AddTrainingDialog from '@/components/academy/AddTrainingDialog.vue'
+import AnnouncementFormDrawer from '@/components/academy/AnnouncementFormDrawer.vue'
+import AnnouncementsList from '@/components/academy/AnnouncementsList.vue'
+import GroupEvaluationsPanel from '@/components/academy/GroupEvaluationsPanel.vue'
+import GroupNotesPanel from '@/components/academy/GroupNotesPanel.vue'
 import EnrollmentDrawer from '@/components/academy/EnrollmentDrawer.vue'
 import EnrollPlayerDrawer from '@/components/academy/EnrollPlayerDrawer.vue'
 import GroupCoachesDialog from '@/components/academy/GroupCoachesDialog.vue'
@@ -32,6 +36,7 @@ import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import {
   tenantApi,
+  type AcademyAnnouncement,
   type AcademyEnrollResult,
   type AcademyGroup,
   type AcademyGroupDetails,
@@ -69,6 +74,7 @@ onMounted(async () => {
   // From the recommendations list: open that player's enrollment.
   const id = Number(route.query.enrollment)
   if (id) openEnrollment(id)
+  if (tab.value === 'announcements') loadAnnouncements()
 })
 const tab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'roster')
 
@@ -147,6 +153,28 @@ function onScheduled(n: number) {
 function onTrainingAdded() {
   toast.add({ severity: 'success', summary: t('academy.schedule.added'), life: 3000 })
   load()
+}
+
+// Announcements to the group's guardians (US-10.21): its coaches and academy admins.
+const announcements = ref<AcademyAnnouncement[]>([])
+const announceOpen = ref(false)
+const canAnnounce = computed(
+  () =>
+    auth.can('academy.update') || (group.value?.coaches ?? []).some((c) => c.id === auth.user?.id),
+)
+async function loadAnnouncements() {
+  announcements.value = await tenantApi.academy.announcements.forGroup(props.id).catch(() => [])
+}
+watch(tab, (value) => {
+  if (value === 'announcements') loadAnnouncements()
+})
+function onAnnounced(a: AcademyAnnouncement) {
+  toast.add({
+    severity: 'success',
+    summary: t('academy.announcements.sent', { n: a.recipients_count }),
+    life: 4000,
+  })
+  loadAnnouncements()
 }
 
 const coachesOpen = ref(false)
@@ -286,6 +314,9 @@ function onCoaches(_: AcademyGroup, updated: number) {
             }}<span v-if="group.waiting" class="count">{{ group.waiting }}</span></Tab
           >
           <Tab value="trials">{{ t('academy.groups.tabs.trials') }}</Tab>
+          <Tab value="notes">{{ t('academy.groups.tabs.notes') }}</Tab>
+          <Tab value="evaluations">{{ t('academy.groups.tabs.evaluations') }}</Tab>
+          <Tab value="announcements">{{ t('academy.groups.tabs.announcements') }}</Tab>
           <Tab value="attendance">{{ t('academy.groups.tabs.attendance') }}</Tab>
           <Tab value="activity">{{ t('academy.groups.tabs.activity') }}</Tab>
         </TabList>
@@ -378,6 +409,32 @@ function onCoaches(_: AcademyGroup, updated: number) {
           <TabPanel value="trials">
             <GroupTrialsPanel :group="group" @changed="load" />
           </TabPanel>
+          <TabPanel value="notes">
+            <GroupNotesPanel :group="group" />
+          </TabPanel>
+          <TabPanel value="evaluations">
+            <GroupEvaluationsPanel :group="group" />
+          </TabPanel>
+          <TabPanel value="announcements">
+            <div class="card announce">
+              <header>
+                <Button
+                  v-if="canAnnounce"
+                  :label="t('academy.announcements.new')"
+                  icon="pi pi-megaphone"
+                  size="small"
+                  @click="announceOpen = true"
+                />
+              </header>
+              <EmptyState
+                v-if="!announcements.length"
+                compact
+                icon="pi-megaphone"
+                :title="t('academy.announcements.none')"
+              />
+              <AnnouncementsList v-else :announcements="announcements" />
+            </div>
+          </TabPanel>
           <TabPanel value="attendance">
             <div class="tiles">
               <div class="card tile">
@@ -460,6 +517,12 @@ function onCoaches(_: AcademyGroup, updated: number) {
       v-model:visible="scheduleOpen"
       :group="group"
       @saved="onScheduled"
+    />
+    <AnnouncementFormDrawer
+      v-if="group"
+      v-model:visible="announceOpen"
+      :group="group"
+      @sent="onAnnounced"
     />
     <AddTrainingDialog
       v-if="group"
@@ -583,6 +646,14 @@ function onCoaches(_: AcademyGroup, updated: number) {
 }
 .num {
   font-variant-numeric: tabular-nums;
+}
+.announce {
+  padding: 4px 16px 8px;
+}
+.announce header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 0;
 }
 .due {
   margin-bottom: 12px;

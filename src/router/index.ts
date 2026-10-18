@@ -49,6 +49,20 @@ const tenantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/tenant/invoices/InvoicePrintView.vue'),
     meta: { permission: 'payments.view' },
   },
+  // A player's evaluation to print or save as PDF for the family (US-10.19), outside the app shell.
+  {
+    path: '/academy/evaluations/:id(\\d+)/print',
+    name: 'tenant.academy.evaluation.print',
+    component: () => import('@/views/tenant/academy/EvaluationPrintView.vue'),
+    meta: { permission: 'academy.view' },
+  },
+  // A child's term progress report to print or save as PDF (US-10.20), outside the app shell.
+  {
+    path: '/academy/progress-report/:id(\\d+)',
+    name: 'tenant.academy.progress-report.print',
+    component: () => import('@/views/tenant/academy/ProgressReportPrintView.vue'),
+    meta: { permission: 'academy.view' },
+  },
   // A payment's receipt, outside the app shell so it prints cleanly (US-04.15).
   {
     path: '/receipts/:id(\\d+)',

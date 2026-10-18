@@ -13,6 +13,7 @@ import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import AgeGroupsPanel from '@/components/academy/AgeGroupsPanel.vue'
+import EvaluationTemplatesPanel from '@/components/academy/EvaluationTemplatesPanel.vue'
 import GroupFormDrawer from '@/components/academy/GroupFormDrawer.vue'
 import GroupsTable from '@/components/academy/GroupsTable.vue'
 import LevelsPanel from '@/components/academy/LevelsPanel.vue'
@@ -189,6 +190,7 @@ function onSaved(saved: Program) {
             <Tab v-if="program.enrollment_mode === 'Term'" value="terms">{{
               t('academy.tabs.terms')
             }}</Tab>
+            <Tab value="evaluations">{{ t('academy.tabs.evaluations') }}</Tab>
             <Tab value="fees">{{ t('academy.tabs.fees') }}</Tab>
           </template>
         </TabList>
@@ -246,6 +248,9 @@ function onSaved(saved: Program) {
             </TabPanel>
             <TabPanel v-if="program.enrollment_mode === 'Term'" value="terms">
               <TermsPanel :program-id="program.id" :terms="terms" @changed="onTermsChanged" />
+            </TabPanel>
+            <TabPanel value="evaluations">
+              <EvaluationTemplatesPanel :program-id="program.id" />
             </TabPanel>
             <TabPanel value="fees">
               <ProgramAcademySettings

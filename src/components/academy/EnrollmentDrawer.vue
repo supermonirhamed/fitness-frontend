@@ -16,6 +16,8 @@ import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
+import NoteFormDrawer from '@/components/academy/NoteFormDrawer.vue'
+import NotesList from '@/components/academy/NotesList.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormDialog from '@/components/patterns/FormDialog.vue'
 import FormField from '@/components/patterns/FormField.vue'
@@ -24,6 +26,7 @@ import {
   tenantApi,
   type AcademyEnrollmentDetails,
   type AcademyGroup,
+  type AcademyNote,
   type AcademyRecommendation,
   type ProgramLevel,
 } from '@/api/tenant'
@@ -50,12 +53,32 @@ const e = ref<AcademyEnrollmentDetails | null>(null)
 const current = computed(() => !!e.value && ['Active', 'Suspended'].includes(e.value.status))
 const day = (ymd: string | null) => (ymd ? showDay(format, ymd) : '—')
 
+// The player's coach notes in this group (US-10.17).
+const notes = ref<AcademyNote[]>([])
+const noteOpen = ref(false)
+const noteEditing = ref<AcademyNote | null>(null)
+async function loadNotes() {
+  if (!e.value?.client) return
+  notes.value = (await tenantApi.academy.notes.forClient(e.value.client.id).catch(() => [])).filter(
+    (n) => !n.group || n.group.id === props.group.id,
+  )
+}
+function openNote(note: AcademyNote | null) {
+  noteEditing.value = note
+  noteOpen.value = true
+}
+async function resolveNote(note: AcademyNote) {
+  await tenantApi.academy.notes.resolve(note.id).catch(() => null)
+  loadNotes()
+}
+
 async function load() {
   if (!props.enrollmentId) return
   state.value = 'loading'
   try {
     e.value = await tenantApi.academy.enrollments.get(props.enrollmentId)
     state.value = 'ready'
+    loadNotes()
   } catch {
     state.value = 'error'
   }
@@ -352,6 +375,28 @@ const saveDisabled = computed(() => {
         />
       </div>
 
+      <section>
+        <div class="section-head">
+          <h3>{{ t('academy.notes.title') }}</h3>
+          <Button
+            v-if="current && (isCoach || auth.can('academy.update'))"
+            :label="t('academy.notes.add')"
+            icon="pi pi-plus"
+            size="small"
+            variant="text"
+            @click="openNote(null)"
+          />
+        </div>
+        <p v-if="!notes.length" class="muted">{{ t('academy.notes.noneForPlayer') }}</p>
+        <NotesList
+          v-else
+          :notes="notes"
+          :can-resolve="isCoach || auth.can('academy.update')"
+          @edit="openNote"
+          @resolve="resolveNote"
+        />
+      </section>
+
       <section v-if="e.recommendations.length">
         <h3>{{ t('academy.transfer.recommendations') }}</h3>
         <div v-for="r in e.recommendations" :key="r.id" class="item">
@@ -589,6 +634,14 @@ const saveDisabled = computed(() => {
       <small class="muted">{{ t('academy.absence.hint') }}</small>
     </template>
   </FormDialog>
+  <NoteFormDrawer
+    v-if="e?.client"
+    v-model:visible="noteOpen"
+    :note="noteEditing"
+    :client="{ id: e.client.id, name: e.client.name }"
+    :group-id="group.id"
+    @saved="loadNotes"
+  />
 </template>
 
 <style scoped>
@@ -619,6 +672,11 @@ const saveDisabled = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 section h3 {
   font-size: 0.875rem;

@@ -1,13 +1,20 @@
 <script setup lang="ts">
-// The Academy (EP-10): every group of every program at the user's branches, filtered by program,
-// branch and status. Coaches only see the groups they coach (US-10.05).
+// The Academy (EP-10): the overview of programs and groups with alerts (US-10.22), every group of
+// every program at the user's branches filtered by program, branch and status, and the
+// announcements sent to guardians (US-10.21). Coaches only see the groups they coach (US-10.05).
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import Tabs from 'primevue/tabs'
+import AcademyOverviewPanel from '@/components/academy/AcademyOverviewPanel.vue'
+import AnnouncementFormDrawer from '@/components/academy/AnnouncementFormDrawer.vue'
+import AnnouncementsList from '@/components/academy/AnnouncementsList.vue'
 import GroupFormDrawer from '@/components/academy/GroupFormDrawer.vue'
 import GroupsTable from '@/components/academy/GroupsTable.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -15,6 +22,7 @@ import ErrorState from '@/components/patterns/ErrorState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import {
   tenantApi,
+  type AcademyAnnouncement,
   type AcademyGroup,
   type AcademyGroupStatus,
   type AcademyRecommendation,
@@ -25,6 +33,7 @@ import { useStaffAuth } from '@/stores/staffAuth'
 const { t } = useI18n()
 const toast = useToast()
 const router = useRouter()
+const route = useRoute()
 const auth = useStaffAuth()
 const branches = computed(() => auth.user?.switchable_locations ?? [])
 
@@ -72,6 +81,7 @@ async function reject(r: AcademyRecommendation) {
 onMounted(async () => {
   load()
   loadRecommendations()
+  if (tab.value === 'announcements') loadAnnouncements()
   if (auth.can('services.view')) programs.value = await tenantApi.programs.list().catch(() => [])
 })
 watch([programId, locationId, status], load)
@@ -87,6 +97,41 @@ const shown = computed(() => {
     : groups.value
 })
 
+// Overview for academy admins, the groups for everyone else (US-10.22).
+const tab = ref(
+  typeof route.query.tab === 'string'
+    ? route.query.tab
+    : auth.can('academy.update')
+      ? 'overview'
+      : 'groups',
+)
+watch(tab, (value) => {
+  router.replace({ query: { ...route.query, tab: value } })
+  if (value === 'announcements') loadAnnouncements()
+})
+// Announcements (US-10.21).
+const announcements = ref<AcademyAnnouncement[]>([])
+const announcementsState = ref<'loading' | 'ready' | 'error'>('loading')
+async function loadAnnouncements() {
+  announcementsState.value = 'loading'
+  try {
+    announcements.value = await tenantApi.academy.announcements.list()
+    announcementsState.value = 'ready'
+  } catch {
+    announcementsState.value = 'error'
+  }
+}
+const announceOpen = ref(false)
+function onAnnounced(a: AcademyAnnouncement) {
+  toast.add({
+    severity: 'success',
+    summary: t('academy.announcements.sent', { n: a.recipients_count }),
+    life: 4000,
+  })
+  if (tab.value === 'announcements') loadAnnouncements()
+  else tab.value = 'announcements'
+}
+
 const formOpen = ref(false)
 function onSaved(group: AcademyGroup) {
   toast.add({
@@ -101,97 +146,132 @@ function onSaved(group: AcademyGroup) {
 <template>
   <div class="page">
     <PageHeader :title="t('academy.title')" :subtitle="t('academy.subtitle')">
-      <template v-if="auth.can('academy.create') && programs.length" #primary>
+      <template v-if="tab === 'announcements'" #primary>
+        <Button
+          :label="t('academy.announcements.new')"
+          icon="pi pi-megaphone"
+          @click="announceOpen = true"
+        />
+      </template>
+      <template v-else-if="auth.can('academy.create') && programs.length" #primary>
         <Button :label="t('academy.groups.new')" icon="pi pi-plus" @click="formOpen = true" />
       </template>
     </PageHeader>
 
-    <div class="toolbar">
-      <InputText
-        v-model="q"
-        :placeholder="t('academy.groups.search')"
-        :aria-label="t('academy.groups.search')"
-        class="search"
-      />
-      <Select
-        v-if="programs.length > 1"
-        v-model="programId"
-        :options="programs"
-        option-label="display_name"
-        option-value="id"
-        :placeholder="t('academy.groups.anyProgram')"
-        show-clear
-      />
-      <Select
-        v-if="branches.length > 1"
-        v-model="locationId"
-        :options="branches"
-        option-label="name"
-        option-value="id"
-        :placeholder="t('clients.filters.anyBranch')"
-        show-clear
-      />
-      <Select
-        v-model="status"
-        :options="statusOptions"
-        option-label="label"
-        option-value="value"
-        :placeholder="t('academy.groups.currentStatus')"
-        show-clear
-      />
-    </div>
+    <Tabs v-model:value="tab">
+      <TabList>
+        <Tab value="overview">{{ t('academy.overview.tab') }}</Tab>
+        <Tab value="groups">{{ t('academy.tabs.groups') }}</Tab>
+        <Tab value="announcements">{{ t('academy.announcements.tab') }}</Tab>
+      </TabList>
+    </Tabs>
 
-    <section v-if="recommendations.length" class="card recs">
-      <h2>{{ t('academy.transfer.recommendations') }}</h2>
-      <div v-for="r in recommendations" :key="r.id" class="rec">
-        <div class="rec__text">
-          <strong>{{ r.client?.name }}</strong>
-          <span class="muted"
-            >{{ r.group?.display_name }} →
-            {{ r.to_group?.display_name ?? r.to_level?.display_name }}</span
-          >
-          <span class="muted small"
-            >{{ r.recommended_by }}<template v-if="r.note"> · {{ r.note }}</template></span
-          >
-        </div>
-        <RouterLink
-          v-if="r.group"
-          :to="{
-            name: 'tenant.academy.group',
-            params: { id: r.group.id },
-            query: { enrollment: r.enrollment_id },
-          }"
-          >{{ t('academy.transfer.review') }}</RouterLink
-        >
-        <Button
-          :label="t('academy.transfer.reject')"
-          size="small"
-          variant="text"
-          severity="secondary"
-          @click="reject(r)"
+    <AcademyOverviewPanel v-if="tab === 'overview'" :programs="programs" />
+
+    <template v-else-if="tab === 'announcements'">
+      <ErrorState v-if="announcementsState === 'error'" class="card" @retry="loadAnnouncements" />
+      <EmptyState
+        v-else-if="announcementsState === 'ready' && !announcements.length"
+        class="card"
+        icon="pi-megaphone"
+        :title="t('academy.announcements.none')"
+        :body="t('academy.announcements.noneHint')"
+      />
+      <div v-else class="card pad">
+        <AnnouncementsList :announcements="announcements" />
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="toolbar">
+        <InputText
+          v-model="q"
+          :placeholder="t('academy.groups.search')"
+          :aria-label="t('academy.groups.search')"
+          class="search"
+        />
+        <Select
+          v-if="programs.length > 1"
+          v-model="programId"
+          :options="programs"
+          option-label="display_name"
+          option-value="id"
+          :placeholder="t('academy.groups.anyProgram')"
+          show-clear
+        />
+        <Select
+          v-if="branches.length > 1"
+          v-model="locationId"
+          :options="branches"
+          option-label="name"
+          option-value="id"
+          :placeholder="t('clients.filters.anyBranch')"
+          show-clear
+        />
+        <Select
+          v-model="status"
+          :options="statusOptions"
+          option-label="label"
+          option-value="value"
+          :placeholder="t('academy.groups.currentStatus')"
+          show-clear
         />
       </div>
-    </section>
 
-    <ErrorState v-if="state === 'error'" class="card" @retry="load" />
-    <EmptyState
-      v-else-if="state === 'ready' && !groups.length"
-      class="card"
-      icon="pi-sitemap"
-      :title="t('academy.groups.none')"
-      :body="
-        auth.can('academy.create') ? t('academy.groups.noneHint') : t('academy.groups.noneCoach')
-      "
-    >
-      <RouterLink
-        v-if="auth.can('services.view')"
-        :to="{ name: 'tenant.services', query: { tab: 'programs' } }"
-        >{{ t('academy.groups.toPrograms') }}</RouterLink
+      <section v-if="recommendations.length" class="card recs">
+        <h2>{{ t('academy.transfer.recommendations') }}</h2>
+        <div v-for="r in recommendations" :key="r.id" class="rec">
+          <div class="rec__text">
+            <strong>{{ r.client?.name }}</strong>
+            <span class="muted"
+              >{{ r.group?.display_name }} →
+              {{ r.to_group?.display_name ?? r.to_level?.display_name }}</span
+            >
+            <span class="muted small"
+              >{{ r.recommended_by }}<template v-if="r.note"> · {{ r.note }}</template></span
+            >
+          </div>
+          <RouterLink
+            v-if="r.group"
+            :to="{
+              name: 'tenant.academy.group',
+              params: { id: r.group.id },
+              query: { enrollment: r.enrollment_id },
+            }"
+            >{{ t('academy.transfer.review') }}</RouterLink
+          >
+          <Button
+            :label="t('academy.transfer.reject')"
+            size="small"
+            variant="text"
+            severity="secondary"
+            @click="reject(r)"
+          />
+        </div>
+      </section>
+
+      <ErrorState v-if="state === 'error'" class="card" @retry="load" />
+      <EmptyState
+        v-else-if="state === 'ready' && !groups.length"
+        class="card"
+        icon="pi-sitemap"
+        :title="t('academy.groups.none')"
+        :body="
+          auth.can('academy.create') ? t('academy.groups.noneHint') : t('academy.groups.noneCoach')
+        "
       >
-    </EmptyState>
-    <div v-else class="card">
-      <GroupsTable :groups="shown" :loading="state === 'loading'" show-program />
-    </div>
+        <RouterLink
+          v-if="auth.can('services.view')"
+          :to="{ name: 'tenant.services', query: { tab: 'programs' } }"
+          >{{ t('academy.groups.toPrograms') }}</RouterLink
+        >
+      </EmptyState>
+      <div v-else class="card">
+        <GroupsTable :groups="shown" :loading="state === 'loading'" show-program />
+      </div>
+    </template>
+
+    <AnnouncementFormDrawer v-model:visible="announceOpen" @sent="onAnnounced" />
 
     <GroupFormDrawer
       v-model:visible="formOpen"
@@ -215,6 +295,9 @@ function onSaved(group: AcademyGroup) {
 }
 .search {
   flex: 1 1 220px;
+}
+.pad {
+  padding: 4px 16px;
 }
 .recs {
   padding: 12px 16px;

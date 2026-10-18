@@ -30,6 +30,7 @@ import ClientFamilyTab from '@/components/clients/ClientFamilyTab.vue'
 import ClientHealthCard from '@/components/clients/ClientHealthCard.vue'
 import ClientAccountCreditCard from '@/components/clients/ClientAccountCreditCard.vue'
 import ClientInvoicesCard from '@/components/clients/ClientInvoicesCard.vue'
+import ClientAcademyTab from '@/components/academy/ClientAcademyTab.vue'
 import ClientMembershipsTab from '@/components/clients/ClientMembershipsTab.vue'
 import ClientPaymentsCard from '@/components/clients/ClientPaymentsCard.vue'
 import ClientNotesTab from '@/components/clients/ClientNotesTab.vue'
@@ -360,6 +361,15 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
               :value="t('clientHealth.alert')"
             />
             <Tag
+              v-for="injury in overview?.alerts.injuries ?? []"
+              :key="injury.id"
+              v-tooltip.bottom="`${injury.body} — ${injury.author ?? ''}`"
+              severity="danger"
+              icon="pi pi-exclamation-triangle"
+              class="tag-sm"
+              :value="t('academy.notes.injuryAlert')"
+            />
+            <Tag
               v-if="overview?.alerts.unpaid_bookings"
               severity="warn"
               icon="pi pi-wallet"
@@ -474,6 +484,9 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
           <Tab value="family">{{ t('clientProfile.tabs.family') }}</Tab>
           <Tab value="waivers">{{ t('clientProfile.tabs.waivers') }}</Tab>
           <Tab value="notes">{{ t('clientProfile.tabs.notes') }}</Tab>
+          <Tab v-if="auth.can('academy.view')" value="academy">{{
+            t('clientProfile.tabs.academy')
+          }}</Tab>
           <Tab value="timeline">{{ t('clientProfile.tabs.timeline') }}</Tab>
           <Tab v-if="auth.can('entitlements.view')" value="memberships">{{
             t('clientProfile.tabs.memberships')
@@ -688,6 +701,9 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
           </TabPanel>
           <TabPanel value="notes">
             <ClientNotesTab v-if="tab === 'notes'" :client-id="client.id" />
+          </TabPanel>
+          <TabPanel value="academy">
+            <ClientAcademyTab v-if="tab === 'academy'" :client-id="client.id" />
           </TabPanel>
           <TabPanel value="memberships">
             <ClientMembershipsTab v-if="tab === 'memberships'" :client-id="client.id" />

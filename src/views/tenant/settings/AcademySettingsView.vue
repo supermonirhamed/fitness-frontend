@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Settings → Academy (EP-10): the sibling discount for a family's 2nd, 3rd… child in the same term
 // (US-10.10), how long a waiting-list family has to take an offered place (US-10.11), and whether
-// guardians hear when a child misses a training without notice (US-10.16). Fees, trials, pauses
+// guardians hear when a child misses a training without notice (US-10.16), and below which size a
+// group is flagged on the overview (US-10.22). Fees, trials, pauses
 // and refunds are set per program.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -29,6 +30,7 @@ const saved = ref<AcademyOrganizationSettings>({
   sibling_discount_percent: 0,
   waitlist_offer_hours: 48,
   notify_absence: true,
+  min_group_size: 4,
 })
 const form = ref<AcademyOrganizationSettings>({ ...saved.value })
 const saving = ref(false)
@@ -103,6 +105,22 @@ async function save() {
           :max="336"
           :allow-empty="false"
           :suffix="` ${t('attendanceSettings.hours')}`"
+          :disabled="!canEdit"
+          show-buttons
+          class="number"
+        />
+      </SettingRow>
+      <SettingRow
+        :label="t('academySettings.minGroupLabel')"
+        :help="t('academySettings.minGroupHelp')"
+        label-for="acad-min-group"
+      >
+        <InputNumber
+          v-model="form.min_group_size"
+          input-id="acad-min-group"
+          :min="0"
+          :max="100"
+          :allow-empty="false"
           :disabled="!canEdit"
           show-buttons
           class="number"
