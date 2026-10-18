@@ -204,6 +204,14 @@ async function archive(term: AcademyTerm) {
             :aria-label="t('academy.terms.copy')"
             @click="start('copy', term)"
           />
+          <RouterLink
+            v-if="!term.archived"
+            v-tooltip.top="t('academy.reenroll.title')"
+            :to="{ name: 'tenant.academy.reenrollment', params: { id: term.id } }"
+            :aria-label="t('academy.reenroll.title')"
+            class="p-button p-button-text p-button-rounded p-button-sm p-button-icon-only"
+            ><i class="pi pi-send" aria-hidden="true"
+          /></RouterLink>
           <Button
             v-if="canDelete"
             :icon="term.archived ? 'pi pi-replay' : 'pi pi-inbox'"

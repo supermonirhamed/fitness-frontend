@@ -275,6 +275,14 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'academy.view' },
       },
       {
+        // Re-enrollment for a term (US-10.14).
+        path: 'academy/terms/:id(\\d+)/reenrollment',
+        name: 'tenant.academy.reenrollment',
+        component: () => import('@/views/tenant/academy/ReenrollmentView.vue'),
+        meta: { permission: 'academy.view' },
+        props: (route) => ({ id: Number(route.params.id) }),
+      },
+      {
         path: 'academy/groups/:id(\\d+)',
         name: 'tenant.academy.group',
         component: () => import('@/views/tenant/academy/AcademyGroupView.vue'),
@@ -360,6 +368,13 @@ const tenantRoutes: RouteRecordRaw[] = [
             path: 'staff',
             name: 'tenant.settings.staff',
             component: () => import('@/views/tenant/settings/StaffSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
+            // Academy (EP-10): sibling discount, waiting-list offers, absence notices.
+            path: 'academy',
+            name: 'tenant.settings.academy',
+            component: () => import('@/views/tenant/settings/AcademySettingsView.vue'),
             meta: { permission: 'settings.view' },
           },
           {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The session's roster for taking attendance (US-08.04), made for the coach's phone: each booked
-// client with photo and alerts (first visit, health note, waiver), marked Present, Late, Absent or Excused (left out of attendance rates),
+// client with photo and alerts (first visit, health note, waiver), marked Present, Late, Absent or Excused (left out of attendance rates;
+// before the training, Excused reports an absence in advance, US-10.16),
 // "Mark all present", and a walk-in added subject to eligibility and capacity. Clients checked in
 // at the desk are already Present. Coaches edit until the organization's limit after the session;
 // later only managers. The coach starts and delivers the session here (US-08.07).
@@ -61,8 +62,21 @@ const marks = computed(() =>
     label: t(`roster.${m}`),
   })),
 )
-const mark = (bookingId: number, value: 'present' | 'late' | 'absent' | 'excused' | null) =>
-  value && act(() => tenantApi.roster.mark(props.sessionId, bookingId, value))
+const mark = (bookingId: number, value: 'present' | 'late' | 'absent' | 'excused' | null) => {
+  if (!value) return
+  // Before the training: Excused reports the absence in advance (US-10.16); anything else
+  // withdraws that report.
+  if (!started.value) {
+    const current = roster.value?.clients.find((c) => c.booking_id === bookingId)?.mark
+    if (value === 'excused' || current === 'excused') {
+      act(() =>
+        tenantApi.roster.excuse(props.sessionId, bookingId, { excused: value === 'excused' }),
+      )
+    }
+    return
+  }
+  act(() => tenantApi.roster.mark(props.sessionId, bookingId, value))
+}
 const markAll = () => act(() => tenantApi.roster.markAll(props.sessionId))
 const deliver = (action: 'start' | 'deliver') =>
   act(() => tenantApi.roster.delivery(props.sessionId, action))
@@ -227,6 +241,14 @@ const isCoach = computed(
             <small v-if="c.checked_in" class="muted">{{
               t('roster.fromDesk', { time: format.time(c.checked_in.at) })
             }}</small>
+            <Tag
+              v-if="c.enrolled"
+              class="tag-sm"
+              severity="secondary"
+              icon="pi pi-sitemap"
+              :value="t('roster.academy')"
+            />
+            <small v-if="c.excuse_reason" class="muted">{{ c.excuse_reason }}</small>
           </span>
         </div>
         <SelectButton

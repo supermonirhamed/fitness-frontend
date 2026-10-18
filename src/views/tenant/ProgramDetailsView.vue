@@ -16,6 +16,7 @@ import AgeGroupsPanel from '@/components/academy/AgeGroupsPanel.vue'
 import GroupFormDrawer from '@/components/academy/GroupFormDrawer.vue'
 import GroupsTable from '@/components/academy/GroupsTable.vue'
 import LevelsPanel from '@/components/academy/LevelsPanel.vue'
+import ProgramAcademySettings from '@/components/academy/ProgramAcademySettings.vue'
 import TermsPanel from '@/components/academy/TermsPanel.vue'
 import BranchChips from '@/components/patterns/BranchChips.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
@@ -188,6 +189,7 @@ function onSaved(saved: Program) {
             <Tab v-if="program.enrollment_mode === 'Term'" value="terms">{{
               t('academy.tabs.terms')
             }}</Tab>
+            <Tab value="fees">{{ t('academy.tabs.fees') }}</Tab>
           </template>
         </TabList>
         <TabPanels>
@@ -244,6 +246,12 @@ function onSaved(saved: Program) {
             </TabPanel>
             <TabPanel v-if="program.enrollment_mode === 'Term'" value="terms">
               <TermsPanel :program-id="program.id" :terms="terms" @changed="onTermsChanged" />
+            </TabPanel>
+            <TabPanel value="fees">
+              <ProgramAcademySettings
+                :program-id="program.id"
+                :enrollment-mode="program.enrollment_mode"
+              />
             </TabPanel>
           </template>
         </TabPanels>

@@ -13,7 +13,13 @@ import GroupsTable from '@/components/academy/GroupsTable.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
-import { tenantApi, type AcademyGroup, type AcademyGroupStatus, type Program } from '@/api/tenant'
+import {
+  tenantApi,
+  type AcademyGroup,
+  type AcademyGroupStatus,
+  type AcademyRecommendation,
+  type Program,
+} from '@/api/tenant'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const { t } = useI18n()
@@ -49,8 +55,23 @@ async function load() {
     state.value = 'error'
   }
 }
+// Coaches' transfer recommendations waiting for a decision (US-10.12).
+const recommendations = ref<AcademyRecommendation[]>([])
+async function loadRecommendations() {
+  if (auth.can('academy.enroll'))
+    recommendations.value = await tenantApi.academy.recommendations.list().catch(() => [])
+}
+async function reject(r: AcademyRecommendation) {
+  try {
+    await tenantApi.academy.recommendations.reject(r.id)
+    loadRecommendations()
+  } catch {
+    toast.add({ severity: 'error', summary: t('common.genericError'), life: 4000 })
+  }
+}
 onMounted(async () => {
   load()
+  loadRecommendations()
   if (auth.can('services.view')) programs.value = await tenantApi.programs.list().catch(() => [])
 })
 watch([programId, locationId, status], load)
@@ -120,6 +141,38 @@ function onSaved(group: AcademyGroup) {
       />
     </div>
 
+    <section v-if="recommendations.length" class="card recs">
+      <h2>{{ t('academy.transfer.recommendations') }}</h2>
+      <div v-for="r in recommendations" :key="r.id" class="rec">
+        <div class="rec__text">
+          <strong>{{ r.client?.name }}</strong>
+          <span class="muted"
+            >{{ r.group?.display_name }} →
+            {{ r.to_group?.display_name ?? r.to_level?.display_name }}</span
+          >
+          <span class="muted small"
+            >{{ r.recommended_by }}<template v-if="r.note"> · {{ r.note }}</template></span
+          >
+        </div>
+        <RouterLink
+          v-if="r.group"
+          :to="{
+            name: 'tenant.academy.group',
+            params: { id: r.group.id },
+            query: { enrollment: r.enrollment_id },
+          }"
+          >{{ t('academy.transfer.review') }}</RouterLink
+        >
+        <Button
+          :label="t('academy.transfer.reject')"
+          size="small"
+          variant="text"
+          severity="secondary"
+          @click="reject(r)"
+        />
+      </div>
+    </section>
+
     <ErrorState v-if="state === 'error'" class="card" @retry="load" />
     <EmptyState
       v-else-if="state === 'ready' && !groups.length"
@@ -162,6 +215,33 @@ function onSaved(group: AcademyGroup) {
 }
 .search {
   flex: 1 1 220px;
+}
+.recs {
+  padding: 12px 16px;
+}
+.recs h2 {
+  font-size: 1rem;
+  margin: 0 0 6px;
+}
+.rec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-default);
+}
+.rec__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+}
+.muted {
+  color: var(--text-secondary);
+}
+.small {
+  font-size: 0.875rem;
 }
 .card {
   background: var(--surface-card);

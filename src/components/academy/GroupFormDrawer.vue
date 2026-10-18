@@ -11,6 +11,7 @@ import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
+import ToggleSwitch from 'primevue/toggleswitch'
 import TranslatedField from '@/components/patterns/TranslatedField.vue'
 import {
   tenantApi,
@@ -48,6 +49,10 @@ const form = reactive<Required<AcademyGroupInput>>({
   status: 'Draft',
   head_coach_id: null,
   assistant_ids: [],
+  allow_drop_in: false,
+  waitlist_enabled: true,
+  accepts_trials: true,
+  fee: null,
 })
 const options = ref<AcademyGroupOptions | null>(null)
 const saving = ref(false)
@@ -114,6 +119,10 @@ watch(visible, async (open) => {
     status: g?.status ?? 'Draft',
     head_coach_id: null,
     assistant_ids: [],
+    allow_drop_in: g?.allow_drop_in ?? false,
+    waitlist_enabled: g?.waitlist_enabled ?? true,
+    accepts_trials: g?.accepts_trials ?? true,
+    fee: g?.fee ?? null,
   })
   if (!g && branchOptions.value.length === 1) form.location_id = branchOptions.value[0]!.id
   errors.value = {}
@@ -358,6 +367,38 @@ async function submit() {
         />
       </div>
 
+      <fieldset class="options">
+        <legend>{{ t('academy.groups.joining') }}</legend>
+        <label class="toggle">
+          <ToggleSwitch v-model="form.waitlist_enabled" input-id="group-waitlist" />
+          <span>{{ t('academy.groups.waitlistEnabled') }}</span>
+        </label>
+        <label class="toggle">
+          <ToggleSwitch v-model="form.accepts_trials" input-id="group-trials" />
+          <span>{{ t('academy.groups.acceptsTrials') }}</span>
+        </label>
+        <label class="toggle">
+          <ToggleSwitch v-model="form.allow_drop_in" input-id="group-dropin" />
+          <span
+            >{{ t('academy.groups.allowDropIn')
+            }}<small class="hint">{{ t('academy.groups.allowDropInHint') }}</small></span
+          >
+        </label>
+        <div class="field">
+          <label for="group-fee">{{ t('academy.groups.fee') }}</label>
+          <InputNumber
+            v-model="form.fee"
+            input-id="group-fee"
+            :min="0"
+            :max-fraction-digits="3"
+            :invalid="!!err('fee')"
+            fluid
+          />
+          <small v-if="err('fee')" class="error">{{ err('fee') }}</small>
+          <small v-else class="hint">{{ t('academy.groups.feeHint') }}</small>
+        </div>
+      </fieldset>
+
       <template v-if="!editing">
         <div class="field">
           <label for="group-head">{{ t('academy.coaches.head') }} *</label>
@@ -445,6 +486,28 @@ async function submit() {
 .error {
   font: var(--text-caption);
   color: var(--sev-danger-fg);
+}
+.options {
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.options legend {
+  font-weight: var(--fw-medium);
+  padding: 0 4px;
+}
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.toggle span {
+  display: flex;
+  flex-direction: column;
 }
 .footer {
   display: flex;

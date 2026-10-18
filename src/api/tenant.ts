@@ -486,7 +486,16 @@ export interface AcademyGroup {
   status: AcademyGroupStatus
   copied_from_id: number | null
   coaches?: { id: number; name: string; role: 'head' | 'assistant' }[]
+  allow_drop_in: boolean
+  waitlist_enabled: boolean
+  accepts_trials: boolean
+  /** Replaces the program's fee amount (US-10.10). */
+  fee: number | null
+  /** Places (US-10.09): current enrollments, places held for offers, free places. */
   enrolled: number
+  held: number
+  free: number
+  waiting: number
 }
 
 export interface AcademyTraining {
@@ -510,8 +519,267 @@ export interface AcademyGroupDetails extends AcademyGroup {
   }
   upcoming: AcademyTraining[]
   recent: AcademyTraining[]
-  roster: unknown[]
+  roster: AcademyEnrollment[]
+  places: AcademyPlaces
+  trial_rules: AcademyProgramSettings['trial']
+  pending_recommendations: number
   activity: { action: string; user: string | null; at: string | null; changed: string[] }[]
+}
+
+export interface AcademyPlaces {
+  capacity: number
+  enrolled: number
+  held: number
+  free: number
+}
+
+export type AcademyEnrollmentStatus =
+  'Active' | 'Paused' | 'Suspended' | 'Withdrawn' | 'Transferred' | 'Completed'
+
+/** A player in a group (US-10.08/09). Amounts in the currency's major unit. */
+export interface AcademyEnrollment {
+  id: number
+  academy_group_id: number
+  group?: Named | null
+  program_id: number
+  term_id: number | null
+  client?: {
+    id: number
+    name: string
+    member_id: string | null
+    age: number | null
+    gender: string | null
+    date_of_birth: string | null
+  } | null
+  payer?: { id: number; name: string; member_id: string | null } | null
+  status: Exclude<AcademyEnrollmentStatus, 'Paused'>
+  display_status: AcademyEnrollmentStatus
+  source: 'staff' | 'waitlist' | 'reenrollment' | 'transfer'
+  starts_on: string
+  ends_on: string | null
+  ended_on: string | null
+  end_reason: string | null
+  end_note: string | null
+  fee: (AcademyProgramSettings['fee'] & { sibling_discount_percent?: number }) | null
+  next_bill_on: string | null
+  overrides: { checks: string[]; reason: string | null } | null
+  transferred_from_id: number | null
+  pauses?: {
+    id: number
+    starts_on: string
+    ends_on: string
+    reason: string | null
+    ended_early: boolean
+  }[]
+  attendance_rate?: number | null
+  created_at: string | null
+}
+
+export interface AcademyInvoiceBrief {
+  id: number
+  number: string
+  status: string
+  due_on: string
+  total: number
+  paid: number
+  currency: string
+  client_id: number | null
+}
+
+export interface AcademyRecommendation {
+  id: number
+  status: 'Pending' | 'Approved' | 'Rejected'
+  note: string | null
+  decision_note: string | null
+  to_group: Named | null
+  to_level: Named | null
+  recommended_by: string | null
+  created_at: string | null
+  enrollment_id?: number
+  client?: { id: number; name: string } | null
+  group?: Named | null
+}
+
+export interface AcademyEnrollmentDetails extends AcademyEnrollment {
+  invoices: AcademyInvoiceBrief[]
+  upcoming: {
+    booking_id: number
+    session_id: number
+    starts_at: string
+    status: string
+    excused: boolean
+    excuse_reason: string | null
+  }[]
+  recommendations: AcademyRecommendation[]
+  pause_rules: AcademyProgramSettings['pause']
+  refund_policy: AcademyProgramSettings['refund']
+}
+
+/** Why a player can't join a group (US-10.07/08). */
+export interface AcademyEnrollReason {
+  check: 'group' | 'duplicate' | 'client' | 'gender' | 'age' | 'closed' | 'capacity' | 'waivers'
+  code: string
+  message: string
+  params: Record<string, unknown>
+  overridable: boolean
+  permission: string | null
+}
+
+export interface AcademyFeeQuote {
+  model: AcademyFeeModel
+  lines: { kind: string; description: string; amount: number; discount: number; due_on: string }[]
+  total: number
+  instalments: number
+  fraction: number
+  sibling_discount_percent: number
+}
+
+export interface AcademyEligibility {
+  reasons: AcademyEnrollReason[]
+  places: AcademyPlaces
+  starts_on: string
+  quote: AcademyFeeQuote
+  payers: { id: number; name: string; can_pay: boolean; relation: string | null }[]
+  can_override: Record<'capacity' | 'closed' | 'waivers' | 'age', boolean>
+  waitlist: boolean
+}
+
+export interface AcademyEnrollInput {
+  client_id?: number | null
+  child?: {
+    first_name: string
+    last_name: string
+    date_of_birth: string | null
+    gender: string | null
+  }
+  guardian_id?: number | null
+  guardian?: {
+    first_name: string
+    last_name: string
+    mobile: string | null
+    email: string | null
+    gender?: string | null
+  }
+  relation?: string | null
+  payer_client_id?: number | null
+  starts_on?: string | null
+  override?: string[]
+  override_reason?: string | null
+  waitlist_entry_id?: number | null
+}
+
+export interface AcademyEnrollResult {
+  enrollment: AcademyEnrollment
+  invoices: AcademyInvoiceBrief[]
+  booked: number
+  skipped: { session_id: number; date: string; reasons: { code: string; message: string }[] }[]
+}
+
+export type AcademyFeeModel = 'none' | 'term' | 'instalments' | 'monthly'
+
+/** How a program runs its academy (US-10.09/10/13/15). */
+export interface AcademyProgramSettings {
+  fee: {
+    model: AcademyFeeModel
+    amount: number
+    instalments: number
+    registration_fee: number
+    kit_fee: number
+    mid_term: 'pro_rata' | 'full'
+  }
+  penalties: boolean
+  trial: { enabled: boolean; price: number; max_per_child: number }
+  pause: {
+    enabled: boolean
+    min_days: number
+    max_days: number
+    max_per_term: number
+    keeps_place: boolean
+  }
+  refund: 'none' | 'pro_rata' | 'manual'
+}
+
+export interface AcademyOrganizationSettings {
+  sibling_discount_percent: number
+  waitlist_offer_hours: number
+  notify_absence: boolean
+}
+
+export interface AcademyWaitlistEntry {
+  id: number
+  status: 'Waiting' | 'Offered' | 'Enrolled' | 'Declined' | 'Expired' | 'Removed'
+  position: number
+  rank: number | null
+  note: string | null
+  client: { id: number; name: string; age: number | null; gender: string | null } | null
+  payer: { id: number; name: string } | null
+  offered_at: string | null
+  offer_expires_at: string | null
+  responded_at: string | null
+  enrollment_id: number | null
+  created_at: string | null
+}
+
+export interface AcademyTrial {
+  id: number
+  client: { id: number; name: string; age: number | null } | null
+  payer: { id: number; name: string } | null
+  booking_id: number
+  booking_status: string | null
+  session: { id: number; starts_at: string } | null
+  invoice: { id: number; number: string; status: string; total: number } | null
+  coach_note: string | null
+  suggested_level: Named | null
+  suggested_group: Named | null
+  noted_by: string | null
+  noted_at: string | null
+  follow_up_sent_at: string | null
+  created_at: string | null
+}
+
+/** One date of a group's schedule preview (US-10.06). */
+export interface AcademySchedulePreviewDate {
+  date: string
+  start: string
+  end: string
+  starts_at: string
+  conflicts: SessionConflictItem[]
+  excluded: { date: string; reason: string | null; source: 'term' | 'closure' } | null
+}
+
+export interface AcademySchedulePattern {
+  weekdays: number[]
+  start_time: string
+  duration: number
+  starts_on?: string | null
+  ends_on?: string | null
+  facility_id?: number | null
+}
+
+export interface AcademyReenrollment {
+  term: Named & { program_id: number; enrollment_opens_on: string; copied_from_id: number | null }
+  groups: {
+    id: number
+    display_name: string | null
+    capacity: number
+    accepted: number
+    pending: number
+    declined: number
+    expired: number
+    enrolled: number
+    free: number
+  }[]
+  offers: {
+    id: number
+    status: 'Pending' | 'Accepted' | 'Declined' | 'Expired'
+    priority_until: string
+    responded_at: string | null
+    client: { id: number; name: string; age: number | null } | null
+    payer: { id: number; name: string } | null
+    current_group: Named | null
+    suggested_group: Named | null
+    new_group: Named | null
+  }[]
 }
 
 export interface AcademyGroupInput {
@@ -528,6 +796,10 @@ export interface AcademyGroupInput {
   status?: AcademyGroupStatus
   head_coach_id?: number | null
   assistant_ids?: number[]
+  allow_drop_in?: boolean
+  waitlist_enabled?: boolean
+  accepts_trials?: boolean
+  fee?: number | null
 }
 
 export interface AcademyGroupOptions {
@@ -2366,6 +2638,10 @@ export interface Roster {
     client: { id: number; name: string; member_id: string | null; photo_url: string | null } | null
     status: string
     mark: 'present' | 'late' | 'absent' | 'excused' | null
+    /** An absence reported in advance (US-10.16). */
+    excuse_reason: string | null
+    /** Booked through an academy enrollment. */
+    enrolled: boolean
     alerts: { first_visit: boolean; health_note: boolean; waiver_missing: boolean }
     checked_in: { at: string; by: string | null; override: boolean } | null
   }[]
@@ -3555,6 +3831,15 @@ export const tenantApi = {
     async markAll(sessionId: number): Promise<Roster> {
       return (await http.post(`/api/sessions/${sessionId}/roster/mark-all`)).data.data
     },
+    /** Reports an absence before the training, or withdraws the report (US-10.16). */
+    async excuse(
+      sessionId: number,
+      bookingId: number,
+      input: { excused: boolean; reason?: string | null },
+    ): Promise<Roster> {
+      return (await http.post(`/api/sessions/${sessionId}/roster/${bookingId}/excuse`, input)).data
+        .data
+    },
     async walkIn(
       sessionId: number,
       input: { client_id: number; entitlement_source: string; entitlement_id?: number | null },
@@ -4149,6 +4434,196 @@ export const tenantApi = {
         service_id?: number | null
       }): Promise<AcademyGroupOptions> {
         return (await http.get('/api/academy/group-options', { params })).data.data
+      },
+      async roster(id: number): Promise<AcademyEnrollment[]> {
+        return (await http.get(`/api/academy/groups/${id}/roster`)).data.data
+      },
+      async eligibility(
+        id: number,
+        params: { client_id: number; starts_on?: string | null; waitlist_entry_id?: number | null },
+      ): Promise<AcademyEligibility> {
+        return (await http.get(`/api/academy/groups/${id}/eligibility`, { params })).data.data
+      },
+      async enroll(id: number, input: AcademyEnrollInput): Promise<AcademyEnrollResult> {
+        return (await http.post(`/api/academy/groups/${id}/enrollments`, input)).data.data
+      },
+      async previewSchedule(
+        id: number,
+        input: AcademySchedulePattern,
+      ): Promise<AcademySchedulePreviewDate[]> {
+        return (await http.post(`/api/academy/groups/${id}/schedule/preview`, input)).data.data
+      },
+      async createSchedule(
+        id: number,
+        input: AcademySchedulePattern & { skip_dates: string[]; confirm_warnings?: boolean },
+      ): Promise<{ id: number; trainings: number; skipped: number }> {
+        return (await http.post(`/api/academy/groups/${id}/schedule`, input)).data.data
+      },
+      async addTraining(
+        id: number,
+        input: {
+          date: string
+          start_time: string
+          duration: number
+          facility_id?: number | null
+          confirm_warnings?: boolean
+        },
+      ): Promise<{ id: number; starts_at: string }> {
+        return (await http.post(`/api/academy/groups/${id}/trainings`, input)).data.data
+      },
+      async waitlist(id: number): Promise<AcademyWaitlistEntry[]> {
+        return (await http.get(`/api/academy/groups/${id}/waitlist`)).data.data
+      },
+      async joinWaitlist(
+        id: number,
+        input: { client_id: number; payer_client_id?: number | null; note?: string | null },
+      ): Promise<AcademyWaitlistEntry> {
+        return (await http.post(`/api/academy/groups/${id}/waitlist`, input)).data.data
+      },
+      async trials(id: number): Promise<AcademyTrial[]> {
+        return (await http.get(`/api/academy/groups/${id}/trials`)).data.data
+      },
+      async bookTrial(
+        id: number,
+        input: {
+          client_id: number
+          session_id: number
+          payer_client_id?: number | null
+          override?: string[]
+          override_reason?: string | null
+        },
+      ): Promise<AcademyTrial> {
+        return (await http.post(`/api/academy/groups/${id}/trials`, input)).data.data
+      },
+    },
+    enrollments: {
+      async get(id: number): Promise<AcademyEnrollmentDetails> {
+        return (await http.get(`/api/academy/enrollments/${id}`)).data.data
+      },
+      async pause(
+        id: number,
+        input: { starts_on: string; ends_on: string; reason?: string | null },
+      ): Promise<{ id: number }> {
+        return (await http.post(`/api/academy/enrollments/${id}/pause`, input)).data.data
+      },
+      async endPause(pauseId: number): Promise<void> {
+        await http.post(`/api/academy/enrollment-pauses/${pauseId}/end`)
+      },
+      async withdraw(
+        id: number,
+        input: { from?: string | null; reason: string; note?: string | null },
+      ): Promise<{
+        enrollment: AcademyEnrollment
+        cancelled: number
+        refund: {
+          policy: string
+          credited: number
+          voided: string[]
+          invoices: { id: number; number: string; status: string }[]
+        }
+      }> {
+        return (await http.post(`/api/academy/enrollments/${id}/withdraw`, input)).data.data
+      },
+      async transfer(
+        id: number,
+        input: {
+          group_id: number
+          effective_on?: string | null
+          override?: string[]
+          reason?: string | null
+          confirm_age?: boolean
+          recommendation_id?: number | null
+        },
+      ): Promise<{
+        to: AcademyEnrollment
+        cancelled: number
+        booked: number
+        fee: { charged: number; credited: number; invoice_id: number | null }
+      }> {
+        return (await http.post(`/api/academy/enrollments/${id}/transfer`, input)).data.data
+      },
+      async recommend(
+        id: number,
+        input: { to_group_id?: number | null; to_level_id?: number | null; note?: string | null },
+      ): Promise<AcademyRecommendation> {
+        return (await http.post(`/api/academy/enrollments/${id}/recommendations`, input)).data.data
+      },
+    },
+    recommendations: {
+      async list(
+        status: AcademyRecommendation['status'] = 'Pending',
+      ): Promise<AcademyRecommendation[]> {
+        return (await http.get('/api/academy/recommendations', { params: { status } })).data.data
+      },
+      async reject(id: number, note?: string | null): Promise<AcademyRecommendation> {
+        return (await http.post(`/api/academy/recommendations/${id}/reject`, { note })).data.data
+      },
+    },
+    waitlist: {
+      async rank(id: number, input: { rank: number; reason: string }): Promise<void> {
+        await http.put(`/api/academy/waitlist/${id}/rank`, input)
+      },
+      async close(
+        id: number,
+        input: { status: 'Declined' | 'Removed'; note?: string | null },
+      ): Promise<AcademyWaitlistEntry> {
+        return (await http.post(`/api/academy/waitlist/${id}/close`, input)).data.data
+      },
+    },
+    trials: {
+      async note(
+        id: number,
+        input: {
+          coach_note: string | null
+          suggested_level_id: number | null
+          suggested_group_id: number | null
+          send_follow_up: boolean
+        },
+      ): Promise<AcademyTrial> {
+        return (await http.put(`/api/academy/trials/${id}`, input)).data.data
+      },
+    },
+    reenrollment: {
+      async get(termId: number): Promise<AcademyReenrollment> {
+        return (await http.get(`/api/academy-terms/${termId}/reenrollment`)).data.data
+      },
+      async send(
+        termId: number,
+        input: {
+          from_term_id?: number | null
+          priority_until: string
+          suggest: 'same' | 'next_level'
+        },
+      ): Promise<{ offered: number; skipped: number }> {
+        return (await http.post(`/api/academy-terms/${termId}/reenrollment`, input)).data.data
+      },
+      async respond(
+        offerId: number,
+        input: {
+          answer: 'accept' | 'decline'
+          group_id?: number | null
+          override?: string[]
+          override_reason?: string | null
+        },
+      ): Promise<{ id: number; status: string; new_enrollment_id: number | null }> {
+        return (await http.put(`/api/academy/reenrollment-offers/${offerId}`, input)).data.data
+      },
+    },
+    settings: {
+      async get(): Promise<AcademyOrganizationSettings> {
+        return (await http.get('/api/academy/settings')).data.data
+      },
+      async update(input: AcademyOrganizationSettings): Promise<AcademyOrganizationSettings> {
+        return (await http.put('/api/academy/settings', input)).data.data
+      },
+      async program(programId: number): Promise<AcademyProgramSettings> {
+        return (await http.get(`/api/programs/${programId}/academy-settings`)).data.data
+      },
+      async updateProgram(
+        programId: number,
+        input: AcademyProgramSettings,
+      ): Promise<AcademyProgramSettings> {
+        return (await http.put(`/api/programs/${programId}/academy-settings`, input)).data.data
       },
     },
   },

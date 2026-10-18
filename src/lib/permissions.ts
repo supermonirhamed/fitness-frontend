@@ -57,6 +57,12 @@ export const SETTINGS_PAGES: SettingsPage[] = [
     permission: 'settings.view',
   },
   {
+    name: 'tenant.settings.academy',
+    key: 'academy',
+    icon: 'pi-sitemap',
+    permission: 'settings.view',
+  },
+  {
     name: 'tenant.settings.security',
     key: 'security',
     icon: 'pi-shield',

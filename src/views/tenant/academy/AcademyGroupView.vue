@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // A group's page (US-10.04): who it is for (program, level, age group, term, branch, facility,
-// places), its coaches (US-10.05), and tabs for the roster, the training schedule, the attendance
-// summary and the activity log. Players enroll with US-10.08; coach notes and announcements come
-// with their own stories.
+// places), its coaches (US-10.05), and tabs for the roster (enroll, pause, withdraw, transfer —
+// US-10.08–10.13), the training schedule (US-10.06), the waiting list (US-10.11), trials
+// (US-10.15), the attendance summary and the activity log. Coach notes and announcements come with
+// their own stories.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
@@ -14,17 +16,27 @@ import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import Tag from 'primevue/tag'
+import Message from 'primevue/message'
+import AddTrainingDialog from '@/components/academy/AddTrainingDialog.vue'
+import EnrollmentDrawer from '@/components/academy/EnrollmentDrawer.vue'
+import EnrollPlayerDrawer from '@/components/academy/EnrollPlayerDrawer.vue'
 import GroupCoachesDialog from '@/components/academy/GroupCoachesDialog.vue'
 import GroupFormDrawer from '@/components/academy/GroupFormDrawer.vue'
+import GroupRosterPanel from '@/components/academy/GroupRosterPanel.vue'
+import GroupScheduleDrawer from '@/components/academy/GroupScheduleDrawer.vue'
+import GroupTrialsPanel from '@/components/academy/GroupTrialsPanel.vue'
+import GroupWaitlistPanel from '@/components/academy/GroupWaitlistPanel.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import {
   tenantApi,
+  type AcademyEnrollResult,
   type AcademyGroup,
   type AcademyGroupDetails,
   type AcademyTraining,
+  type AcademyWaitlistEntry,
   type Program,
 } from '@/api/tenant'
 import { showDay } from '@/lib/academy'
@@ -38,7 +50,9 @@ const { t, te } = useI18n()
 const toast = useToast()
 const format = useFormat()
 const auth = useStaffAuth()
+const route = useRoute()
 const canUpdate = computed(() => auth.can('academy.update'))
+const canEnroll = computed(() => auth.can('academy.enroll'))
 
 const state = ref<'loading' | 'ready' | 'error' | 'missing'>('loading')
 const group = ref<AcademyGroupDetails | null>(null)
@@ -50,8 +64,13 @@ async function load() {
     state.value = statusOf(e) === 404 ? 'missing' : 'error'
   }
 }
-onMounted(load)
-const tab = ref('roster')
+onMounted(async () => {
+  await load()
+  // From the recommendations list: open that player's enrollment.
+  const id = Number(route.query.enrollment)
+  if (id) openEnrollment(id)
+})
+const tab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'roster')
 
 const head = computed(() => group.value?.coaches?.find((c) => c.role === 'head'))
 const assistants = computed(() => group.value?.coaches?.filter((c) => c.role === 'assistant') ?? [])
@@ -82,6 +101,54 @@ function onSaved(saved: AcademyGroup) {
   })
   load()
 }
+// Players (US-10.08–10.13).
+const enrollOpen = ref(false)
+const fromWaitlist = ref<{ entryId: number; client: { id: number; name: string } } | null>(null)
+const lastResult = ref<AcademyEnrollResult | null>(null)
+function enroll(entry: AcademyWaitlistEntry | null = null) {
+  fromWaitlist.value = entry?.client
+    ? { entryId: entry.id, client: { id: entry.client.id, name: entry.client.name } }
+    : null
+  enrollOpen.value = true
+}
+function onEnrolled(result: AcademyEnrollResult) {
+  lastResult.value = result
+  toast.add({
+    severity: 'success',
+    summary: t('academy.enroll.done', { name: result.enrollment.client?.name, n: result.booked }),
+    life: 4000,
+  })
+  waitlistPanel.value?.load()
+  load()
+}
+const dueInvoices = computed(() =>
+  (lastResult.value?.invoices ?? []).filter(
+    (i) => i.status === 'Due' || i.status === 'PartiallyPaid',
+  ),
+)
+const enrollmentId = ref<number | null>(null)
+const enrollmentOpen = ref(false)
+function openEnrollment(id: number) {
+  enrollmentId.value = id
+  enrollmentOpen.value = true
+}
+const waitlistPanel = ref<InstanceType<typeof GroupWaitlistPanel> | null>(null)
+function toWaitlist() {
+  enrollOpen.value = false
+  tab.value = 'waitlist'
+}
+// Schedule (US-10.06).
+const scheduleOpen = ref(false)
+const addOpen = ref(false)
+function onScheduled(n: number) {
+  toast.add({ severity: 'success', summary: t('academy.schedule.created', { n }), life: 4000 })
+  load()
+}
+function onTrainingAdded() {
+  toast.add({ severity: 'success', summary: t('academy.schedule.added'), life: 3000 })
+  load()
+}
+
 const coachesOpen = ref(false)
 function onCoaches(_: AcademyGroup, updated: number) {
   toast.add({
@@ -139,8 +206,16 @@ function onCoaches(_: AcademyGroup, updated: number) {
           <span>{{ group.location?.name }}</span>
           <span v-if="group.term">{{ group.term.display_name }}</span>
         </template>
-        <template v-if="canUpdate" #primary>
-          <Button :label="t('common.edit')" icon="pi pi-pencil" @click="edit" />
+        <template v-if="canEnroll && group.status !== 'Archived'" #primary>
+          <Button :label="t('academy.enroll.title')" icon="pi pi-user-plus" @click="enroll()" />
+        </template>
+        <template v-if="canUpdate" #actions>
+          <Button
+            :label="t('common.edit')"
+            icon="pi pi-pencil"
+            severity="secondary"
+            @click="edit"
+          />
         </template>
       </PageHeader>
 
@@ -164,9 +239,15 @@ function onCoaches(_: AcademyGroup, updated: number) {
           <span class="facts__label">{{ t('academy.groups.facility') }}</span>
           <span>{{ group.facility?.name ?? '—' }}</span>
           <span class="facts__label">{{ t('academy.groups.columns.places') }}</span>
-          <span
-            ><span dir="ltr">{{ group.enrolled }} / {{ group.capacity }}</span></span
-          >
+          <span>
+            <span dir="ltr">{{ group.enrolled }} / {{ group.capacity }}</span>
+            <span v-if="group.held" class="muted small">
+              · {{ t('academy.groups.heldPlaces', { n: group.held }) }}</span
+            >
+            <span v-if="group.waiting" class="muted small">
+              · {{ t('academy.groups.waiting', { n: group.waiting }) }}</span
+            >
+          </span>
           <span class="facts__label">{{ t('catalog.genderLabel') }}</span>
           <span>{{ t(`catalog.gender.${group.gender}`) }}</span>
         </div>
@@ -200,20 +281,59 @@ function onCoaches(_: AcademyGroup, updated: number) {
         <TabList>
           <Tab value="roster">{{ t('academy.groups.tabs.roster') }}</Tab>
           <Tab value="schedule">{{ t('academy.groups.tabs.schedule') }}</Tab>
+          <Tab value="waitlist"
+            >{{ t('academy.groups.tabs.waitlist')
+            }}<span v-if="group.waiting" class="count">{{ group.waiting }}</span></Tab
+          >
+          <Tab value="trials">{{ t('academy.groups.tabs.trials') }}</Tab>
           <Tab value="attendance">{{ t('academy.groups.tabs.attendance') }}</Tab>
           <Tab value="activity">{{ t('academy.groups.tabs.activity') }}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="roster">
-            <EmptyState
-              class="card"
-              compact
-              icon="pi-users"
-              :title="t('academy.groups.noPlayers')"
-              :body="t('academy.groups.noPlayersHint')"
+            <Message v-if="dueInvoices.length" severity="info" :closable="false" class="due">
+              {{ t('academy.enroll.invoicesDue', { n: dueInvoices.length }) }}
+              <RouterLink
+                v-if="auth.can('payments.create')"
+                :to="{
+                  name: 'tenant.client',
+                  params: { id: dueInvoices[0]?.client_id ?? 0 },
+                  query: { tab: 'payments' },
+                }"
+                >{{ t('academy.roster.takePayment') }}</RouterLink
+              >
+            </Message>
+            <Message
+              v-if="group.pending_recommendations && canEnroll"
+              severity="warn"
+              :closable="false"
+              class="due"
+            >
+              {{ t('academy.transfer.pending', { n: group.pending_recommendations }) }}
+            </Message>
+            <GroupRosterPanel
+              :roster="group.roster"
+              :can-enroll="canEnroll && group.status !== 'Archived'"
+              @open="openEnrollment"
+              @enroll="enroll()"
             />
           </TabPanel>
           <TabPanel value="schedule">
+            <div v-if="canUpdate && group.status !== 'Archived'" class="schedule-actions">
+              <Button
+                :label="t('academy.schedule.title')"
+                icon="pi pi-calendar"
+                size="small"
+                @click="scheduleOpen = true"
+              />
+              <Button
+                :label="t('academy.schedule.addTitle')"
+                icon="pi pi-calendar-plus"
+                size="small"
+                severity="secondary"
+                @click="addOpen = true"
+              />
+            </div>
             <EmptyState
               v-if="!group.upcoming.length && !group.recent.length"
               class="card"
@@ -246,6 +366,17 @@ function onCoaches(_: AcademyGroup, updated: number) {
                 <StatusTag :status="s.status" size="sm" />
               </RouterLink>
             </div>
+          </TabPanel>
+          <TabPanel value="waitlist">
+            <GroupWaitlistPanel
+              ref="waitlistPanel"
+              :group="group"
+              @enroll="enroll"
+              @changed="load"
+            />
+          </TabPanel>
+          <TabPanel value="trials">
+            <GroupTrialsPanel :group="group" @changed="load" />
           </TabPanel>
           <TabPanel value="attendance">
             <div class="tiles">
@@ -308,6 +439,33 @@ function onCoaches(_: AcademyGroup, updated: number) {
       v-model:visible="coachesOpen"
       :group="group"
       @saved="onCoaches"
+    />
+    <EnrollPlayerDrawer
+      v-if="group"
+      v-model:visible="enrollOpen"
+      :group="group"
+      :from-waitlist="fromWaitlist"
+      @saved="onEnrolled"
+      @waitlist="toWaitlist"
+    />
+    <EnrollmentDrawer
+      v-if="group"
+      v-model:visible="enrollmentOpen"
+      :enrollment-id="enrollmentId"
+      :group="group"
+      @changed="load"
+    />
+    <GroupScheduleDrawer
+      v-if="group"
+      v-model:visible="scheduleOpen"
+      :group="group"
+      @saved="onScheduled"
+    />
+    <AddTrainingDialog
+      v-if="group"
+      v-model:visible="addOpen"
+      :group="group"
+      @saved="onTrainingAdded"
     />
   </div>
 </template>
@@ -425,6 +583,23 @@ function onCoaches(_: AcademyGroup, updated: number) {
 }
 .num {
   font-variant-numeric: tabular-nums;
+}
+.due {
+  margin-bottom: 12px;
+}
+.schedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.count {
+  margin-inline-start: 6px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--primary-50);
+  color: var(--primary-700);
+  font-size: 0.75rem;
 }
 @media (max-width: 760px) {
   .cards {
