@@ -14,7 +14,7 @@ import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
-import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormDrawer from '@/components/patterns/FormDrawer.vue'
 import FormField from '@/components/patterns/FormField.vue'
 import TranslatedField from '@/components/patterns/TranslatedField.vue'
 import {
@@ -292,10 +292,9 @@ const termOptions = computed(() => [
       </li>
     </ul>
 
-    <FormDialog
+    <FormDrawer
       v-model:visible="open"
       :title="editing ? t('academy.ageGroups.editTitle') : t('academy.ageGroups.newTitle')"
-      icon="pi-users"
       :saving="saving"
       :error="formError"
       @save="save"
@@ -370,7 +369,7 @@ const termOptions = computed(() => [
           />
         </FormField>
       </div>
-    </FormDialog>
+    </FormDrawer>
   </section>
 </template>
 

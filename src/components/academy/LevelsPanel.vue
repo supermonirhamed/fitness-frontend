@@ -9,7 +9,7 @@ import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
-import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormDrawer from '@/components/patterns/FormDrawer.vue'
 import TranslatedField from '@/components/patterns/TranslatedField.vue'
 import { tenantApi, type ProgramLevel, type Translated } from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
@@ -214,10 +214,9 @@ async function remove(level: ProgramLevel) {
       </li>
     </ol>
 
-    <FormDialog
+    <FormDrawer
       v-model:visible="open"
       :title="editing ? t('academy.levels.editTitle') : t('academy.levels.newTitle')"
-      icon="pi-sort-amount-up"
       :saving="saving"
       :error="formError"
       @save="save"
@@ -244,7 +243,7 @@ async function remove(level: ProgramLevel) {
         multiline
         :maxlength="1000"
       />
-    </FormDialog>
+    </FormDrawer>
   </section>
 </template>
 

@@ -11,7 +11,7 @@ import MultiSelect from 'primevue/multiselect'
 import SelectButton from 'primevue/selectbutton'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
-import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormDrawer from '@/components/patterns/FormDrawer.vue'
 import FormField from '@/components/patterns/FormField.vue'
 import { tenantApi, type StaffInput, type StaffMember } from '@/api/tenant'
 import { apiMessage } from '@/lib/apiErrors'
@@ -129,10 +129,9 @@ async function save() {
 </script>
 
 <template>
-  <FormDialog
+  <FormDrawer
     v-model:visible="visible"
     :title="member ? t('staffForm.editTitle', { name: member.name }) : t('staffForm.newTitle')"
-    icon="pi-user-plus"
     size="lg"
     :save-label="
       member
@@ -301,7 +300,7 @@ async function save() {
         <span>{{ t('staffForm.showOnApp') }}</span>
       </label>
     </fieldset>
-  </FormDialog>
+  </FormDrawer>
 </template>
 
 <style scoped>

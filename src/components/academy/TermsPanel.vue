@@ -11,7 +11,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import EmptyState from '@/components/patterns/EmptyState.vue'
-import FormDialog from '@/components/patterns/FormDialog.vue'
+import FormDrawer from '@/components/patterns/FormDrawer.vue'
 import FormField from '@/components/patterns/FormField.vue'
 import TranslatedField from '@/components/patterns/TranslatedField.vue'
 import { tenantApi, type AcademyTerm, type ExcludedDate, type Translated } from '@/api/tenant'
@@ -218,10 +218,9 @@ async function archive(term: AcademyTerm) {
       </li>
     </ul>
 
-    <FormDialog
+    <FormDrawer
       v-model:visible="open"
       :title="title"
-      icon="pi-calendar"
       size="lg"
       :saving="saving"
       :error="formError"
@@ -317,7 +316,7 @@ async function archive(term: AcademyTerm) {
           {{ b.dates.map((d) => `${day(d.date)}${d.reason ? ` (${d.reason})` : ''}`).join('، ') }}
         </div>
       </div>
-    </FormDialog>
+    </FormDrawer>
   </section>
 </template>
 

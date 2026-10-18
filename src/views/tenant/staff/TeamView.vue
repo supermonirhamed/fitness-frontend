@@ -16,7 +16,7 @@ import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
-import StaffFormDialog from '@/components/staff/StaffFormDialog.vue'
+import StaffFormDrawer from '@/components/staff/StaffFormDrawer.vue'
 import { tenantApi, type Service, type StaffMember } from '@/api/tenant'
 import { statusOf } from '@/lib/http'
 import { useFormat } from '@/composables/useFormat'
@@ -252,7 +252,7 @@ const open = (m: StaffMember) => router.push({ name: 'tenant.staff.member', para
       </Column>
     </DataTable>
 
-    <StaffFormDialog v-model:visible="formOpen" :member="null" :roles="roles" @saved="onSaved" />
+    <StaffFormDrawer v-model:visible="formOpen" :member="null" :roles="roles" @saved="onSaved" />
   </section>
 </template>
 

@@ -27,7 +27,7 @@ import FormDialog from '@/components/patterns/FormDialog.vue'
 import FormField from '@/components/patterns/FormField.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import AvailabilityPanel from '@/components/staff/AvailabilityPanel.vue'
-import StaffFormDialog from '@/components/staff/StaffFormDialog.vue'
+import StaffFormDrawer from '@/components/staff/StaffFormDrawer.vue'
 import {
   tenantApi,
   type PayRate,
@@ -513,7 +513,7 @@ const rateScope = (r: PayRate) =>
       </TabPanels>
     </Tabs>
 
-    <StaffFormDialog v-model:visible="editing" :member="member" :roles="roles" @saved="load" />
+    <StaffFormDrawer v-model:visible="editing" :member="member" :roles="roles" @saved="load" />
     <FormDialog
       v-model:visible="rateOpen"
       :title="rateId ? t('payRates.edit') : t('payRates.add')"
