@@ -30,7 +30,14 @@ async function verify() {
   try {
     app.adopt(await clientApi.auth.verify(channel.value, code.value))
     toast.add({ severity: 'success', summary: t('app.verify.done'), life: 3000 })
-    await router.replace({ name: 'app.home' })
+    // Waivers to sign come first after sign-up (US-11.21).
+    const family = await clientApi.waivers.family().catch(() => [])
+    const pending = family.some((f) =>
+      f.waivers.some((w) => w.state !== 'signed' && w.required_for !== 'services'),
+    )
+    await router.replace(
+      pending ? { name: 'app.waivers', query: { welcome: '1' } } : { name: 'app.home' },
+    )
   } catch (e) {
     error.value = firstMessage(e) ?? t('common.genericError')
   } finally {

@@ -4,17 +4,21 @@
 // child's next training for parents, and for new clients the intro offers and "Explore classes".
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import ProgressBar from 'primevue/progressbar'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import MemberQrDialog from '@/components/app/MemberQrDialog.vue'
+import QrScanDialog from '@/components/checkin/QrScanDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import { clientApi, type AppBooking, type AppHome } from '@/api/clientApp'
 import { useFormat } from '@/composables/useFormat'
 import { showDay } from '@/lib/academy'
+import { firstMessage } from '@/lib/apiErrors'
 import { useClientApp } from '@/stores/clientApp'
 
 const { t } = useI18n()
@@ -23,6 +27,15 @@ const app = useClientApp()
 const home = ref<AppHome | null>(null)
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const qrOpen = ref(false)
+const router = useRouter()
+const toast = useToast()
+// Scanning the branch's check-in QR opens its check-in page (US-11.23).
+const scanning = ref(false)
+function onScanned(code: string) {
+  const token = /\/app\/check-in\/([A-Za-z0-9]{40})/.exec(code)?.[1]
+  if (token) router.push({ name: 'app.checkin', params: { token } })
+  else toast.add({ severity: 'warn', summary: t('app.checkIn.notBranchCode'), life: 4000 })
+}
 const day = (ymd: string) => showDay(format, ymd)
 const isNew = computed(
   () => !!home.value && !home.value.next_booking && !home.value.entitlements.length,
@@ -35,6 +48,30 @@ const hasAlerts = computed(
       home.value.alerts.waivers.length > 0),
 )
 const when = (b: AppBooking) => `${day(b.session.date)} · ${b.session.time}`
+
+// Academy offers (US-11.26): a place from the waiting list, or next term.
+const answering = ref<string | null>(null)
+async function answer(kind: 'w' | 'r', id: number, accept: boolean) {
+  answering.value = `${kind}-${id}`
+  try {
+    if (kind === 'w') await clientApi.academy.answerWaitlistOffer(id, accept)
+    else await clientApi.academy.answerReenrollment(id, accept)
+    toast.add({
+      severity: 'success',
+      summary: accept ? t('app.academy.accepted') : t('app.academy.declined'),
+      life: 3000,
+    })
+    await load()
+  } catch (e) {
+    toast.add({
+      severity: 'error',
+      summary: firstMessage(e) ?? t('common.genericError'),
+      life: 4000,
+    })
+  } finally {
+    answering.value = null
+  }
+}
 
 async function load() {
   state.value = 'loading'
@@ -50,7 +87,27 @@ onMounted(load)
 
 <template>
   <div class="ca-stack">
-    <h1 class="ca-title">{{ t('app.home.hello', { name: app.firstName }) }}</h1>
+    <div class="ca-spread">
+      <h1 class="ca-title">{{ t('app.home.hello', { name: app.firstName }) }}</h1>
+      <span class="ca-row">
+        <Button
+          icon="pi pi-camera"
+          variant="text"
+          rounded
+          :aria-label="t('app.checkIn.scan')"
+          v-tooltip.bottom="t('app.checkIn.scan')"
+          @click="scanning = true"
+        />
+        <Button
+          icon="pi pi-qrcode"
+          variant="outlined"
+          rounded
+          :aria-label="t('app.qr.title')"
+          v-tooltip.bottom="t('app.qr.title')"
+          @click="qrOpen = true"
+        />
+      </span>
+    </div>
     <template v-if="state === 'loading'">
       <div class="ca-card"><Skeleton height="96px" /></div>
       <div class="ca-card"><Skeleton height="64px" /></div>
@@ -108,12 +165,88 @@ onMounted(load)
         >
         <Message
           v-for="w in home.alerts.waivers"
-          :key="`w-${w.id}`"
+          :key="`w-${w.id}-${w.client_id}`"
           severity="info"
           :closable="false"
           icon="pi pi-file-edit"
-          >{{ t('app.home.waiver', { name: w.name }) }}</Message
+          ><span class="ca-spread grow"
+            >{{
+              w.for
+                ? t('app.home.waiverFor', { name: w.name, child: w.for })
+                : t('app.home.waiver', { name: w.name })
+            }}
+            <RouterLink
+              :to="{
+                name: 'app.waiver',
+                params: { id: w.id },
+                query: w.for ? { client_id: w.client_id } : {},
+              }"
+              class="ca-small"
+              >{{ t('app.waivers.sign') }}</RouterLink
+            ></span
+          ></Message
         >
+      </section>
+
+      <section
+        v-if="home.academy_offers.waitlist.length || home.academy_offers.reenrollment.length"
+        class="ca-card"
+      >
+        <h2 class="ca-subtitle">{{ t('app.academy.offers') }}</h2>
+        <ul class="ca-list">
+          <li v-for="o in home.academy_offers.waitlist" :key="`w-${o.id}`" class="offer">
+            <span
+              >{{ t('app.academy.waitlistOffer', { name: o.client.first_name, group: o.group }) }}
+              <span class="ca-muted ca-small block">{{
+                t('app.academy.until', { date: format.dateTime(o.expires_at) })
+              }}</span></span
+            >
+            <span class="ca-row">
+              <Button
+                :label="t('app.academy.accept')"
+                size="small"
+                :loading="answering === `w-${o.id}`"
+                @click="answer('w', o.id, true)"
+              />
+              <Button
+                :label="t('app.academy.decline')"
+                size="small"
+                variant="text"
+                severity="secondary"
+                @click="answer('w', o.id, false)"
+              />
+            </span>
+          </li>
+          <li v-for="o in home.academy_offers.reenrollment" :key="`r-${o.id}`" class="offer">
+            <span
+              >{{
+                t('app.academy.reenrollOffer', {
+                  name: o.client.first_name,
+                  group: o.group,
+                  term: o.term,
+                })
+              }}
+              <span class="ca-muted ca-small block">{{
+                t('app.academy.until', { date: day(o.deadline) })
+              }}</span></span
+            >
+            <span class="ca-row">
+              <Button
+                :label="t('app.academy.accept')"
+                size="small"
+                :loading="answering === `r-${o.id}`"
+                @click="answer('r', o.id, true)"
+              />
+              <Button
+                :label="t('app.academy.decline')"
+                size="small"
+                variant="text"
+                severity="secondary"
+                @click="answer('r', o.id, false)"
+              />
+            </span>
+          </li>
+        </ul>
       </section>
 
       <section v-if="home.entitlements.length" class="ca-card">
@@ -151,7 +284,9 @@ onMounted(load)
         <h2 class="ca-subtitle">{{ t('app.home.children') }}</h2>
         <ul class="ca-list">
           <li v-for="c in home.children" :key="c.id" class="child">
-            <strong>{{ c.first_name }}</strong>
+            <RouterLink :to="{ name: 'app.child', params: { id: c.id } }"
+              ><strong>{{ c.first_name }}</strong></RouterLink
+            >
             <span v-if="c.next_booking" class="ca-small"
               >{{ c.next_booking.session.service }} · {{ when(c.next_booking) }}</span
             >
@@ -208,18 +343,8 @@ onMounted(load)
       </RouterLink>
     </template>
 
-    <Dialog
-      v-model:visible="qrOpen"
-      modal
-      :header="t('app.home.checkIn')"
-      :style="{ width: 'min(92vw, 360px)' }"
-    >
-      <div class="qr">
-        <img :src="clientApi.qrUrl()" :alt="t('app.home.qrAlt')" />
-        <p class="ca-muted ca-small">{{ t('app.home.qrHint') }}</p>
-        <p class="ca-num">{{ home?.client.member_id }}</p>
-      </div>
-    </Dialog>
+    <MemberQrDialog v-model:visible="qrOpen" :member-id="home?.client.member_id" />
+    <QrScanDialog v-model:visible="scanning" @scanned="onScanned" />
   </div>
 </template>
 
@@ -263,15 +388,16 @@ onMounted(load)
 .offers li {
   padding: 10px 0;
 }
-.qr {
+.grow {
+  flex: 1;
+}
+.offer {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  text-align: center;
+  gap: 6px;
+  padding: 10px 0;
 }
-.qr img {
-  width: 240px;
-  height: 240px;
+.block {
+  display: block;
 }
 </style>

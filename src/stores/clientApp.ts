@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { clientApi, type ClientAccount, type ClientAppConfig } from '@/api/clientApp'
+import {
+  clientApi,
+  type ClientAccount,
+  type ClientAppConfig,
+  type FamilyChild,
+} from '@/api/clientApp'
 import { statusOf } from '@/lib/http'
 import { applyBrandColor } from '@/lib/brand'
 import { hasSavedLocale, setLocale } from '@/i18n'
@@ -15,6 +20,14 @@ export const useClientApp = defineStore('clientApp', () => {
   const checked = ref(false)
   /** Unread inbox messages (US-11.20), for the badge. */
   const unread = ref(0)
+  // The parent's children, for "for whom" in booking and buying (US-11.25).
+  const children = ref<FamilyChild[] | null>(null)
+  async function loadChildren(refresh = false): Promise<FamilyChild[]> {
+    if (!account.value?.is_guardian) return (children.value = [])
+    if (children.value === null || refresh)
+      children.value = await clientApi.family.list().catch(() => [])
+    return children.value
+  }
   async function refreshUnread() {
     if (!account.value?.verified) return
     unread.value = await clientApi.inbox.unread().catch(() => unread.value)
@@ -62,6 +75,7 @@ export const useClientApp = defineStore('clientApp', () => {
 
   function forget() {
     account.value = null
+    children.value = null
     checked.value = true
   }
 
@@ -74,6 +88,8 @@ export const useClientApp = defineStore('clientApp', () => {
     firstName,
     unread,
     refreshUnread,
+    children,
+    loadChildren,
     loadConfig,
     check,
     adopt,

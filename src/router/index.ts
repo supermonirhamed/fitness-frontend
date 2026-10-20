@@ -412,6 +412,13 @@ const tenantRoutes: RouteRecordRaw[] = [
             meta: { permission: 'settings.view' },
           },
           {
+            // Notifications (EP-12): sender, SMS sender ID, the types and their channels.
+            path: 'notifications',
+            name: 'tenant.settings.notifications',
+            component: () => import('@/views/tenant/settings/NotificationSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
             path: 'security',
             name: 'tenant.settings.security',
             component: () => import('@/views/tenant/settings/SecuritySettingsView.vue'),
@@ -584,11 +591,90 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { tab: 'app.account' },
       },
       {
+        path: 'academy/enroll',
+        name: 'app.academy.enroll',
+        component: () => import('@/views/app/AppAcademyEnrollView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'family',
+        name: 'app.family',
+        component: () => import('@/views/app/AppFamilyView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'family/new',
+        name: 'app.child.new',
+        component: () => import('@/views/app/AppChildFormView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'family/:id(\\d+)',
+        name: 'app.child',
+        component: () => import('@/views/app/AppChildView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'family/:id(\\d+)/academy',
+        name: 'app.child.academy',
+        component: () => import('@/views/app/AppChildAcademyView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'family/:id(\\d+)/edit',
+        name: 'app.child.edit',
+        component: () => import('@/views/app/AppChildFormView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'coaches',
+        name: 'app.coaches',
+        component: () => import('@/views/app/AppCoachesView.vue'),
+        meta: { tab: 'app.schedule' },
+      },
+      {
+        path: 'coaches/:id(\\d+)',
+        name: 'app.coach',
+        component: () => import('@/views/app/AppCoachView.vue'),
+        meta: { tab: 'app.schedule' },
+      },
+      {
+        path: 'check-in/:token([A-Za-z0-9]{40})',
+        name: 'app.checkin',
+        component: () => import('@/views/app/AppCheckInView.vue'),
+        meta: { tab: 'app.home' },
+      },
+      {
+        path: 'attendance',
+        name: 'app.attendance',
+        component: () => import('@/views/app/AppAttendanceView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'waivers',
+        name: 'app.waivers',
+        component: () => import('@/views/app/AppWaiversView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
+        path: 'waivers/:id(\\d+)',
+        name: 'app.waiver',
+        component: () => import('@/views/app/AppWaiverSignView.vue'),
+        meta: { tab: 'app.account' },
+      },
+      {
         path: 'inbox',
         name: 'app.inbox',
         component: () => import('@/views/app/AppInboxView.vue'),
       },
     ],
+  },
+  // A child's term progress report for their parent to print or save as PDF (US-11.27).
+  {
+    path: '/app/print/family/:id(\\d+)/report',
+    name: 'app.print.report',
+    component: () => import('@/views/tenant/academy/ProgressReportPrintView.vue'),
+    meta: { clientApp: true, clientDocument: true },
   },
   // A client's invoice or receipt to print or save as PDF (US-11.14), outside the app shell.
   {

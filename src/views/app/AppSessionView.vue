@@ -4,7 +4,7 @@
 // engine's answer — book (with a membership or package, free, or paid at the desk), join the
 // waitlist, see what to buy, or the reasons it can't be booked, in plain words. One confirmation
 // books; the confirmation screen adds it to the calendar.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { AxiosError } from 'axios'
@@ -13,6 +13,7 @@ import Message from 'primevue/message'
 import RadioButton from 'primevue/radiobutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import ForWhom from '@/components/app/ForWhom.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormDialog from '@/components/patterns/FormDialog.vue'
 import { clientApi, type AppSessionDetails, type BookingResult } from '@/api/clientApp'
@@ -31,6 +32,8 @@ const choice = ref<string | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
 const booked = ref<BookingResult | null>(null)
+// Booking for a child (US-11.25): eligibility and payment are the child's.
+const forWhom = ref<number | null>(route.query.client_id ? Number(route.query.client_id) : null)
 const waitlisted = ref<number | null>(null)
 
 const action = computed(() => session.value?.eligibility.action ?? 'unavailable')
@@ -95,13 +98,19 @@ const policyLine = computed(() => {
 async function load() {
   state.value = 'loading'
   try {
-    session.value = await clientApi.session(id)
+    session.value = await clientApi.session(id, forWhom.value)
     state.value = 'ready'
   } catch {
     state.value = 'error'
   }
 }
 onMounted(load)
+watch(forWhom, () => {
+  booked.value = null
+  waitlisted.value = null
+  error.value = null
+  load()
+})
 
 function main() {
   error.value = null
@@ -118,6 +127,7 @@ async function book() {
     booked.value = await clientApi.book(id, {
       entitlement_source: source || null,
       entitlement_id: entitlementId ? Number(entitlementId) : null,
+      client_id: forWhom.value,
     })
     confirmOpen.value = false
   } catch (e) {
@@ -135,7 +145,7 @@ async function book() {
 async function joinWaitlist() {
   busy.value = true
   try {
-    waitlisted.value = (await clientApi.joinWaitlist(id)).position
+    waitlisted.value = (await clientApi.joinWaitlist(id, forWhom.value)).position
     await load()
   } catch (e) {
     error.value = firstMessage(e) ?? t('common.genericError')
@@ -192,7 +202,10 @@ async function joinWaitlist() {
           {{ t('app.schedule.minutes', { n: session.duration }) }}
         </p>
         <p v-if="session.coach">
-          <i class="pi pi-user" aria-hidden="true" /> {{ session.coach.name }}
+          <i class="pi pi-user" aria-hidden="true" />
+          <RouterLink :to="{ name: 'app.coach', params: { id: session.coach.id } }">{{
+            session.coach.name
+          }}</RouterLink>
         </p>
         <p>
           <i class="pi pi-map-marker" aria-hidden="true" />
@@ -255,9 +268,18 @@ async function joinWaitlist() {
         severity="secondary"
         :closable="false"
         icon="pi pi-info-circle"
-        >{{ r.message }}</Message
+        ><span class="ca-spread"
+          >{{ r.message }}
+          <RouterLink
+            v-if="r.code === 'waiver_missing'"
+            :to="{ name: 'app.waivers', query: { redirect: route.fullPath } }"
+            class="ca-small"
+            >{{ t('app.waivers.signNow') }}</RouterLink
+          ></span
+        ></Message
       >
 
+      <ForWhom v-model="forWhom" />
       <div class="cta">
         <Button
           v-if="action !== 'buy'"

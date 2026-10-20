@@ -15,6 +15,7 @@ import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import BookTabs from '@/components/app/BookTabs.vue'
+import ForWhom from '@/components/app/ForWhom.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormField from '@/components/patterns/FormField.vue'
@@ -36,6 +37,8 @@ const days = computed(() =>
   Array.from({ length: catalog.value?.days_ahead ?? 14 }, (_, i) => addDays(today, i)),
 )
 const date = ref(today)
+// Browsing for a child shows what they can book (US-11.25).
+const forWhom = ref<number | null>(Number(route.query.client_id) || null)
 const filters = ref<ScheduleFilters>({
   service_id: Number(route.query.service_id) || null,
   location_id: null,
@@ -80,7 +83,7 @@ const price = (s: AppSession) =>
 async function load() {
   state.value = 'loading'
   try {
-    sessions.value = await clientApi.day(date.value, filters.value)
+    sessions.value = await clientApi.day(date.value, { ...filters.value, client_id: forWhom.value })
     state.value = 'ready'
   } catch {
     state.value = 'error'
@@ -90,7 +93,7 @@ onMounted(async () => {
   catalog.value = await clientApi.catalog().catch(() => null)
   load()
 })
-watch(date, load)
+watch([date, forWhom], load)
 let search: ReturnType<typeof setTimeout> | undefined
 watch(
   () => filters.value.q,
@@ -125,6 +128,7 @@ const options = (items: { id: number; name: string | null }[] | undefined) =>
       />
     </div>
     <BookTabs />
+    <ForWhom v-model="forWhom" />
     <IconField>
       <InputIcon class="pi pi-search" />
       <InputText v-model="filters.q" :placeholder="t('app.schedule.search')" fluid />
@@ -160,7 +164,14 @@ const options = (items: { id: number; name: string | null }[] | undefined) =>
     </div>
     <ul v-else class="ca-stack sessions">
       <li v-for="s in sessions" :key="s.id">
-        <RouterLink :to="{ name: 'app.session', params: { id: s.id } }" class="session ca-card">
+        <RouterLink
+          :to="{
+            name: 'app.session',
+            params: { id: s.id },
+            query: forWhom ? { client_id: forWhom } : {},
+          }"
+          class="session ca-card"
+        >
           <span class="stripe" :style="{ background: s.service.color ?? 'var(--primary)' }" />
           <div class="time">
             <strong class="ca-num">{{ s.time }}</strong>

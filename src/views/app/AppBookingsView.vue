@@ -12,6 +12,7 @@ import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import MemberQrDialog from '@/components/app/MemberQrDialog.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormDialog from '@/components/patterns/FormDialog.vue'
@@ -38,6 +39,7 @@ const children = ref<{ id: number; first_name: string }[]>([])
 const bookings = ref<MyBooking[]>([])
 const waitlist = ref<MyWaitlistEntry[]>([])
 const state = ref<'loading' | 'ready' | 'error'>('loading')
+const qrOpen = ref(false)
 const day = (ymd: string) => showDay(format, ymd)
 const people = computed(() => [
   { value: null, label: t('app.bookings.me') },
@@ -250,6 +252,14 @@ const sourceLabel = (b: MyBooking) =>
               size="small"
               @click="askMove(b)"
             />
+            <Button
+              v-if="who === null && b.status === 'Confirmed'"
+              icon="pi pi-qrcode"
+              :label="t('app.qr.title')"
+              variant="text"
+              size="small"
+              @click="qrOpen = true"
+            />
             <a :href="clientApi.calendarUrl(b.id)" class="ca-small">{{
               t('app.session.addToCalendar')
             }}</a>
@@ -259,6 +269,7 @@ const sourceLabel = (b: MyBooking) =>
       </ul>
     </template>
 
+    <MemberQrDialog v-model:visible="qrOpen" />
     <FormDialog
       :visible="!!cancelling"
       :title="t('app.bookings.cancelTitle')"

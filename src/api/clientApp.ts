@@ -1,5 +1,11 @@
 import { http } from '@/lib/http'
-import type { InvoiceDocument, Receipt, Translated } from '@/api/tenant'
+import type {
+  AcademyProfile,
+  InvoiceDocument,
+  ProgressReport,
+  Receipt,
+  Translated,
+} from '@/api/tenant'
 
 // The client app's API (EP-11): /api/app/* on the organization's subdomain, with the client's own
 // cookie session (separate from staff sign-in).
@@ -123,11 +129,18 @@ export interface AppHome {
   alerts: {
     expiring: { id: number; name: string; ends_on: string }[]
     balance: { owed: number; overdue: number; oldest_due_on: string | null } | null
-    waivers: { id: number; name: string; state: 'missing' | 'resign' }[]
+    waivers: {
+      id: number
+      name: string
+      state: 'missing' | 'resign'
+      client_id: number
+      for: string | null
+    }[]
   }
   book_again: { service_id: number; name: string | null; location_id: number }[]
   children: { id: number; first_name: string; next_booking: AppBooking | null }[]
   offers: { id: number; name: string; kind: string; price: number | null }[]
+  academy_offers: AcademyOffers
 }
 
 export interface AppCatalog {
@@ -227,6 +240,7 @@ export type ScheduleFilters = {
   time_of_day?: 'morning' | 'afternoon' | 'evening' | null
   level?: string | null
   q?: string | null
+  client_id?: number | null
 }
 
 export interface MyBooking {
@@ -452,6 +466,221 @@ export interface InboxItem {
   at: string | null
 }
 
+/** A waiver as the app lists it (US-11.21). */
+export interface AppWaiver {
+  template_id: number
+  name: string
+  required_for: 'all' | 'services' | 'minors'
+  services: string[]
+  version: number | null
+  state: 'signed' | 'missing' | 'resign'
+  signed: {
+    id: number
+    version: number
+    signer_name: string
+    on_behalf: boolean
+    method: 'typed' | 'drawn'
+    signed_at: string
+    in_app: boolean
+  } | null
+}
+
+export interface FamilyWaivers {
+  client: { id: number; first_name: string; self: boolean; minor: boolean }
+  waivers: AppWaiver[]
+}
+
+export interface WaiverToSign {
+  template_id: number
+  name: Translated
+  version: number | null
+  content: Translated | null
+  client: { id: number; name: string; minor: boolean }
+  on_behalf: boolean
+}
+
+/** A client's attendance in a period (US-11.22). */
+export interface AppAttendance {
+  from: string
+  to: string
+  visits: {
+    type: 'session' | 'open_access'
+    id: number
+    date: string
+    time: string
+    title: string | null
+    location: string | null
+    coach: string | null
+    status: 'attended' | 'late' | 'no_show' | 'excused' | 'late_cancel'
+    method: string | null
+  }[]
+  summary: {
+    attended: number
+    no_show: number
+    excused: number
+    late_cancel: number
+    rate: number | null
+  }
+  streak: { current_weeks: number; best_weeks: number }
+}
+
+/** One minute of the client's rotating check-in code (US-11.23). */
+export interface CheckInCode {
+  code: string
+  valid_from: string
+  valid_until: string
+  svg: string
+}
+
+/** What scanning a branch's check-in QR offers (US-11.23). */
+export interface BranchCheckIn {
+  location: { id: number; name: string }
+  bookings: {
+    id: number
+    client: { id: number; first_name: string | null; self: boolean }
+    session: { id: number; service: string; time: string; facility: string | null }
+    checked_in: boolean
+    can_check_in: boolean
+    denials: { code: string; message: string }[]
+  }[]
+}
+
+/** A coach as clients see them (US-11.24). */
+export interface AppCoach {
+  id: number
+  name: string
+  specialties: string[]
+  photo_url: string | null
+}
+
+export interface AppCoachProfile extends AppCoach {
+  bio: string | null
+  certifications: string[]
+  sessions: (SessionBrief & { duration: number })[]
+  appointments: { id: number; name: string | null }[]
+}
+
+/** A parent's child (US-11.25). */
+export interface FamilyChild {
+  id: number
+  first_name: string
+  last_name: string
+  member_id: string | null
+  date_of_birth: string | null
+  age: number | null
+  gender: 'female' | 'male' | null
+  relation: 'mother' | 'father' | 'guardian' | 'other'
+  permissions: Record<
+    'can_book' | 'can_pay' | 'can_view_performance' | 'receives_notifications',
+    boolean
+  >
+  photo_url: string | null
+  has_health_notes: boolean
+}
+
+export interface FamilyChildProfile extends FamilyChild {
+  bookings: { bookings: MyBooking[]; waitlist: MyWaitlistEntry[] }
+  enrollments: {
+    id: number
+    status: string
+    program: string | null
+    group: string | null
+    term: string | null
+  }[]
+  attendance: { attended: number; no_shows: number; rate: number | null }
+  payments: MyInvoice[] | null
+}
+
+export interface ChildInput {
+  first_name: string
+  last_name: string
+  date_of_birth: string | null
+  gender: 'female' | 'male' | null
+}
+
+/** Params for a request made for a child; nothing for the client themselves. */
+function forWhom(clientId?: number | null): { client_id?: number } {
+  return clientId ? { client_id: clientId } : {}
+}
+
+/** Academy enrollment in the app (US-11.26). */
+export interface AppProgram {
+  id: number
+  name: string | null
+  description: Translated | null
+  age_min: number | null
+  age_max: number | null
+  gender: string
+  trials: boolean
+}
+
+export interface AppAcademyFees {
+  model: 'none' | 'term' | 'instalments' | 'monthly'
+  lines: { kind: string; description: string; amount: number; discount: number; due_on: string }[]
+  total: number
+  instalments: number
+  fraction: number
+  sibling_discount_percent: number
+}
+
+export interface AppAcademyGroup {
+  id: number
+  name: string | null
+  level: string | null
+  age_group: string | null
+  gender: string
+  location: string | null
+  coach: string | null
+  term: { name: string | null; starts_on: string; ends_on: string | null } | null
+  schedule: { weekdays: number[]; start_time: string; minutes: number }[]
+  places_left: number
+  suitable: boolean
+  reasons: { check: string; code: string; message: string }[]
+  waivers_missing: boolean
+  waitlist: boolean
+  trial_sessions: { id: number; starts_at: string; date: string; time: string }[]
+  fees: AppAcademyFees | null
+}
+
+export interface AcademyOffers {
+  waitlist: {
+    id: number
+    client: { id: number; first_name: string | null }
+    program: string | null
+    group: string | null
+    expires_at: string
+  }[]
+  reenrollment: {
+    id: number
+    client: { id: number; first_name: string | null }
+    term: string | null
+    group: string | null
+    deadline: string
+  }[]
+}
+
+export interface AcademyEnrolled {
+  enrollment: { id: number; status: string; starts_on: string }
+  invoices: MyInvoice[]
+  booked: number
+}
+
+/** A child's academy page for their parent (US-11.27): the staff profile, as guardians see it. */
+export type ChildAcademy = Omit<AcademyProfile, 'upcoming'> & {
+  child: { id: number; first_name: string }
+  upcoming: {
+    booking_id: number
+    session_id: number
+    starts_at: string
+    group: string | null
+    location: string | null
+    excused: boolean
+    excuse_reason: string | null
+  }[]
+  announcements: { id: number; title: string; body: string; author: string | null; at: string }[]
+  report_terms: { id: number; name: string | null }[]
+}
+
 export const clientApi = {
   async config(): Promise<ClientAppConfig> {
     return (await http.get('/api/app/config')).data.data
@@ -573,17 +802,25 @@ export const clientApi = {
     )
     return (await http.get('/api/app/sessions', { params })).data.data
   },
-  async session(id: number): Promise<AppSessionDetails> {
-    return (await http.get(`/api/app/sessions/${id}`)).data.data
+  /** `clientId`: a child the parent books for (US-11.25). */
+  async session(id: number, clientId?: number | null): Promise<AppSessionDetails> {
+    return (await http.get(`/api/app/sessions/${id}`, { params: forWhom(clientId) })).data.data
   },
   async book(
     id: number,
-    input: { entitlement_source?: string | null; entitlement_id?: number | null },
+    input: {
+      entitlement_source?: string | null
+      entitlement_id?: number | null
+      client_id?: number | null
+    },
   ): Promise<BookingResult> {
     return (await http.post(`/api/app/sessions/${id}/book`, input)).data.data
   },
-  async joinWaitlist(id: number): Promise<{ id: number; position: number | null }> {
-    return (await http.post(`/api/app/sessions/${id}/waitlist`, {})).data.data
+  async joinWaitlist(
+    id: number,
+    clientId?: number | null,
+  ): Promise<{ id: number; position: number | null }> {
+    return (await http.post(`/api/app/sessions/${id}/waitlist`, forWhom(clientId))).data.data
   },
   bookings: {
     async list(
@@ -612,6 +849,10 @@ export const clientApi = {
         .data
     },
   },
+  /** Reporting an academy training absence ahead (US-11.27); `false` withdraws it. */
+  async excuse(bookingId: number, excused: boolean, reason: string | null): Promise<void> {
+    await http.post(`/api/app/bookings/${bookingId}/excuse`, { excused, reason })
+  },
   waitlist: {
     async leave(id: number): Promise<void> {
       await http.post(`/api/app/waitlist/${id}/leave`)
@@ -637,6 +878,7 @@ export const clientApi = {
       location_id: number
       starts_at: string
       coach_id?: number | null
+      client_id?: number | null
     }): Promise<BookingResult> {
       return (await http.post('/api/app/appointments', input)).data.data
     },
@@ -645,22 +887,23 @@ export const clientApi = {
     async list(): Promise<AppEvent[]> {
       return (await http.get('/api/app/events')).data.data
     },
-    async get(id: number): Promise<AppEvent> {
-      return (await http.get(`/api/app/events/${id}`)).data.data
+    async get(id: number, clientId?: number | null): Promise<AppEvent> {
+      return (await http.get(`/api/app/events/${id}`, { params: forWhom(clientId) })).data.data
     },
     async register(
       id: number,
+      clientId?: number | null,
     ): Promise<{ id: number; invoice_id: number | null; event: AppEvent }> {
-      return (await http.post(`/api/app/events/${id}/register`)).data.data
+      return (await http.post(`/api/app/events/${id}/register`, forWhom(clientId))).data.data
     },
   },
   shop: {
-    async list(): Promise<ShopProduct[]> {
-      return (await http.get('/api/app/shop')).data.data
+    async list(clientId?: number | null): Promise<ShopProduct[]> {
+      return (await http.get('/api/app/shop', { params: forWhom(clientId) })).data.data
     },
     async quote(
       planId: number,
-      input: { location_id: number; coupon?: string | null },
+      input: { location_id: number; coupon?: string | null; client_id?: number | null },
     ): Promise<ShopQuote> {
       return (await http.post(`/api/app/shop/${planId}/quote`, input)).data.data
     },
@@ -671,6 +914,7 @@ export const clientApi = {
         coupon?: string | null
         starts_on?: string | null
         accept_terms: boolean
+        client_id?: number | null
       },
     ): Promise<{
       entitlement: MyEntitlement
@@ -735,6 +979,131 @@ export const clientApi = {
     },
     async revoke(): Promise<void> {
       await http.delete('/api/app/calendar-feed')
+    },
+  },
+  academy: {
+    async programs(): Promise<AppProgram[]> {
+      return (await http.get('/api/app/academy/programs')).data.data
+    },
+    async groups(programId: number, clientId: number | null): Promise<AppAcademyGroup[]> {
+      return (
+        await http.get(`/api/app/academy/programs/${programId}/groups`, {
+          params: forWhom(clientId),
+        })
+      ).data.data
+    },
+    async enroll(groupId: number, clientId: number | null): Promise<AcademyEnrolled> {
+      return (await http.post(`/api/app/academy/groups/${groupId}/enroll`, forWhom(clientId))).data
+        .data
+    },
+    async joinWaitlist(
+      groupId: number,
+      clientId: number | null,
+    ): Promise<{ id: number; position: number }> {
+      return (await http.post(`/api/app/academy/groups/${groupId}/waitlist`, forWhom(clientId)))
+        .data.data
+    },
+    async trial(groupId: number, clientId: number | null, sessionId: number): Promise<void> {
+      await http.post(`/api/app/academy/groups/${groupId}/trial`, {
+        ...forWhom(clientId),
+        session_id: sessionId,
+      })
+    },
+    async answerWaitlistOffer(id: number, accept: boolean): Promise<AcademyEnrolled | null> {
+      return (await http.post(`/api/app/academy/waitlist-offers/${id}`, { accept })).data.data
+    },
+    async answerReenrollment(id: number, accept: boolean): Promise<void> {
+      await http.post(`/api/app/academy/reenrollment-offers/${id}`, { accept })
+    },
+  },
+  family: {
+    async list(): Promise<FamilyChild[]> {
+      return (await http.get('/api/app/family')).data.data
+    },
+    async add(
+      input: ChildInput & { relation: string; health_notes: string | null },
+    ): Promise<FamilyChildProfile> {
+      return (await http.post('/api/app/family', input)).data.data
+    },
+    async get(id: number): Promise<FamilyChildProfile> {
+      return (await http.get(`/api/app/family/${id}`)).data.data
+    },
+    async update(id: number, input: ChildInput): Promise<FamilyChildProfile> {
+      return (await http.put(`/api/app/family/${id}`, input)).data.data
+    },
+    async healthNotes(id: number, notes: string | null): Promise<void> {
+      await http.put(`/api/app/family/${id}/health-notes`, { health_notes: notes })
+    },
+    async academy(id: number): Promise<ChildAcademy> {
+      return (await http.get(`/api/app/family/${id}/academy`)).data.data
+    },
+    async report(id: number, termId?: number | null): Promise<ProgressReport> {
+      return (
+        await http.get(`/api/app/family/${id}/academy/report`, {
+          params: termId ? { term_id: termId } : {},
+        })
+      ).data.data
+    },
+    async uploadPhoto(id: number, file: File): Promise<FamilyChildProfile> {
+      const form = new FormData()
+      form.append('photo', file)
+      return (await http.post(`/api/app/family/${id}/photo`, form)).data.data
+    },
+  },
+  coaches: {
+    async list(): Promise<AppCoach[]> {
+      return (await http.get('/api/app/coaches')).data.data
+    },
+    async get(id: number): Promise<AppCoachProfile> {
+      return (await http.get(`/api/app/coaches/${id}`)).data.data
+    },
+  },
+  checkIn: {
+    async codes(): Promise<CheckInCode[]> {
+      return (await http.get('/api/app/check-in/codes')).data.data
+    },
+    async branch(token: string): Promise<BranchCheckIn> {
+      return (await http.get(`/api/app/check-in/${token}`)).data.data
+    },
+    async checkIn(token: string, bookingId: number): Promise<BranchCheckIn> {
+      return (await http.post(`/api/app/check-in/${token}`, { booking_id: bookingId })).data.data
+    },
+  },
+  async attendance(params: {
+    from: string
+    to: string
+    client_id?: number | null
+  }): Promise<AppAttendance> {
+    return (
+      await http.get('/api/app/attendance', {
+        params: { ...params, client_id: params.client_id ?? undefined },
+      })
+    ).data.data
+  },
+  waivers: {
+    async family(): Promise<FamilyWaivers[]> {
+      return (await http.get('/api/app/waivers')).data.data
+    },
+    async get(id: number, clientId?: number | null): Promise<WaiverToSign> {
+      return (
+        await http.get(`/api/app/waivers/${id}`, { params: { client_id: clientId ?? undefined } })
+      ).data.data
+    },
+    async sign(
+      id: number,
+      clientId: number | null,
+      input: {
+        signer_name: string
+        method: 'typed' | 'drawn'
+        signature: string | null
+        accepted: boolean
+      },
+    ): Promise<AppWaiver['signed']> {
+      return (
+        await http.post(`/api/app/waivers/${id}/sign`, input, {
+          params: { client_id: clientId ?? undefined },
+        })
+      ).data.data
     },
   },
   async invoice(id: number): Promise<InvoiceDocument> {

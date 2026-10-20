@@ -2,12 +2,13 @@
 // An event's details and registration (US-11.12): every session and its time, the total price,
 // seats left; one registration covers all its sessions. Payment follows US-11.13: without a
 // gateway the invoice is paid at the desk.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Skeleton from 'primevue/skeleton'
+import ForWhom from '@/components/app/ForWhom.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormDialog from '@/components/patterns/FormDialog.vue'
 import { clientApi, type AppEvent } from '@/api/clientApp'
@@ -24,6 +25,8 @@ const confirming = ref(false)
 const busy = ref(false)
 const error = ref<string | null>(null)
 const justRegistered = ref(false)
+// Registering a child (US-11.25).
+const forWhom = ref<number | null>(null)
 const description = computed(() => {
   const d = event.value?.description
   return d ? (locale.value === 'ar' ? d.ar || d.en : d.en || d.ar) : null
@@ -32,19 +35,23 @@ const description = computed(() => {
 async function load() {
   state.value = 'loading'
   try {
-    event.value = await clientApi.events.get(Number(route.params.id))
+    event.value = await clientApi.events.get(Number(route.params.id), forWhom.value)
     state.value = 'ready'
   } catch {
     state.value = 'error'
   }
 }
 onMounted(load)
+watch(forWhom, () => {
+  justRegistered.value = false
+  load()
+})
 
 async function register() {
   busy.value = true
   error.value = null
   try {
-    event.value = (await clientApi.events.register(event.value!.id)).event
+    event.value = (await clientApi.events.register(event.value!.id, forWhom.value)).event
     justRegistered.value = true
     confirming.value = false
   } catch (e) {
@@ -81,6 +88,7 @@ async function register() {
           : t('app.events.done')
       }}</Message>
       <Message v-if="error" severity="warn" :closable="false">{{ error }}</Message>
+      <ForWhom v-model="forWhom" />
       <Button
         v-if="event.registered"
         :label="t('app.events.registered')"

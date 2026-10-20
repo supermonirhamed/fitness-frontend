@@ -12,6 +12,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
+import ForWhom from '@/components/app/ForWhom.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormField from '@/components/patterns/FormField.vue'
 import { clientApi, type ShopProduct, type ShopQuote } from '@/api/clientApp'
@@ -23,6 +24,8 @@ import { useClientApp } from '@/stores/clientApp'
 
 const { t } = useI18n()
 const route = useRoute()
+// Buying for a child (US-11.25): the child gets it, the parent is invoiced.
+const forWhom = ref<number | null>(route.query.client_id ? Number(route.query.client_id) : null)
 const format = useFormat()
 const app = useClientApp()
 const product = ref<ShopProduct | null>(null)
@@ -51,7 +54,8 @@ const canBuy = computed(
 onMounted(async () => {
   try {
     product.value =
-      (await clientApi.shop.list()).find((p) => p.id === Number(route.params.id)) ?? null
+      (await clientApi.shop.list(forWhom.value)).find((p) => p.id === Number(route.params.id)) ??
+      null
     if (!product.value) throw new Error('missing')
     const home = app.config?.locations.find((l) =>
       product.value!.prices.some((p) => p.location_id === l.id),
@@ -70,6 +74,7 @@ async function loadQuote() {
   couponError.value = null
   try {
     quote.value = await clientApi.shop.quote(product.value.id, {
+      client_id: forWhom.value,
       location_id: locationId.value,
       coupon: appliedCoupon.value,
     })
@@ -77,11 +82,11 @@ async function loadQuote() {
     couponError.value = firstMessage(e) ?? t('common.genericError')
     appliedCoupon.value = null
     quote.value = await clientApi.shop
-      .quote(product.value.id, { location_id: locationId.value })
+      .quote(product.value.id, { location_id: locationId.value, client_id: forWhom.value })
       .catch(() => null)
   }
 }
-watch(locationId, loadQuote)
+watch([locationId, forWhom], loadQuote)
 function applyCoupon() {
   appliedCoupon.value = coupon.value.trim() || null
   loadQuote()
@@ -93,6 +98,7 @@ async function buy() {
   error.value = null
   try {
     done.value = await clientApi.shop.buy(product.value.id, {
+      client_id: forWhom.value,
       location_id: locationId.value,
       coupon: appliedCoupon.value,
       starts_on: ymd(startsOn.value),
@@ -142,6 +148,7 @@ async function buy() {
         <p class="ca-small">{{ productSummary(t, product) }}</p>
       </div>
       <div class="ca-card ca-form">
+        <ForWhom v-model="forWhom" permission="can_pay" />
         <FormField
           v-if="product.prices.length > 1"
           :label="t('app.schedule.branch')"

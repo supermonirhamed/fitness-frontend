@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A child's progress report for a term (US-10.20) to print or save as PDF, A4, in Arabic or
 // English: attendance per group, the published evaluations, the coach's shared notes and the level
-// recommended for the next term. From MVP-4 guardians see the same report in their account.
+// recommended for the next term. Guardians open the same report from the app (US-11.27).
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -14,6 +14,7 @@ import {
   type EvaluationValue,
   type ProgressReport,
 } from '@/api/tenant'
+import { clientApi } from '@/api/clientApp'
 import { useFormat } from '@/composables/useFormat'
 import { showDay } from '@/lib/academy'
 import en from '@/i18n/en'
@@ -49,7 +50,10 @@ function value(c: EvaluationCriterion, scores: Record<string, EvaluationValue>) 
 async function load() {
   failed.value = false
   try {
-    report.value = await tenantApi.academy.profile.progressReport(clientId, termId.value)
+    // Parents open it from the app (US-11.27), staff from the child's profile.
+    report.value = route.meta.clientDocument
+      ? await clientApi.family.report(clientId, termId.value)
+      : await tenantApi.academy.profile.progressReport(clientId, termId.value)
     termId.value = report.value.term?.id ?? null
   } catch {
     failed.value = true

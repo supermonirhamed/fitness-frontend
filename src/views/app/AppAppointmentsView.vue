@@ -4,11 +4,13 @@
 // rules; a slot taken meanwhile says so and the list reloads.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
 import BookTabs from '@/components/app/BookTabs.vue'
+import ForWhom from '@/components/app/ForWhom.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormDialog from '@/components/patterns/FormDialog.vue'
@@ -27,6 +29,9 @@ import { useClientApp } from '@/stores/clientApp'
 const { t, locale } = useI18n()
 const format = useFormat()
 const app = useClientApp()
+const route = useRoute()
+// "Book with this trainer" from a coach's profile (US-11.24).
+const wantedCoach = route.query.coach_id ? Number(route.query.coach_id) : null
 const services = ref<AppointmentService[]>([])
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const serviceId = ref<number | null>(null)
@@ -42,6 +47,7 @@ const picked = ref<AppointmentDay['slots'][number] | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
 const booked = ref<BookingResult | null>(null)
+const forWhom = ref<number | null>(null)
 
 const service = computed(() => services.value.find((s) => s.id === serviceId.value) ?? null)
 const location = computed(
@@ -56,7 +62,9 @@ const weekday = (ymd: string) =>
 onMounted(async () => {
   try {
     services.value = await clientApi.appointments.services()
-    if (services.value.length === 1) serviceId.value = services.value[0]!.id
+    const wanted = Number(route.query.service_id)
+    if (services.value.some((x) => x.id === wanted)) serviceId.value = wanted
+    else if (services.value.length === 1) serviceId.value = services.value[0]!.id
     state.value = 'ready'
   } catch {
     state.value = 'error'
@@ -64,7 +72,7 @@ onMounted(async () => {
 })
 watch(serviceId, () => {
   locationId.value = service.value?.locations.length === 1 ? service.value.locations[0]!.id : null
-  coachId.value = null
+  coachId.value = service.value?.trainers.some((x) => x.id === wantedCoach) ? wantedCoach : null
 })
 async function loadSlots() {
   if (!serviceId.value || !locationId.value) return
@@ -96,6 +104,7 @@ async function book() {
       location_id: location.value.id,
       starts_at: picked.value.starts_at,
       coach_id: coachId.value ?? picked.value.coaches[0]?.id ?? null,
+      client_id: forWhom.value,
     })
     picked.value = null
   } catch (e) {
@@ -255,6 +264,7 @@ async function book() {
         }}
       </p>
       <p class="ca-muted ca-small">{{ location?.name }}</p>
+      <ForWhom v-model="forWhom" />
     </FormDialog>
   </div>
 </template>

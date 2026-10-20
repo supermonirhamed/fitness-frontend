@@ -847,16 +847,19 @@ export interface AcademyProfile {
       group: string | null
     }[]
   }
-  notes: {
-    id: number
-    category: AcademyNoteCategory
-    visibility: 'internal' | 'shared'
-    body: string
-    group: string | null
-    author: string | null
-    created_at: string | null
-    open_injury: boolean
-  }[]
+  /** null for a guardian without "can view performance" (US-11.27) */
+  notes:
+    | {
+        id: number
+        category: AcademyNoteCategory
+        visibility: 'internal' | 'shared'
+        body: string
+        group: string | null
+        author: string | null
+        created_at: string | null
+        open_injury: boolean
+      }[]
+    | null
   evaluations:
     | {
         id: number
@@ -1375,6 +1378,10 @@ export interface Client {
   name: string
   mobile: string | null
   email: string | null
+  /** The notification engine can't reach these until they are corrected (US-12.02/03). */
+  email_bounced?: boolean
+  email_bounce_reason?: string | null
+  mobile_invalid?: boolean
   address: string | null
   national_id: string | null
   contact_hidden: boolean
@@ -3203,6 +3210,20 @@ export interface ClientDeletionRequest {
   processed_at: string | null
 }
 
+/** Settings → Notifications (EP-12). */
+export interface NotificationSettings {
+  sms_sender_id: string | null
+  sms: { provider: string; platform_sender: string; sender_id_allowed: boolean }
+  email: { from_name: string | null; reply_to: string | null }
+  types: {
+    key: string
+    area: string
+    preference: string | null
+    enabled: boolean
+    channels: ('email' | 'sms' | 'push')[]
+  }[]
+}
+
 export const tenantApi = {
   async organization(): Promise<Organization> {
     return (await http.get('/api/organization')).data.data
@@ -3289,6 +3310,13 @@ export const tenantApi = {
     const form = new FormData()
     form.append('photo', file)
     return (await http.post(`/api/locations/${id}/photo`, form)).data.data
+  },
+  /** The branch's check-in QR for clients to scan with the app (US-11.23). */
+  async checkInQr(id: number): Promise<{ url: string; svg: string }> {
+    return (await http.get(`/api/locations/${id}/check-in-qr`)).data.data
+  },
+  async rotateCheckInQr(id: number): Promise<{ url: string; svg: string }> {
+    return (await http.post(`/api/locations/${id}/check-in-qr`)).data.data
   },
   async deleteLocationPhoto(id: number): Promise<void> {
     await http.delete(`/api/locations/${id}/photo`)
@@ -4001,6 +4029,14 @@ export const tenantApi = {
     },
   },
   /** Settings → Payments: same-day voids (US-07.06), manual discount limits per role (US-07.07). */
+  notificationSettings: {
+    async get(): Promise<NotificationSettings> {
+      return (await http.get('/api/settings/notifications')).data.data
+    },
+    async update(input: { sms_sender_id: string | null }): Promise<NotificationSettings> {
+      return (await http.put('/api/settings/notifications', input)).data.data
+    },
+  },
   paymentSettings: {
     async get(): Promise<PaymentSettings> {
       return (await http.get('/api/settings/payments')).data.data

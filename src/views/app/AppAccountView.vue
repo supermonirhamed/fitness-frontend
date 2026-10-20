@@ -10,7 +10,6 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import DatePicker from 'primevue/datepicker'
-import Dialog from 'primevue/dialog'
 import InputOtp from 'primevue/inputotp'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -20,6 +19,7 @@ import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
+import MemberQrDialog from '@/components/app/MemberQrDialog.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import FormDialog from '@/components/patterns/FormDialog.vue'
 import FormField from '@/components/patterns/FormField.vue'
@@ -324,6 +324,18 @@ onMounted(async () => {
           ><i class="pi pi-wallet" aria-hidden="true" />{{ t('app.payments.title')
           }}<i class="pi pi-angle-right pi-dir" aria-hidden="true"
         /></RouterLink>
+        <RouterLink :to="{ name: 'app.family' }"
+          ><i class="pi pi-users" aria-hidden="true" />{{ t('app.family.title')
+          }}<i class="pi pi-angle-right pi-dir" aria-hidden="true"
+        /></RouterLink>
+        <RouterLink :to="{ name: 'app.attendance' }"
+          ><i class="pi pi-chart-bar" aria-hidden="true" />{{ t('app.attendance.title')
+          }}<i class="pi pi-angle-right pi-dir" aria-hidden="true"
+        /></RouterLink>
+        <RouterLink :to="{ name: 'app.waivers' }"
+          ><i class="pi pi-file-edit" aria-hidden="true" />{{ t('app.waivers.title')
+          }}<i class="pi pi-angle-right pi-dir" aria-hidden="true"
+        /></RouterLink>
         <RouterLink v-if="app.config?.features.online_sales" :to="{ name: 'app.shop' }"
           ><i class="pi pi-shopping-bag" aria-hidden="true" />{{ t('app.shop.title')
           }}<i class="pi pi-angle-right pi-dir" aria-hidden="true"
@@ -613,17 +625,7 @@ onMounted(async () => {
       </section>
     </template>
 
-    <Dialog
-      v-model:visible="qrOpen"
-      modal
-      :header="t('app.home.checkIn')"
-      :style="{ width: 'min(92vw, 360px)' }"
-    >
-      <div class="qr">
-        <img :src="clientApi.qrUrl()" :alt="t('app.home.qrAlt')" />
-        <p class="ca-muted ca-small">{{ t('app.home.qrHint') }}</p>
-      </div>
-    </Dialog>
+    <MemberQrDialog v-model:visible="qrOpen" :member-id="profile?.client?.member_id" />
 
     <FormDialog
       v-model:visible="contact.open"

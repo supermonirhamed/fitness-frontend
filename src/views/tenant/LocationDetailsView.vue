@@ -25,6 +25,7 @@ import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusBanner from '@/components/patterns/StatusBanner.vue'
 import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
 import ZoneBadge from '@/components/patterns/ZoneBadge.vue'
+import CheckInQrDialog from '@/components/locations/CheckInQrDialog.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import BusinessHoursEditor from '@/components/locations/BusinessHoursEditor.vue'
@@ -129,10 +130,18 @@ const vatLine = computed(() => {
 const archiveOpen = ref(false)
 const archiving = ref(false)
 const archiveError = ref<string | null>(null)
+const qrOpen = ref(false)
 const moreItems = computed<MenuItem[]>(() => {
   const l = location.value
-  if (!l || !canChangeStatus.value) return []
+  if (!l) return []
+  const qr: MenuItem = {
+    label: t('checkInQr.title'),
+    icon: 'pi pi-qrcode',
+    command: () => (qrOpen.value = true),
+  }
+  if (!canChangeStatus.value) return [qr]
   return [
+    qr,
     l.status === 'Active'
       ? {
           label: t('deactivateLocation.action'),
@@ -374,6 +383,12 @@ async function refreshStats() {
           <Button icon="pi pi-pencil" :label="t('common.edit')" @click="formOpen = true" />
         </template>
       </PageHeader>
+      <CheckInQrDialog
+        v-model:visible="qrOpen"
+        :location-id="location.id"
+        :location-name="location.name"
+        :can-edit="canEdit"
+      />
 
       <StatusBanner
         v-if="location.status === 'Draft'"

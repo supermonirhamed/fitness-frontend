@@ -321,7 +321,19 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
           <div class="head__meta">
             <span class="mono">{{ client.member_id }}</span>
             <span v-if="client.mobile" dir="ltr">{{ client.mobile }}</span>
+            <Tag
+              v-if="client.mobile_invalid"
+              severity="warn"
+              :value="t('clients.mobileInvalid')"
+              v-tooltip.bottom="t('clients.mobileInvalidHint')"
+            />
             <span v-if="client.email" dir="ltr">{{ client.email }}</span>
+            <Tag
+              v-if="client.email_bounced"
+              severity="danger"
+              :value="t('clients.emailBounced')"
+              v-tooltip.bottom="client.email_bounce_reason ?? t('clients.emailBouncedHint')"
+            />
             <span v-if="client.home_location"
               ><i class="pi pi-map-marker" aria-hidden="true" />{{
                 client.home_location.name
