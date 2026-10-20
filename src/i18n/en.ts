@@ -170,7 +170,7 @@ export default {
     nav: {
       messages: 'Messages',
       academy: 'Academy',
-      attendance: 'Attendance',
+      attendance: 'Attendance rates',
       checkIn: 'Check-in',
       collections: 'Unpaid & overdue',
       transactions: 'Transactions',
@@ -187,6 +187,11 @@ export default {
       staff: 'Staff',
       branches: 'Branches & facilities',
       settings: 'Settings',
+      attendanceGroup: 'Attendance',
+      offerings: 'Services & programs',
+      finance: 'Finance',
+      marketing: 'Marketing',
+      organization: 'Organization',
     },
   },
   today: {

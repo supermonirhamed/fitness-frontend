@@ -172,7 +172,7 @@ const ar: typeof en = {
     nav: {
       messages: 'الرسائل',
       academy: 'الأكاديمية',
-      attendance: 'الحضور',
+      attendance: 'نسب الحضور',
       checkIn: 'تسجيل الحضور',
       collections: 'المستحقات والمتأخرات',
       transactions: 'المعاملات',
@@ -189,6 +189,11 @@ const ar: typeof en = {
       staff: 'الموظفون',
       branches: 'الفروع والمرافق',
       settings: 'الإعدادات',
+      attendanceGroup: 'الحضور',
+      offerings: 'الخدمات والبرامج',
+      finance: 'المالية',
+      marketing: 'التسويق',
+      organization: 'المنظمة',
     },
   },
   today: {

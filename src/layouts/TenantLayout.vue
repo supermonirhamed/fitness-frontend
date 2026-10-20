@@ -18,8 +18,13 @@ const auth = useStaffAuth()
 const router = useRouter()
 const { theme, toggle: toggleTheme } = useTheme()
 
-// The design's sidebar order (shell/Sidebar.jsx NAV_ITEMS). Calendar, Bookings, Clients and
-// Check-in are added as their stories ship. Items are filtered by permission (US-00.07).
+// The design's sidebar order (shell/Sidebar.jsx NAV_ITEMS), with related pages grouped.
+// Items are filtered by permission (US-00.07); a group shows only the pages the user can open,
+// and a group left with one page shows that page on its own.
+function group(key: string, icon: string, children: NavItem[]): NavItem[] {
+  if (children.length > 1) return [{ key, icon, children }]
+  return children
+}
 const nav = computed<NavItem[]>(() => [
   { key: 'today', icon: 'pi-sun', to: '/', exact: true },
   ...(auth.can('schedule.view') ? [{ key: 'calendar', icon: 'pi-calendar', to: '/calendar' }] : []),
@@ -29,35 +34,47 @@ const nav = computed<NavItem[]>(() => [
     : []),
   ...(auth.can('bookings.view') ? [{ key: 'bookings', icon: 'pi-bookmark', to: '/bookings' }] : []),
   ...(auth.can('clients.view') ? [{ key: 'clients', icon: 'pi-users', to: '/clients' }] : []),
-  ...(auth.can('attendance.create')
-    ? [{ key: 'checkIn', icon: 'pi-qrcode', to: '/check-in' }]
-    : []),
-  ...(auth.can('attendance.view')
-    ? [{ key: 'attendance', icon: 'pi-chart-line', to: '/attendance' }]
-    : []),
-  ...(auth.can('services.view') ? [{ key: 'services', icon: 'pi-th-large', to: '/services' }] : []),
-  ...(auth.can('academy.view') ? [{ key: 'academy', icon: 'pi-sitemap', to: '/academy' }] : []),
-  ...(auth.can('memberships.view')
-    ? [{ key: 'memberships', icon: 'pi-id-card', to: '/memberships' }]
-    : []),
-  ...(auth.can('payments.create') ? [{ key: 'pos', icon: 'pi-shopping-cart', to: '/pos' }] : []),
-  ...(auth.can('payments.view') ? [{ key: 'invoices', icon: 'pi-file', to: '/invoices' }] : []),
-  ...(auth.can('payments.view')
-    ? [{ key: 'collections', icon: 'pi-exclamation-circle', to: '/collections' }]
-    : []),
-  ...(auth.can('payments.view')
-    ? [{ key: 'transactions', icon: 'pi-arrow-right-arrow-left', to: '/transactions' }]
-    : []),
-  ...(auth.can('messages.send') ? [{ key: 'messages', icon: 'pi-send', to: '/messages' }] : []),
-  ...(auth.can('marketing.view')
-    ? [{ key: 'promotions', icon: 'pi-percentage', to: '/promotions' }]
-    : []),
-  ...(allowedPages(STAFF_PAGES, (p) => auth.can(p)).length
-    ? [{ key: 'staff', icon: 'pi-id-card', to: '/staff' }]
-    : []),
-  ...(auth.can('locations.view')
-    ? [{ key: 'branches', icon: 'pi-building', to: '/branches' }]
-    : []),
+  ...group('attendanceGroup', 'pi-check-square', [
+    ...(auth.can('attendance.create')
+      ? [{ key: 'checkIn', icon: 'pi-qrcode', to: '/check-in' }]
+      : []),
+    ...(auth.can('attendance.view')
+      ? [{ key: 'attendance', icon: 'pi-chart-line', to: '/attendance' }]
+      : []),
+  ]),
+  ...group('offerings', 'pi-th-large', [
+    ...(auth.can('services.view')
+      ? [{ key: 'services', icon: 'pi-th-large', to: '/services' }]
+      : []),
+    ...(auth.can('academy.view') ? [{ key: 'academy', icon: 'pi-sitemap', to: '/academy' }] : []),
+    ...(auth.can('memberships.view')
+      ? [{ key: 'memberships', icon: 'pi-id-card', to: '/memberships' }]
+      : []),
+  ]),
+  ...group('finance', 'pi-wallet', [
+    ...(auth.can('payments.create') ? [{ key: 'pos', icon: 'pi-shopping-cart', to: '/pos' }] : []),
+    ...(auth.can('payments.view') ? [{ key: 'invoices', icon: 'pi-file', to: '/invoices' }] : []),
+    ...(auth.can('payments.view')
+      ? [{ key: 'collections', icon: 'pi-exclamation-circle', to: '/collections' }]
+      : []),
+    ...(auth.can('payments.view')
+      ? [{ key: 'transactions', icon: 'pi-arrow-right-arrow-left', to: '/transactions' }]
+      : []),
+  ]),
+  ...group('marketing', 'pi-megaphone', [
+    ...(auth.can('messages.send') ? [{ key: 'messages', icon: 'pi-send', to: '/messages' }] : []),
+    ...(auth.can('marketing.view')
+      ? [{ key: 'promotions', icon: 'pi-percentage', to: '/promotions' }]
+      : []),
+  ]),
+  ...group('organization', 'pi-building', [
+    ...(allowedPages(STAFF_PAGES, (p) => auth.can(p)).length
+      ? [{ key: 'staff', icon: 'pi-id-card', to: '/staff' }]
+      : []),
+    ...(auth.can('locations.view')
+      ? [{ key: 'branches', icon: 'pi-building', to: '/branches' }]
+      : []),
+  ]),
   // Shown when the user can open at least one settings page.
   ...(allowedSettingsPages((p) => auth.can(p)).length
     ? [{ key: 'settings', icon: 'pi-cog', to: '/settings' }]
