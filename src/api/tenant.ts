@@ -3358,6 +3358,8 @@ export interface BroadcastInput {
 /** A message to a group of clients (US-12.13). */
 export interface Broadcast extends Omit<BroadcastInput, 'scheduled_at'> {
   id: number
+  /** The session, series, branch, segment, group or program it went to, by name. */
+  audience_label: string | null
   status: 'Scheduled' | 'Sending' | 'Sent' | 'Cancelled'
   scheduled_at: string | null
   sent_at: string | null

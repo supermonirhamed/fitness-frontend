@@ -88,12 +88,19 @@ const localeOptions = [
 ]
 const part = computed(() => draft.value?.[channel.value][locale.value])
 const hasSubject = computed(() => channel.value !== 'sms')
-const unknown = computed(() => {
-  if (!editing.value || !part.value) return []
+function unknownIn(text: string | undefined): string[] {
+  if (!editing.value || !text) return []
   const allowed = new Set(editing.value.variables)
-  const found = `${part.value.subject} ${part.value.body}`.match(/\{([^{}\s]*)\}/g) ?? []
+  const found = text.match(/\{([^{}\s]*)\}/g) ?? []
   return [...new Set(found.map((v) => v.slice(1, -1)).filter((v) => !allowed.has(v)))]
-})
+}
+const unknownSubject = computed(() => (hasSubject.value ? unknownIn(part.value?.subject) : []))
+const unknownBody = computed(() => unknownIn(part.value?.body))
+const unknown = computed(() => [...new Set([...unknownSubject.value, ...unknownBody.value])])
+const unknownMessage = (names: string[]) =>
+  names.length
+    ? t('notificationTemplates.unknown', { names: names.map((v) => `{${v}}`).join(', ') })
+    : undefined
 const sms = computed(() => smsCount(part.value?.body ?? ''))
 const changed = computed(() => {
   if (!draft.value) return []
@@ -311,6 +318,7 @@ async function sendTest() {
             : t('notificationTemplates.title')
         "
         for="tpl-subject"
+        :error="unknownMessage(unknownSubject)"
       >
         <InputText
           id="tpl-subject"
@@ -318,6 +326,7 @@ async function sendTest() {
           :dir="locale === 'ar' ? 'rtl' : 'ltr'"
           :disabled="!canEdit"
           maxlength="255"
+          :invalid="unknownSubject.length > 0"
         />
       </FormField>
       <FormField
@@ -325,11 +334,7 @@ async function sendTest() {
           channel === 'email' ? t('notificationTemplates.body') : t('notificationTemplates.text')
         "
         for="tpl-body"
-        :error="
-          unknown.length
-            ? t('notificationTemplates.unknown', { names: unknown.map((v) => `{${v}}`).join(', ') })
-            : undefined
-        "
+        :error="unknownMessage(unknownBody)"
       >
         <Textarea
           id="tpl-body"
@@ -339,7 +344,7 @@ async function sendTest() {
           auto-resize
           :dir="locale === 'ar' ? 'rtl' : 'ltr'"
           :disabled="!canEdit"
-          :invalid="unknown.length > 0"
+          :invalid="unknownBody.length > 0"
         />
         <span v-if="channel === 'sms'" class="muted small">{{
           t('notificationSettings.count', {

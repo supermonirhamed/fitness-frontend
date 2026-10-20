@@ -89,7 +89,8 @@ async function cancel(b: Broadcast) {
           <div class="main">
             <strong>{{ subject(b) }}</strong>
             <span class="muted small">
-              {{ t(`broadcasts.audiences.${b.audience.type}`) }} ·
+              {{ t(`broadcasts.audiences.${b.audience.type}`)
+              }}<template v-if="b.audience_label">: {{ b.audience_label }}</template> ·
               {{ b.channels.map((c) => t(`notificationSettings.channels.${c}`)).join(', ') }} ·
               {{ b.author ?? '—' }}
             </span>

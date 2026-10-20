@@ -190,6 +190,7 @@ async function submit() {
           ]"
           option-label="label"
           option-value="value"
+          :placeholder="t('locationForm.languageOrg')"
           :invalid="!!err('language')"
           fluid
         />
