@@ -33,6 +33,7 @@ import ClientInvoicesCard from '@/components/clients/ClientInvoicesCard.vue'
 import ClientAcademyTab from '@/components/academy/ClientAcademyTab.vue'
 import ClientMembershipsTab from '@/components/clients/ClientMembershipsTab.vue'
 import ClientPaymentsCard from '@/components/clients/ClientPaymentsCard.vue'
+import ClientMessagesTab from '@/components/clients/ClientMessagesTab.vue'
 import ClientNotesTab from '@/components/clients/ClientNotesTab.vue'
 import MergeClientsDialog from '@/components/clients/MergeClientsDialog.vue'
 import ClientTimeline from '@/components/clients/ClientTimeline.vue'
@@ -499,6 +500,7 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
           <Tab v-if="auth.can('academy.view')" value="academy">{{
             t('clientProfile.tabs.academy')
           }}</Tab>
+          <Tab value="messages">{{ t('clientProfile.tabs.messages') }}</Tab>
           <Tab value="timeline">{{ t('clientProfile.tabs.timeline') }}</Tab>
           <Tab v-if="auth.can('entitlements.view')" value="memberships">{{
             t('clientProfile.tabs.memberships')
@@ -719,6 +721,9 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
           </TabPanel>
           <TabPanel value="memberships">
             <ClientMembershipsTab v-if="tab === 'memberships'" :client-id="client.id" />
+          </TabPanel>
+          <TabPanel value="messages">
+            <ClientMessagesTab v-if="tab === 'messages'" :client-id="client.id" />
           </TabPanel>
           <TabPanel value="timeline">
             <ClientTimeline v-if="tab === 'timeline'" :client-id="client.id" />

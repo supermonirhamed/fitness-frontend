@@ -39,6 +39,7 @@ const blank = (): LocationInput => ({
   status: 'Draft',
   address: '',
   timezone: org.organization?.timezone ?? 'Asia/Riyadh',
+  language: null,
   phone: null,
   email: null,
   latitude: null,
@@ -79,6 +80,7 @@ watch(visible, (open) => {
           status: l.status,
           address: l.address ?? '',
           timezone: l.timezone,
+          language: l.language ?? null,
           phone: l.phone,
           email: l.email,
           latitude: l.latitude,
@@ -173,6 +175,26 @@ async function submit() {
         />
         <small :class="err('timezone') ? 'error' : 'hint'">{{
           err('timezone') ?? t('locationForm.timezoneHint')
+        }}</small>
+      </div>
+
+      <div class="field">
+        <label for="loc-language">{{ t('locationForm.fields.language') }}</label>
+        <Select
+          v-model="form.language"
+          input-id="loc-language"
+          :options="[
+            { value: null, label: t('locationForm.languageOrg') },
+            { value: 'ar', label: 'العربية' },
+            { value: 'en', label: 'English' },
+          ]"
+          option-label="label"
+          option-value="value"
+          :invalid="!!err('language')"
+          fluid
+        />
+        <small :class="err('language') ? 'error' : 'hint'">{{
+          err('language') ?? t('locationForm.languageHint')
         }}</small>
       </div>
 

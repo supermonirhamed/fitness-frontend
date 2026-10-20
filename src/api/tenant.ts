@@ -300,6 +300,8 @@ export interface Service {
   buffer_after: number
   /** Appointments (US-03.09): minutes between slot starts; null: back to back. */
   slot_interval: number | null
+  /** Its own booking reminder times, hours before (US-12.08); null: the organization's. */
+  reminder_hours?: number[] | null
   /** How it can be paid for (US-02.08). */
   allow_membership: boolean
   allow_package: boolean
@@ -339,6 +341,7 @@ export interface ServiceInput {
   buffer_before: number | null
   buffer_after: number | null
   slot_interval?: number | null
+  reminder_hours?: number[] | null
   allow_membership: boolean
   allow_package: boolean
   allow_drop_in: boolean
@@ -2650,6 +2653,8 @@ export interface LocationInput {
   status: LocationStatus
   address: string
   timezone: string
+  /** Messages to clients without a language of their own (US-12.10); null: the organization's. */
+  language?: 'ar' | 'en' | null
   phone: string | null
   email: string | null
   latitude: number | null
@@ -3211,17 +3216,169 @@ export interface ClientDeletionRequest {
 }
 
 /** Settings → Notifications (EP-12). */
+export type NotificationChannel = 'email' | 'sms' | 'push' | 'whatsapp'
+type PageMeta = { total: number; current_page: number; last_page: number }
+export interface NotificationTypeChoice {
+  enabled?: boolean
+  channels?: NotificationChannel[]
+}
+/** A notification type in the catalog (US-12.07), with its organization-wide setting. */
+export interface NotificationCatalogType {
+  key: string
+  area: string
+  preference: string | null
+  default_channels: NotificationChannel[]
+  mandatory: boolean
+  /** Sent by its own module (sign-in codes, receipts…): shown, not set up here. */
+  direct: boolean
+  timing: 'reminder_hours' | 'expiry_days' | null
+  variables: string[]
+  enabled: boolean
+  channels: NotificationChannel[]
+}
+export interface WhatsAppTemplate {
+  name: string
+  params: string[]
+}
 export interface NotificationSettings {
   sms_sender_id: string | null
   sms: { provider: string; platform_sender: string; sender_id_allowed: boolean }
   email: { from_name: string | null; reply_to: string | null }
-  types: {
-    key: string
-    area: string
-    preference: string | null
-    enabled: boolean
-    channels: ('email' | 'sms' | 'push')[]
+  /** What the organization changed from the catalog, per type; branch overrides on top. */
+  types: Record<string, NotificationTypeChoice>
+  location_types: Record<string, Record<string, NotificationTypeChoice>>
+  reminder_hours: number[]
+  expiry_notice_days: number
+  quiet_hours: { enabled: boolean; start: string; end: string }
+  combine_minutes: number
+  whatsapp: { enabled: boolean; templates: Record<string, WhatsAppTemplate> }
+  push_available: boolean
+  whatsapp_provider: string
+  catalog: NotificationCatalogType[]
+  locations: { id: number; name: string }[]
+}
+export type NotificationSettingsInput = Partial<
+  Pick<
+    NotificationSettings,
+    | 'sms_sender_id'
+    | 'types'
+    | 'location_types'
+    | 'reminder_hours'
+    | 'expiry_notice_days'
+    | 'quiet_hours'
+    | 'combine_minutes'
+    | 'whatsapp'
+  >
+>
+
+export type TemplateChannel = 'email' | 'sms' | 'push'
+export interface TemplatePart {
+  subject: string | null
+  body: string | null
+  default_subject: string | null
+  default_body: string | null
+  custom: boolean
+  updated_at: string | null
+  updated_by: string | null
+}
+/** A notification type's texts per channel and language (US-12.06). */
+export interface NotificationTemplateType {
+  key: string
+  area: string
+  variables: string[]
+  parts: Record<TemplateChannel, Record<'ar' | 'en', TemplatePart>>
+  /** Languages with no text at all: the other one is used (US-12.10). */
+  missing: ('ar' | 'en')[]
+}
+export type TemplateDraft = Partial<
+  Record<
+    TemplateChannel,
+    Partial<Record<'ar' | 'en', { subject?: string | null; body?: string | null }>>
+  >
+>
+export interface RenderedTemplate {
+  subject: string | null
+  body: string
+  sms: string
+  push_title: string
+  push_body: string
+}
+
+/** A message the engine sent, or skipped with the reason (US-12.09). */
+export interface ClientMessage {
+  id: number
+  type: string
+  channel: NotificationChannel
+  status: 'Queued' | 'Sending' | 'Sent' | 'Delivered' | 'Failed' | 'Bounced' | 'Skipped'
+  skip_reason: string | null
+  to: string | null
+  /** A guardian it went to, when not the client. */
+  recipient: string | null
+  about: string | null
+  subject: string | null
+  body: string | null
+  error: string | null
+  locale: string
+  booking_id: number | null
+  invoice_id: number | null
+  combined_into_id: number | null
+  created_at: string | null
+  send_after: string | null
+  sent_at: string | null
+  delivered_at: string | null
+}
+export interface ConsentState {
+  granted: boolean
+  at: string | null
+  source: string | null
+}
+/** Marketing consent per channel and WhatsApp opt-in, with history (US-12.12, US-12.05). */
+export interface ClientConsents {
+  marketing: Record<NotificationChannel, ConsentState>
+  whatsapp: string | null
+  history: {
+    purpose: 'marketing' | 'whatsapp'
+    channel: NotificationChannel | null
+    granted: boolean
+    source: string
+    by: string | null
+    at: string | null
   }[]
+}
+
+export type BroadcastAudienceType =
+  'session' | 'series' | 'location' | 'segment' | 'academy_group' | 'program'
+export interface BroadcastInput {
+  audience: { type: BroadcastAudienceType; id: number; booked?: boolean; waitlist?: boolean }
+  purpose: 'operational' | 'marketing'
+  channels: NotificationChannel[]
+  content: Partial<Record<'ar' | 'en', { subject?: string | null; body?: string | null }>>
+  scheduled_at?: string | null
+}
+/** A message to a group of clients (US-12.13). */
+export interface Broadcast extends Omit<BroadcastInput, 'scheduled_at'> {
+  id: number
+  status: 'Scheduled' | 'Sending' | 'Sent' | 'Cancelled'
+  scheduled_at: string | null
+  sent_at: string | null
+  cancelled_at: string | null
+  recipients: number
+  counts: Partial<Record<NotificationChannel, { queued?: number; skipped?: number }>> | null
+  author: string | null
+  created_by: number | null
+  created_at: string | null
+}
+export interface BroadcastPreview {
+  recipients: number
+  channels: Partial<Record<NotificationChannel, { reach: number; skipped: number }>>
+  sms_segments: number
+}
+export interface StaffInboxItem {
+  id: number
+  kind: string
+  data: Record<string, unknown>
+  read: boolean
+  at: string | null
 }
 
 export const tenantApi = {
@@ -4033,8 +4190,98 @@ export const tenantApi = {
     async get(): Promise<NotificationSettings> {
       return (await http.get('/api/settings/notifications')).data.data
     },
-    async update(input: { sms_sender_id: string | null }): Promise<NotificationSettings> {
+    async update(input: NotificationSettingsInput): Promise<NotificationSettings> {
       return (await http.put('/api/settings/notifications', input)).data.data
+    },
+  },
+  /** Message templates (US-12.06). */
+  notificationTemplates: {
+    async list(): Promise<NotificationTemplateType[]> {
+      return (await http.get('/api/settings/notification-templates')).data.data
+    },
+    async update(
+      type: string,
+      input: {
+        channel: TemplateChannel
+        locale: 'ar' | 'en'
+        subject: string | null
+        body: string
+      },
+    ): Promise<NotificationTemplateType[]> {
+      return (await http.put(`/api/settings/notification-templates/${type}`, input)).data.data
+    },
+    async reset(
+      type: string,
+      channel: TemplateChannel,
+      locale: 'ar' | 'en',
+    ): Promise<NotificationTemplateType[]> {
+      return (
+        await http.delete(`/api/settings/notification-templates/${type}`, {
+          data: { channel, locale },
+        })
+      ).data.data
+    },
+    async preview(
+      type: string,
+      draft: TemplateDraft,
+    ): Promise<Record<'ar' | 'en', RenderedTemplate>> {
+      return (await http.post(`/api/settings/notification-templates/${type}/preview`, { draft }))
+        .data.data
+    },
+    async test(
+      type: string,
+      channel: TemplateChannel,
+      locale: 'ar' | 'en',
+      draft: TemplateDraft,
+    ): Promise<void> {
+      await http.post(`/api/settings/notification-templates/${type}/test`, {
+        channel,
+        locale,
+        draft,
+      })
+    },
+  },
+  /** A client's messages (US-12.09) and consent (US-12.12). */
+  clientMessages: {
+    async list(
+      clientId: number,
+      params: { page?: number; channel?: string | null; status?: string | null } = {},
+    ): Promise<{ data: ClientMessage[]; meta: PageMeta }> {
+      return (await http.get(`/api/clients/${clientId}/messages`, { params })).data
+    },
+    async consents(clientId: number): Promise<ClientConsents> {
+      return (await http.get(`/api/clients/${clientId}/consents`)).data.data
+    },
+    async updateConsents(
+      clientId: number,
+      input: { marketing?: Partial<Record<NotificationChannel, boolean>>; whatsapp?: boolean },
+    ): Promise<ClientConsents> {
+      return (await http.put(`/api/clients/${clientId}/consents`, input)).data.data
+    },
+  },
+  /** Messages to a group of clients (US-12.13). */
+  broadcasts: {
+    async list(page = 1): Promise<{ data: Broadcast[]; meta: PageMeta }> {
+      return (await http.get('/api/broadcasts', { params: { page } })).data
+    },
+    async preview(input: BroadcastInput): Promise<BroadcastPreview> {
+      return (await http.post('/api/broadcasts/preview', input)).data.data
+    },
+    async create(input: BroadcastInput): Promise<Broadcast> {
+      return (await http.post('/api/broadcasts', input)).data.data
+    },
+    async cancel(id: number): Promise<Broadcast> {
+      return (await http.post(`/api/broadcasts/${id}/cancel`)).data.data
+    },
+  },
+  /** The signed-in staff user's in-app inbox (US-12.04). */
+  staffInbox: {
+    async list(): Promise<{ data: StaffInboxItem[]; meta: { unread: number } }> {
+      return (await http.get('/api/account/notifications')).data
+    },
+    async read(ids?: number[]): Promise<number> {
+      return (await http.post('/api/account/notifications/read', ids ? { ids } : {})).data.data
+        .unread
     },
   },
   paymentSettings: {

@@ -6,6 +6,7 @@ import Drawer from 'primevue/drawer'
 import AppSidebar, { type NavItem } from '@/components/shell/AppSidebar.vue'
 import AppHeader from '@/components/shell/AppHeader.vue'
 import BranchSwitcher from '@/components/shell/BranchSwitcher.vue'
+import StaffInboxButton from '@/components/shell/StaffInboxButton.vue'
 import { useOrganization } from '@/stores/organization'
 import { useStaffAuth } from '@/stores/staffAuth'
 import { allowedPages, allowedSettingsPages, STAFF_PAGES } from '@/lib/permissions'
@@ -47,6 +48,7 @@ const nav = computed<NavItem[]>(() => [
   ...(auth.can('payments.view')
     ? [{ key: 'transactions', icon: 'pi-arrow-right-arrow-left', to: '/transactions' }]
     : []),
+  ...(auth.can('messages.send') ? [{ key: 'messages', icon: 'pi-send', to: '/messages' }] : []),
   ...(auth.can('marketing.view')
     ? [{ key: 'promotions', icon: 'pi-percentage', to: '/promotions' }]
     : []),
@@ -154,6 +156,7 @@ async function signOut() {
         @sign-out="signOut"
       >
         <template #context><BranchSwitcher /></template>
+        <template #actions><StaffInboxButton /></template>
       </AppHeader>
       <main class="shell__content"><RouterView /></main>
     </div>

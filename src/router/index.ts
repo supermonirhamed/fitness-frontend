@@ -126,6 +126,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'clients.view' },
       },
       {
+        // Messages to groups of clients (US-12.13).
+        path: 'messages',
+        name: 'tenant.messages',
+        component: () => import('@/views/tenant/messages/BroadcastsView.vue'),
+        meta: { permission: 'messages.send' },
+      },
+      {
         // Promotions: discounts and coupons (US-07.07).
         path: 'promotions',
         name: 'tenant.promotions',
@@ -416,6 +423,13 @@ const tenantRoutes: RouteRecordRaw[] = [
             path: 'notifications',
             name: 'tenant.settings.notifications',
             component: () => import('@/views/tenant/settings/NotificationSettingsView.vue'),
+            meta: { permission: 'settings.view' },
+          },
+          {
+            // Message templates (US-12.06).
+            path: 'notification-templates',
+            name: 'tenant.settings.notificationTemplates',
+            component: () => import('@/views/tenant/settings/NotificationTemplatesView.vue'),
             meta: { permission: 'settings.view' },
           },
           {

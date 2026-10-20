@@ -49,6 +49,13 @@ const { t, te, locale } = useI18n()
 const org = useOrganization()
 const position = computed(() => (locale.value === 'ar' ? 'left' : 'right'))
 const editing = computed(() => props.service !== null)
+// Booking reminder times of its own (US-12.08), in hours before the session.
+const reminderOptions = computed(() =>
+  [1, 2, 3, 4, 6, 12, 24, 48, 72].map((h) => ({
+    value: h,
+    label: t('notificationSettings.hoursBefore', { n: h }),
+  })),
+)
 
 const blank = (): ServiceInput => ({
   name: emptyTranslated(),
@@ -60,6 +67,7 @@ const blank = (): ServiceInput => ({
   buffer_before: 0,
   buffer_after: 0,
   slot_interval: null,
+  reminder_hours: null,
   allow_membership: false,
   allow_package: false,
   allow_drop_in: true,
@@ -181,6 +189,7 @@ watch(visible, (open) => {
           buffer_before: s.buffer_before,
           buffer_after: s.buffer_after,
           slot_interval: s.slot_interval,
+          reminder_hours: s.reminder_hours ?? null,
           allow_membership: s.allow_membership,
           allow_package: s.allow_package,
           allow_drop_in: s.allow_drop_in,
@@ -424,6 +433,32 @@ async function submit() {
         />
         <small :class="err('slot_interval') ? 'error' : 'hint'">{{
           err('slot_interval') ?? t('catalog.slotIntervalHint')
+        }}</small>
+      </div>
+
+      <div class="field">
+        <label class="inline-check">
+          <Checkbox
+            :model-value="form.reminder_hours != null"
+            binary
+            @update:model-value="(v: boolean) => (form.reminder_hours = v ? [24] : null)"
+          />{{ t('catalog.ownReminders') }}
+        </label>
+        <MultiSelect
+          v-if="form.reminder_hours"
+          v-model="form.reminder_hours"
+          :options="reminderOptions"
+          option-label="label"
+          option-value="value"
+          :selection-limit="3"
+          display="chip"
+          :placeholder="t('notificationSettings.noReminders')"
+          :invalid="!!err('reminder_hours')"
+          :aria-label="t('catalog.ownReminders')"
+          fluid
+        />
+        <small :class="err('reminder_hours') ? 'error' : 'hint'">{{
+          err('reminder_hours') ?? t('catalog.remindersHint')
         }}</small>
       </div>
 
@@ -830,6 +865,11 @@ async function submit() {
   .branch-name {
     grid-column: 1 / -1;
   }
+}
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>
 

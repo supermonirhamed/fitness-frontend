@@ -31,6 +31,7 @@ import EmptyState from '@/components/patterns/EmptyState.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
+import BroadcastDrawer, { type BroadcastPreset } from '@/components/messages/BroadcastDrawer.vue'
 import PersonAvatar from '@/components/patterns/PersonAvatar.vue'
 import StatusBanner from '@/components/patterns/StatusBanner.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
@@ -398,6 +399,17 @@ async function publishSeries() {
   }
 }
 
+const messageOpen = ref(false)
+const messagePreset = computed<BroadcastPreset | null>(() =>
+  session.value
+    ? {
+        sessionId: session.value.id,
+        seriesId: session.value.series?.id ?? null,
+        label: `${session.value.service.name ?? ''} · ${session.value.local.date} ${session.value.local.start}`,
+      }
+    : null,
+)
+
 const moreItems = computed<MenuItem[]>(() => {
   const items: MenuItem[] = []
   if (canEdit.value)
@@ -415,11 +427,13 @@ const moreItems = computed<MenuItem[]>(() => {
       icon: 'pi pi-send',
       command: publishSeries,
     })
-  items.push({
-    label: `${t('sessionPage.message')} · ${t('sessionPage.later')}`,
-    icon: 'pi pi-send',
-    disabled: true,
-  })
+  // A message to the session's clients (US-12.13).
+  if (auth.can('messages.send'))
+    items.push({
+      label: t('sessionPage.message'),
+      icon: 'pi pi-send',
+      command: () => (messageOpen.value = true),
+    })
   if (canCancel.value)
     items.push(
       { separator: true },
@@ -904,6 +918,7 @@ const moreItems = computed<MenuItem[]>(() => {
         @cancelled="onCancelled"
       />
     </template>
+    <BroadcastDrawer v-model:visible="messageOpen" :preset="messagePreset" />
   </div>
 </template>
 

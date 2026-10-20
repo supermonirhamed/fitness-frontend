@@ -42,6 +42,20 @@ const icons: Record<string, string> = {
   coach_note: 'pi-comment',
   evaluation_published: 'pi-chart-line',
   announcement: 'pi-megaphone',
+  booking_reminder: 'pi-bell',
+  waitlist_joined: 'pi-list',
+  no_show_recorded: 'pi-user-minus',
+  refund_issued: 'pi-replay',
+  membership_expired: 'pi-calendar-times',
+  membership_frozen: 'pi-pause',
+  membership_unfrozen: 'pi-play',
+  membership_suspended: 'pi-lock',
+  academy_absence: 'pi-user-minus',
+  academy_enrolled: 'pi-check-circle',
+  academy_waitlist_offer: 'pi-bolt',
+  academy_reenrollment_offer: 'pi-refresh',
+  broadcast: 'pi-send',
+  marketing: 'pi-gift',
 }
 
 function text(n: InboxItem): string {
@@ -52,7 +66,18 @@ function text(n: InboxItem): string {
     total: typeof d.total === 'number' ? format.money(d.total) : '',
     ends: d.ends_on ? showDay(format, String(d.ends_on)) : '',
   }
+  // Messages the notification engine adds come already worded in the reader's language (US-12.04).
+  if (typeof d.text === 'string') return d.title ? `${d.title} — ${d.text}` : d.text
   return te(`app.inbox.kinds.${n.kind}`) ? t(`app.inbox.kinds.${n.kind}`, params) : n.kind
+}
+
+/** Where a message leads: its booking, invoice or child. */
+function link(n: InboxItem): string | null {
+  const d = n.data as Record<string, unknown>
+  if (d.booking_id || d.session_id) return '/app/bookings'
+  if (d.invoice_id || d.invoice || d.entitlement_id)
+    return d.entitlement_id ? '/app/memberships' : '/app/payments'
+  return null
 }
 
 async function load() {
@@ -129,7 +154,8 @@ async function enablePush() {
           <span v-if="n.about" class="ca-muted ca-small">{{
             t('app.inbox.about', { name: n.about })
           }}</span>
-          <span>{{ text(n) }}</span>
+          <RouterLink v-if="link(n)" :to="link(n)!" class="link">{{ text(n) }}</RouterLink>
+          <span v-else>{{ text(n) }}</span>
           <span class="ca-muted ca-small">{{ n.at ? format.dateTime(n.at) : '' }}</span>
           <Button
             v-if="n.kind === 'spot_opened' && !claimed.has(n.id)"
@@ -165,6 +191,13 @@ async function enablePush() {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+.link {
+  color: inherit;
+  text-decoration: none;
+}
+.link:hover {
+  text-decoration: underline;
 }
 .claim {
   align-self: flex-start;

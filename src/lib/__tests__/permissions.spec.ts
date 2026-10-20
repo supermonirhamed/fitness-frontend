@@ -29,6 +29,7 @@ describe('permissions helpers', () => {
       'academy',
       'clientApp',
       'notifications',
+      'notificationTemplates',
       'security',
       'waivers',
       'audit',

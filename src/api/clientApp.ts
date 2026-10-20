@@ -85,6 +85,8 @@ export interface ClientProfile extends ClientAccount {
   }
   emergency_contacts: { name: string; relation: string; phone: string }[]
   preferences: Preferences
+  /** WhatsApp messages need the client's opt-in (US-12.05). */
+  whatsapp?: { available: boolean; opted_in: boolean }
 }
 
 export interface DeletionSummary {
@@ -754,8 +756,8 @@ export const clientApi = {
     async healthNotes(health_notes: string | null): Promise<ClientProfile> {
       return (await http.put('/api/app/profile/health-notes', { health_notes })).data.data
     },
-    async preferences(preferences: Preferences): Promise<ClientProfile> {
-      return (await http.put('/api/app/profile/preferences', { preferences })).data.data
+    async preferences(preferences: Preferences, whatsapp?: boolean): Promise<ClientProfile> {
+      return (await http.put('/api/app/profile/preferences', { preferences, whatsapp })).data.data
     },
     async uploadPhoto(file: File): Promise<ClientProfile> {
       const body = new FormData()

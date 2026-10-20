@@ -70,6 +70,7 @@ const errors = ref<ValidationErrors>({})
 const contacts = ref<ClientProfile['emergency_contacts']>([])
 const health = ref('')
 const prefs = ref<Preferences | null>(null)
+const whatsapp = ref<{ available: boolean; opted_in: boolean } | null>(null)
 const types: NotificationType[] = ['reminders', 'waitlist', 'payments', 'marketing']
 const channels: NotificationChannel[] = ['email', 'sms', 'push']
 
@@ -86,6 +87,7 @@ function adopt(p: ClientProfile) {
   }
   contacts.value = p.emergency_contacts.map((c) => ({ ...c }))
   prefs.value = JSON.parse(JSON.stringify(p.preferences))
+  whatsapp.value = p.whatsapp ? { ...p.whatsapp } : null
 }
 
 async function load() {
@@ -200,7 +202,12 @@ async function saveHealth() {
 }
 async function savePrefs() {
   try {
-    adopt(await clientApi.profile.preferences(prefs.value!))
+    adopt(
+      await clientApi.profile.preferences(
+        prefs.value!,
+        whatsapp.value?.available ? whatsapp.value.opted_in : undefined,
+      ),
+    )
     saved()
   } catch (e) {
     failed(e)
@@ -594,6 +601,9 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+        <label v-if="whatsapp?.available" class="whatsapp">
+          <ToggleSwitch v-model="whatsapp.opted_in" />{{ t('app.account.whatsappOptIn') }}
+        </label>
         <p class="ca-muted ca-small">{{ t('app.account.notificationsHint') }}</p>
         <Button :label="t('common.save')" size="small" @click="savePrefs" />
       </section>
@@ -766,6 +776,12 @@ onMounted(async () => {
 }
 .contact > :nth-child(3) {
   grid-column: 1;
+}
+.whatsapp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
 }
 .prefs {
   width: 100%;

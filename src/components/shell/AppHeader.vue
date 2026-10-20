@@ -33,6 +33,7 @@ const items = computed<MenuItem[]>(() => [
     />
     <slot name="context" />
     <span class="app-header__spacer" />
+    <slot name="actions" />
     <LanguageToggle :icon="null" />
     <button
       type="button"
