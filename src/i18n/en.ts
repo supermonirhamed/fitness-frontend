@@ -78,6 +78,18 @@ export default {
     },
     sessionExpired: 'You were signed out, sign in again.',
     tenants: {
+      smsLimit: {
+        title: 'Monthly SMS limit',
+        used: '{used} of {limit} SMS parts used this month.',
+        usedNoLimit: '{used} SMS parts used this month, no limit.',
+        plan: 'Follow the plan ({plan})',
+        own: 'A limit for this organization',
+        parts: 'parts',
+        hard: 'Hard limit',
+        hardHelp: 'Past it no SMS go at all, not even short-notice cancellations.',
+        hardShort: 'hard',
+        saved: 'SMS limit saved for {name}',
+      },
       title: 'Organizations',
       subtitle: 'Every organization runs on its own subdomain and database.',
       new: 'New organization',
@@ -85,6 +97,7 @@ export default {
       emptyHint: 'Create the first organization to give a business its own workspace.',
       loadError: "Organizations couldn't be loaded.",
       columns: {
+        sms: 'SMS this month',
         name: 'Organization',
         subdomain: 'Subdomain',
         owner: 'Owner',
@@ -3560,6 +3573,15 @@ export default {
     retentionHelp:
       'After this, the message log keeps who, when, which channel and the status, but deletes the texts.',
     months: 'months',
+    smsUsageLabel: 'SMS this month',
+    smsUsageNoLimit: 'No monthly limit is set for your organization.',
+    smsUsageSoft:
+      'Set by the platform. Past it, SMS that aren’t essential go by email instead; short-notice cancellations still go by SMS. You’re alerted at 80% and 100%.',
+    smsUsageHard:
+      'Set by the platform as a hard limit: past it no SMS go, and messages go by email where possible. You’re alerted at 80% and 100%.',
+    smsUsed: '{used} SMS parts',
+    smsUsedOf: '{used} of {limit} SMS parts',
+    smsSkipped: '1 SMS not sent because of the limit | {n} SMS not sent because of the limit',
     combineLabel: 'Combine repeated messages',
     combineHelp:
       'Several messages of one kind to the same client within this time (for example a recurring booking cancelled) become one summary. 0 sends each straight away.',
@@ -3783,6 +3805,7 @@ export default {
       Skipped: 'Skipped',
     },
     reasons: {
+      sms_limit_reached: 'Monthly SMS limit reached',
       channel_unavailable: 'Channel not set up on the platform',
       no_contact: 'No email or mobile for this channel',
       opted_out: 'Turned off by the client',

@@ -16,6 +16,7 @@ import StatusTag from '@/components/patterns/StatusTag.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
 import OverrideDialog from '@/components/patterns/OverrideDialog.vue'
 import CreateTenantDrawer from './CreateTenantDrawer.vue'
+import SmsLimitDrawer from './SmsLimitDrawer.vue'
 import { platformApi, type Tenant, type TenantStatus } from '@/api/platform'
 import { validationErrors } from '@/lib/http'
 
@@ -135,6 +136,22 @@ async function confirmAction(reason: string) {
 }
 
 const count = (n: number | null) => (n === null ? '—' : n)
+
+// Monthly SMS limit (US-12.16)
+const smsTenant = ref<Tenant | null>(null)
+const smsOpen = ref(false)
+function openSms(tenant: Tenant) {
+  smsTenant.value = tenant
+  smsOpen.value = true
+}
+function smsUpdated(tenant: Tenant) {
+  upsert(tenant)
+  toast.add({
+    severity: 'success',
+    summary: t('platform.tenants.smsLimit.saved', { name: tenant.name }),
+    life: 3000,
+  })
+}
 
 onMounted(load)
 </script>
@@ -278,6 +295,26 @@ onMounted(load)
             <span class="num">{{ count(data.active_clients_count) }}</span>
           </template>
         </Column>
+        <Column :header="t('platform.tenants.columns.sms')" class="num-col">
+          <template #body="{ data }">
+            <button
+              v-if="data.sms"
+              type="button"
+              :class="['sms-usage', { 'sms-usage--full': data.sms.reached }]"
+              :aria-label="t('platform.tenants.smsLimit.title')"
+              @click="openSms(data)"
+            >
+              <span class="num">{{ data.sms.used }}</span>
+              <span class="tenants__muted"
+                >/ {{ data.sms.limit ?? '∞'
+                }}<template v-if="data.sms.hard">
+                  · {{ t('platform.tenants.smsLimit.hardShort') }}</template
+                ></span
+              >
+            </button>
+            <span v-else class="tenants__muted">—</span>
+          </template>
+        </Column>
         <Column :header="t('platform.tenants.columns.created')">
           <template #body="{ data }">
             <span class="num">{{ d(new Date(data.created_at), 'short') }}</span>
@@ -327,6 +364,7 @@ onMounted(load)
     </section>
 
     <CreateTenantDrawer v-model:visible="drawerOpen" :tenant="drawerTenant" @updated="upsert" />
+    <SmsLimitDrawer v-model:visible="smsOpen" :tenant="smsTenant" @updated="smsUpdated" />
 
     <OverrideDialog
       v-model:visible="actionOpen"
@@ -393,5 +431,22 @@ onMounted(load)
 .tenants__actions {
   display: flex;
   justify-content: flex-end;
+}
+.sms-usage {
+  border: 0;
+  padding: 2px 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.sms-usage:hover {
+  background: var(--surface-hover, var(--surface-ground));
+}
+.sms-usage--full .num {
+  color: var(--sev-danger-fg, var(--red-600));
+  font-weight: 600;
 }
 </style>

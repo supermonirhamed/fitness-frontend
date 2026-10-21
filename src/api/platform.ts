@@ -22,6 +22,17 @@ export interface Tenant {
   /** null until the tenant has the table (locations: EP-01, clients: EP-05) */
   locations_count: number | null
   active_clients_count: number | null
+  /** The organization's own monthly SMS limit (null: its plan's) and whether it is hard (US-12.16). */
+  sms_monthly_limit: number | null
+  sms_hard_limit: boolean
+  /** This month's usage against the limit in effect; null while provisioning. */
+  sms: {
+    used: number
+    limit: number | null
+    percent: number | null
+    reached: boolean
+    hard: boolean
+  } | null
   created_at: string
 }
 
@@ -74,6 +85,12 @@ export const platformApi = {
   },
   async reactivate(id: string, reason: string): Promise<Tenant> {
     return (await http.post(`/api/platform/tenants/${id}/reactivate`, { reason })).data.data
+  },
+  async updateSmsLimit(
+    id: string,
+    input: { sms_monthly_limit: number | null; sms_hard_limit: boolean },
+  ): Promise<Tenant> {
+    return (await http.put(`/api/platform/tenants/${id}/sms-limit`, input)).data.data
   },
   async tenant(id: string): Promise<Tenant> {
     return (await http.get(`/api/platform/tenants/${id}`)).data.data

@@ -13,6 +13,7 @@ import Checkbox from 'primevue/checkbox'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
+import ProgressBar from 'primevue/progressbar'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Skeleton from 'primevue/skeleton'
@@ -250,6 +251,51 @@ async function save() {
           :placeholder="settings.sms.platform_sender"
           :disabled="!canEdit || !settings.sms.sender_id_allowed"
         />
+      </SettingRow>
+      <SettingRow
+        :label="t('notificationSettings.smsUsageLabel')"
+        :help="
+          settings.sms_usage.limit === null
+            ? t('notificationSettings.smsUsageNoLimit')
+            : settings.sms_usage.hard
+              ? t('notificationSettings.smsUsageHard')
+              : t('notificationSettings.smsUsageSoft')
+        "
+      >
+        <div class="usage">
+          <span class="num">{{
+            settings.sms_usage.limit === null
+              ? t('notificationSettings.smsUsed', { used: settings.sms_usage.used })
+              : t('notificationSettings.smsUsedOf', {
+                  used: settings.sms_usage.used,
+                  limit: settings.sms_usage.limit,
+                })
+          }}</span>
+          <ProgressBar
+            v-if="settings.sms_usage.limit !== null"
+            :value="Math.min(100, settings.sms_usage.percent ?? 0)"
+            :show-value="false"
+            :class="[
+              'usage__bar',
+              {
+                'usage__bar--warn': (settings.sms_usage.percent ?? 0) >= 80,
+                'usage__bar--full': settings.sms_usage.reached,
+              },
+            ]"
+            :aria-label="t('notificationSettings.smsUsageLabel')"
+          />
+          <span v-if="settings.sms_usage.skipped" class="muted small">{{
+            t('notificationSettings.smsSkipped', settings.sms_usage.skipped)
+          }}</span>
+          <span v-if="settings.sms_usage.history.length > 1" class="muted small">
+            {{
+              settings.sms_usage.history
+                .slice(1)
+                .map((h) => `${h.month}: ${h.segments}`)
+                .join(' · ')
+            }}
+          </span>
+        </div>
       </SettingRow>
       <SettingRow
         :label="t('notificationSettings.counterLabel')"
@@ -613,5 +659,20 @@ async function save() {
 }
 .channel.unavailable {
   color: var(--text-muted);
+}
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+.usage__bar {
+  height: 8px;
+}
+.usage__bar--warn :deep(.p-progressbar-value) {
+  background: var(--sev-warn-solid);
+}
+.usage__bar--full :deep(.p-progressbar-value) {
+  background: var(--sev-danger-solid, var(--red-600));
 }
 </style>

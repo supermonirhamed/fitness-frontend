@@ -3259,6 +3259,18 @@ export interface NotificationSettings {
   log_retention_months: number
   whatsapp: { enabled: boolean; templates: Record<string, WhatsAppTemplate> }
   push_available: boolean
+  /** This month's SMS parts against the platform's limit (US-12.16). */
+  sms_usage: {
+    month: string
+    used: number
+    messages: number
+    skipped: number
+    limit: number | null
+    hard: boolean
+    percent: number | null
+    reached: boolean
+    history: { month: string; segments: number; messages: number; skipped: number }[]
+  }
   whatsapp_provider: string
   catalog: NotificationCatalogType[]
   locations: { id: number; name: string }[]
