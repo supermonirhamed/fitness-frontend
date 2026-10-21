@@ -3251,6 +3251,8 @@ export interface NotificationSettings {
   expiry_notice_days: number
   quiet_hours: { enabled: boolean; start: string; end: string }
   combine_minutes: number
+  /** Months the log keeps message bodies (US-12.14). */
+  log_retention_months: number
   whatsapp: { enabled: boolean; templates: Record<string, WhatsAppTemplate> }
   push_available: boolean
   whatsapp_provider: string
@@ -3267,6 +3269,7 @@ export type NotificationSettingsInput = Partial<
     | 'expiry_notice_days'
     | 'quiet_hours'
     | 'combine_minutes'
+    | 'log_retention_months'
     | 'whatsapp'
   >
 >
@@ -3326,6 +3329,66 @@ export interface ClientMessage {
   send_after: string | null
   sent_at: string | null
   delivered_at: string | null
+}
+/** An entry of the notification log (US-12.14). */
+export interface LoggedMessage {
+  id: number
+  type: string
+  channel: NotificationChannel
+  status: ClientMessage['status']
+  skip_reason: string | null
+  /** Null without clients.contact_view. */
+  to: string | null
+  recipient: { id: number; name: string } | null
+  about: { id: number; name: string } | null
+  subject: string | null
+  body: string | null
+  /** Past the retention period: only the metadata is kept. */
+  body_purged: boolean
+  error: string | null
+  provider: string | null
+  provider_message_id: string | null
+  segments: number | null
+  attempts: number
+  locale: string
+  booking_id: number | null
+  scheduled_session_id: number | null
+  broadcast_id: number | null
+  invoice: { id: number; number: string } | null
+  location: string | null
+  combined_into_id: number | null
+  resent_from_id: number | null
+  resent_by: string | null
+  can_resend: boolean
+  created_at: string | null
+  send_after: string | null
+  sent_at: string | null
+  delivered_at: string | null
+  complained_at: string | null
+  updated_at: string | null
+}
+export interface LoggedMessageDetails extends LoggedMessage {
+  session: { id: number; name: string | null; starts_at: string | null } | null
+  resends: {
+    id: number
+    status: ClientMessage['status']
+    to: string | null
+    created_at: string | null
+  }[]
+  client_contact: { email: string | null; mobile: string | null } | null
+}
+export interface NotificationLogFilters {
+  client_id?: number
+  to?: string
+  type?: string
+  channel?: NotificationChannel
+  status?: ClientMessage['status']
+  from?: string
+  until?: string
+  booking_id?: number
+  scheduled_session_id?: number
+  invoice_id?: number
+  broadcast_id?: number
 }
 export interface ConsentState {
   granted: boolean
@@ -4241,6 +4304,23 @@ export const tenantApi = {
         locale,
         draft,
       })
+    },
+  },
+  /** The notification log (US-12.14). */
+  notificationLog: {
+    async list(
+      params: NotificationLogFilters & { page?: number },
+    ): Promise<{ data: LoggedMessage[]; meta: PageMeta }> {
+      return (await http.get('/api/notification-log', { params })).data
+    },
+    async get(id: number): Promise<LoggedMessageDetails> {
+      return (await http.get(`/api/notification-log/${id}`)).data.data
+    },
+    async resend(
+      id: number,
+      input: { to?: string | null; update_client?: boolean } = {},
+    ): Promise<LoggedMessage> {
+      return (await http.post(`/api/notification-log/${id}/resend`, input)).data.data
     },
   },
   /** A client's messages (US-12.09) and consent (US-12.12). */

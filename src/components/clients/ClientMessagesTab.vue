@@ -11,6 +11,7 @@ import Paginator from 'primevue/paginator'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
+import MessageDetailsDrawer from '@/components/messages/MessageDetailsDrawer.vue'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import {
   tenantApi,
@@ -37,6 +38,7 @@ const total = ref(0)
 const page = ref(1)
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const expanded = ref<number | null>(null)
+const detailsOpen = ref(false)
 const canSeeMessages = computed(() => auth.can('messages.view'))
 const STATUS: Record<
   ClientMessage['status'],
@@ -202,6 +204,18 @@ function source(key: string | null): string {
             <span v-if="m.send_after && m.status === 'Queued'" class="muted small">{{
               t('clientMessages.waiting', { at: format.dateTime(m.send_after) })
             }}</span>
+            <Button
+              :label="
+                ['Failed', 'Bounced', 'Skipped'].includes(m.status) && auth.can('messages.send')
+                  ? t('clientMessages.detailsResend')
+                  : t('clientMessages.details')
+              "
+              icon="pi pi-external-link"
+              variant="text"
+              size="small"
+              class="details-btn"
+              @click="detailsOpen = true"
+            />
           </div>
         </li>
       </ul>
@@ -211,6 +225,11 @@ function source(key: string | null): string {
         :total-records="total"
         :first="(page - 1) * 30"
         @page="(e) => ((page = e.page + 1), loadMessages())"
+      />
+      <MessageDetailsDrawer
+        v-model:visible="detailsOpen"
+        :message-id="expanded"
+        @resent="loadMessages"
       />
     </section>
   </div>
@@ -290,5 +309,8 @@ function source(key: string | null): string {
 .pre {
   margin: 0;
   white-space: pre-wrap;
+}
+.details-btn {
+  align-self: flex-start;
 }
 </style>

@@ -62,7 +62,12 @@ const nav = computed<NavItem[]>(() => [
       : []),
   ]),
   ...group('marketing', 'pi-megaphone', [
-    ...(auth.can('messages.send') ? [{ key: 'messages', icon: 'pi-send', to: '/messages' }] : []),
+    ...(auth.can('messages.send')
+      ? [{ key: 'messages', icon: 'pi-send', to: '/messages', exact: true }]
+      : []),
+    ...(auth.can('messages.view')
+      ? [{ key: 'messageLog', icon: 'pi-history', to: '/messages/log' }]
+      : []),
     ...(auth.can('marketing.view')
       ? [{ key: 'promotions', icon: 'pi-percentage', to: '/promotions' }]
       : []),

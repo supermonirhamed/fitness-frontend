@@ -82,6 +82,7 @@ function snapshot(data: NotificationSettings): Form {
       expiry_notice_days: data.expiry_notice_days,
       quiet_hours: data.quiet_hours,
       combine_minutes: data.combine_minutes,
+      log_retention_months: data.log_retention_months,
       whatsapp: {
         enabled: data.whatsapp.enabled,
         templates: Array.isArray(data.whatsapp.templates) ? {} : data.whatsapp.templates,
@@ -404,6 +405,23 @@ async function save() {
           :max="30"
           :allow-empty="false"
           :suffix="` ${t('notificationSettings.minutes')}`"
+          show-buttons
+          :disabled="!canEdit"
+          class="number"
+        />
+      </SettingRow>
+      <SettingRow
+        :label="t('notificationSettings.retentionLabel')"
+        :help="t('notificationSettings.retentionHelp')"
+        label-for="retention"
+      >
+        <InputNumber
+          v-model="form.log_retention_months"
+          input-id="retention"
+          :min="1"
+          :max="60"
+          :allow-empty="false"
+          :suffix="` ${t('notificationSettings.months')}`"
           show-buttons
           :disabled="!canEdit"
           class="number"

@@ -133,6 +133,13 @@ const tenantRoutes: RouteRecordRaw[] = [
         meta: { permission: 'messages.send' },
       },
       {
+        // The notification log (US-12.14).
+        path: 'messages/log',
+        name: 'tenant.messageLog',
+        component: () => import('@/views/tenant/messages/NotificationLogView.vue'),
+        meta: { permission: 'messages.view' },
+      },
+      {
         // Promotions: discounts and coupons (US-07.07).
         path: 'promotions',
         name: 'tenant.promotions',
