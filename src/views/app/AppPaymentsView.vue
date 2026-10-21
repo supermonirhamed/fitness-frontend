@@ -1,8 +1,11 @@
 <script setup lang="ts">
 // My payments (US-11.14): what is owed, account credit, invoices with their status, due date and
 // balance, payments and refunds; each invoice and receipt opens to print or save as PDF.
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
+import Button from 'primevue/button'
+import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
@@ -12,6 +15,7 @@ import StatusTag from '@/components/patterns/StatusTag.vue'
 import { clientApi, type MyPayments } from '@/api/clientApp'
 import { useFormat } from '@/composables/useFormat'
 import { showDay } from '@/lib/academy'
+import { firstMessage } from '@/lib/apiErrors'
 
 const { t, te } = useI18n()
 const format = useFormat()
@@ -19,6 +23,60 @@ const data = ref<MyPayments | null>(null)
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const tab = ref<'invoices' | 'payments'>('invoices')
 const method = (m: string) => (te(`payments.methods.${m}`) ? t(`payments.methods.${m}`) : m)
+const route = useRoute()
+const router = useRouter()
+
+// Paying by card online (US-07.12): at branches whose gateway is set up; back from the checkout,
+// the outcome shows once the gateway has confirmed it.
+const cardLocations = ref<number[]>([])
+const paying = ref(false)
+const outcome = ref<{ severity: 'success' | 'warn' | 'info'; text: string } | null>(null)
+const payable = (i: { balance: number; location_id: number }) =>
+  i.balance > 0 && cardLocations.value.includes(i.location_id)
+const payAll = computed(() => {
+  const owing = (data.value?.invoices ?? []).filter(payable)
+  return owing.length > 1 && new Set(owing.map((i) => i.location_id)).size === 1 ? owing : []
+})
+async function payByCard(invoiceIds: number[]) {
+  paying.value = true
+  try {
+    const { url } = await clientApi.online.start({
+      invoice_ids: invoiceIds,
+      return_path: '/app/payments',
+    })
+    window.location.assign(url)
+  } catch (e) {
+    outcome.value = { severity: 'warn', text: firstMessage(e) ?? t('common.genericError') }
+    paying.value = false
+  }
+}
+async function checkReturn() {
+  const reference = typeof route.query.online === 'string' ? route.query.online : null
+  if (!reference) return
+  router.replace({ query: {} })
+  if (route.query.cancelled) {
+    outcome.value = { severity: 'info', text: t('app.payments.cardCancelled') }
+    return
+  }
+  outcome.value = { severity: 'info', text: t('app.payments.cardChecking') }
+  for (let tries = 0; tries < 10; tries++) {
+    const result = await clientApi.online.status(reference).catch(() => null)
+    if (result?.status === 'Succeeded') {
+      outcome.value = {
+        severity: 'success',
+        text: t('app.payments.cardPaid', { receipt: result.receipt_number ?? '' }),
+      }
+      await load()
+      return
+    }
+    if (result?.status === 'Failed') {
+      outcome.value = { severity: 'warn', text: result.error ?? t('app.payments.cardFailed') }
+      return
+    }
+    await new Promise((r) => setTimeout(r, 1500))
+  }
+  outcome.value = { severity: 'info', text: t('app.payments.cardPending') }
+}
 
 async function load() {
   state.value = 'loading'
@@ -29,7 +87,12 @@ async function load() {
     state.value = 'error'
   }
 }
-onMounted(load)
+onMounted(async () => {
+  checkReturn()
+  await load()
+  cardLocations.value =
+    (await clientApi.online.availability().catch(() => null))?.location_ids ?? []
+})
 </script>
 
 <template>
@@ -54,7 +117,24 @@ onMounted(load)
           <strong class="ca-num">{{ format.money(data.account_credit) }}</strong>
         </div>
       </div>
-      <p v-if="data.owed > 0" class="ca-muted ca-small">{{ t('app.payments.payAtDesk') }}</p>
+      <Message v-if="outcome" :severity="outcome.severity" :closable="false">{{
+        outcome.text
+      }}</Message>
+      <Button
+        v-if="payAll.length"
+        :label="
+          t('app.payments.payAllByCard', {
+            amount: format.money(payAll.reduce((s, i) => s + i.balance, 0)),
+          })
+        "
+        icon="pi pi-credit-card"
+        :loading="paying"
+        fluid
+        @click="payByCard(payAll.map((i) => i.id))"
+      />
+      <p v-if="data.owed > 0 && !cardLocations.length" class="ca-muted ca-small">
+        {{ t('app.payments.payAtDesk') }}
+      </p>
       <SelectButton
         v-model="tab"
         :options="[
@@ -92,8 +172,19 @@ onMounted(load)
               >
               <span class="ca-num">{{ format.money(i.total) }}</span>
             </div>
-            <div v-if="i.balance > 0" class="ca-small balance">
-              {{ t('app.payments.balance', { amount: format.money(i.balance) }) }}
+            <div v-if="i.balance > 0" class="ca-spread">
+              <span class="ca-small balance">{{
+                t('app.payments.balance', { amount: format.money(i.balance) })
+              }}</span>
+              <Button
+                v-if="payable(i)"
+                :label="t('app.payments.payByCard')"
+                icon="pi pi-credit-card"
+                size="small"
+                variant="outlined"
+                :loading="paying"
+                @click="payByCard([i.id])"
+              />
             </div>
           </li>
         </ul>

@@ -83,6 +83,13 @@ const tenantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/tenant/WaiverSignView.vue'),
     meta: { permission: 'clients.update' },
   },
+  // The sandbox gateway's test checkout (US-07.12), opened from the client app.
+  {
+    path: '/pay/sandbox/:reference',
+    name: 'tenant.pay.sandbox',
+    component: () => import('@/views/pay/SandboxCheckoutView.vue'),
+    meta: { link: true },
+  },
   // The self check-in kiosk (US-08.05): signed in by its device token, never a staff login.
   {
     path: '/kiosk',

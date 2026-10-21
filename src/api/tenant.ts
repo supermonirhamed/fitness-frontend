@@ -2005,6 +2005,19 @@ export interface GuestOptions {
 export type PaymentMethod =
   'cash' | 'bank_transfer' | 'card_terminal' | 'cheque' | 'account_credit' | 'other'
 
+/** The online payment gateway of the organization or a branch (US-07.12); secrets come back masked. */
+export interface GatewaySetup {
+  driver: 'sandbox' | 'stripe' | null
+  credentials: Record<string, string | null>
+  missing: string[]
+}
+export interface PaymentGatewaySettings {
+  organization: GatewaySetup
+  locations: ({ id: number; name: string } & GatewaySetup)[]
+  drivers: { key: 'sandbox' | 'stripe'; fields: string[]; secret: string[] }[]
+  webhook_urls: Record<string, string>
+}
+
 /** What a branch takes (US-07.03). */
 export interface PaymentMethodSettings {
   methods: PaymentMethod[]
@@ -4346,6 +4359,19 @@ export const tenantApi = {
         locale,
         draft,
       })
+    },
+  },
+  /** The online payment gateway (US-07.12). */
+  paymentGateway: {
+    async get(): Promise<PaymentGatewaySettings> {
+      return (await http.get('/api/settings/payment-gateway')).data.data
+    },
+    async update(input: {
+      location_id: number | null
+      driver: string | null
+      credentials: Record<string, string>
+    }): Promise<PaymentGatewaySettings> {
+      return (await http.put('/api/settings/payment-gateway', input)).data.data
     },
   },
   /** Self check-in kiosks of a branch, and clients' kiosk PINs (US-08.05). */

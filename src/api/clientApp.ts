@@ -398,6 +398,7 @@ export interface MyInvoice {
   id: number
   number: string
   status: string
+  location_id: number
   issued_on: string
   due_on: string
   total: number
@@ -935,6 +936,29 @@ export const clientApi = {
   },
   async payments(): Promise<MyPayments> {
     return (await http.get('/api/app/payments')).data.data
+  },
+  /** Paying by card online (US-07.12). */
+  online: {
+    async availability(): Promise<{ available: boolean; location_ids: number[] }> {
+      return (await http.get('/api/app/payments/online')).data.data
+    },
+    async start(input: {
+      invoice_ids: number[]
+      save_card?: boolean
+      return_path?: string
+    }): Promise<{ reference: string; url: string }> {
+      return (await http.post('/api/app/payments/online', input)).data.data
+    },
+    async status(reference: string): Promise<{
+      reference: string
+      status: 'Pending' | 'Succeeded' | 'Failed' | 'Cancelled'
+      amount: number
+      currency: string
+      error: string | null
+      receipt_number: string | null
+    }> {
+      return (await http.get(`/api/app/payments/online/${reference}`)).data.data
+    },
   },
   memberships: {
     async list(): Promise<MyMembership[]> {

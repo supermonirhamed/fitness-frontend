@@ -11,6 +11,7 @@ import Skeleton from 'primevue/skeleton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import ErrorState from '@/components/patterns/ErrorState.vue'
 import NoPermission from '@/components/patterns/NoPermission.vue'
+import PaymentGatewayCard from '@/components/payments/PaymentGatewayCard.vue'
 import SettingRow from '@/components/patterns/SettingRow.vue'
 import SettingsCard from '@/components/patterns/SettingsCard.vue'
 import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
@@ -93,90 +94,100 @@ const roleName = (r: string) => {
 </script>
 
 <template>
-  <SettingsCard v-if="state === 'loading'"><Skeleton height="48px" /></SettingsCard>
-  <SettingsCard v-else-if="state === 'forbidden'"><NoPermission /></SettingsCard>
-  <SettingsCard v-else-if="state === 'error'">
-    <ErrorState :title="t('paymentSettings.loadError')" @retry="load" />
-  </SettingsCard>
-  <form v-else class="stack" @submit.prevent="save">
-    <Message v-if="!canEdit" severity="secondary" :closable="false">{{
-      t('regional.readOnly')
-    }}</Message>
-    <SettingsCard>
-      <div class="settings-group" role="heading" aria-level="3">
-        {{ t('paymentSettings.voiding') }}
-      </div>
-      <SettingRow
-        :label="t('paymentSettings.selfVoidLabel')"
-        :help="t('paymentSettings.selfVoidHelp')"
-        label-for="self-void"
-      >
-        <ToggleSwitch v-model="form.self_void_same_day" input-id="self-void" :disabled="!canEdit" />
-      </SettingRow>
-      <div class="settings-group" role="heading" aria-level="3">
-        {{ t('paymentSettings.refunds') }}
-      </div>
-      <SettingRow
-        :label="t('paymentSettings.sessionRefundLabel')"
-        :help="t('paymentSettings.sessionRefundHelp')"
-        label-for="session-refund"
-      >
-        <Select
-          v-model="form.session_cancel_refund"
-          input-id="session-refund"
-          :options="[
-            { value: 'account_credit', label: t('refunds.toCredit') },
-            { value: 'original', label: t('paymentSettings.originalMethod') },
-            { value: 'none', label: t('paymentSettings.noAutoRefund') },
-          ]"
-          option-label="label"
-          option-value="value"
-          :disabled="!canEdit"
-          class="select"
-        />
-      </SettingRow>
-      <div class="settings-group" role="heading" aria-level="3">
-        {{ t('paymentSettings.overdue') }}
-      </div>
-      <SettingRow
-        :label="t('paymentSettings.overdueBlocksLabel')"
-        :help="t('paymentSettings.overdueBlocksHelp')"
-        label-for="overdue-blocks"
-      >
-        <ToggleSwitch
-          v-model="form.overdue_blocks_booking"
-          input-id="overdue-blocks"
-          :disabled="!canEdit"
-        />
-      </SettingRow>
-      <div class="settings-group" role="heading" aria-level="3">
-        {{ t('paymentSettings.discounts') }}
-      </div>
-      <SettingRow :label="t('paymentSettings.limitsLabel')" :help="t('paymentSettings.limitsHelp')">
-        <ul class="limits">
-          <li v-for="r in roles" :key="r">
-            <label :for="`limit-${r}`">{{ roleName(r) }}</label>
-            <InputNumber
-              v-model="form.manual_discount_limits[r]"
-              :input-id="`limit-${r}`"
-              :min="0"
-              :max="100"
-              suffix="%"
-              :placeholder="t('paymentSettings.noLimit')"
-              :disabled="!canEdit"
-              class="limit"
-            />
-          </li>
-        </ul>
-      </SettingRow>
+  <div class="page">
+    <SettingsCard v-if="state === 'loading'"><Skeleton height="48px" /></SettingsCard>
+    <SettingsCard v-else-if="state === 'forbidden'"><NoPermission /></SettingsCard>
+    <SettingsCard v-else-if="state === 'error'">
+      <ErrorState :title="t('paymentSettings.loadError')" @retry="load" />
     </SettingsCard>
-    <UnsavedBar
-      v-if="canEdit && dirty"
-      :saving="saving"
-      @discard="form = JSON.parse(saved)"
-      @save="save"
-    />
-  </form>
+    <form v-else class="stack" @submit.prevent="save">
+      <Message v-if="!canEdit" severity="secondary" :closable="false">{{
+        t('regional.readOnly')
+      }}</Message>
+      <SettingsCard>
+        <div class="settings-group" role="heading" aria-level="3">
+          {{ t('paymentSettings.voiding') }}
+        </div>
+        <SettingRow
+          :label="t('paymentSettings.selfVoidLabel')"
+          :help="t('paymentSettings.selfVoidHelp')"
+          label-for="self-void"
+        >
+          <ToggleSwitch
+            v-model="form.self_void_same_day"
+            input-id="self-void"
+            :disabled="!canEdit"
+          />
+        </SettingRow>
+        <div class="settings-group" role="heading" aria-level="3">
+          {{ t('paymentSettings.refunds') }}
+        </div>
+        <SettingRow
+          :label="t('paymentSettings.sessionRefundLabel')"
+          :help="t('paymentSettings.sessionRefundHelp')"
+          label-for="session-refund"
+        >
+          <Select
+            v-model="form.session_cancel_refund"
+            input-id="session-refund"
+            :options="[
+              { value: 'account_credit', label: t('refunds.toCredit') },
+              { value: 'original', label: t('paymentSettings.originalMethod') },
+              { value: 'none', label: t('paymentSettings.noAutoRefund') },
+            ]"
+            option-label="label"
+            option-value="value"
+            :disabled="!canEdit"
+            class="select"
+          />
+        </SettingRow>
+        <div class="settings-group" role="heading" aria-level="3">
+          {{ t('paymentSettings.overdue') }}
+        </div>
+        <SettingRow
+          :label="t('paymentSettings.overdueBlocksLabel')"
+          :help="t('paymentSettings.overdueBlocksHelp')"
+          label-for="overdue-blocks"
+        >
+          <ToggleSwitch
+            v-model="form.overdue_blocks_booking"
+            input-id="overdue-blocks"
+            :disabled="!canEdit"
+          />
+        </SettingRow>
+        <div class="settings-group" role="heading" aria-level="3">
+          {{ t('paymentSettings.discounts') }}
+        </div>
+        <SettingRow
+          :label="t('paymentSettings.limitsLabel')"
+          :help="t('paymentSettings.limitsHelp')"
+        >
+          <ul class="limits">
+            <li v-for="r in roles" :key="r">
+              <label :for="`limit-${r}`">{{ roleName(r) }}</label>
+              <InputNumber
+                v-model="form.manual_discount_limits[r]"
+                :input-id="`limit-${r}`"
+                :min="0"
+                :max="100"
+                suffix="%"
+                :placeholder="t('paymentSettings.noLimit')"
+                :disabled="!canEdit"
+                class="limit"
+              />
+            </li>
+          </ul>
+        </SettingRow>
+      </SettingsCard>
+      <UnsavedBar
+        v-if="canEdit && dirty"
+        :saving="saving"
+        @discard="form = JSON.parse(saved)"
+        @save="save"
+      />
+    </form>
+    <PaymentGatewayCard v-if="state === 'ready'" :can-edit="canEdit" />
+  </div>
 </template>
 
 <style scoped>
@@ -205,5 +216,15 @@ const roleName = (r: string) => {
 }
 .limit {
   width: 120px;
+}
+.limit :deep(input) {
+  width: 100%;
+  min-width: 0;
+}
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 </style>
