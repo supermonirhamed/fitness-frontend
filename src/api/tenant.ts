@@ -1410,6 +1410,8 @@ export interface Client {
   /** A health note exists (US-05.03); reading it needs clients.health_view. */
   has_health_notes: boolean
   photo_url: string | null
+  /** Mobile and PIN work at the self check-in kiosk (US-08.05). */
+  has_kiosk_pin?: boolean
   created_at: string | null
 }
 
@@ -3463,6 +3465,18 @@ export interface StaffInboxItem {
   read: boolean
   at: string | null
 }
+/** A self check-in kiosk at a branch (US-08.05). */
+export interface KioskDevice {
+  id: number
+  name: string
+  created_by: string | null
+  created_at: string | null
+  last_seen_at: string | null
+  revoked: boolean
+  /** Only right after it is added: the device token, and the link that pairs the kiosk. */
+  token?: string
+  url?: string
+}
 /** How a staff user gets their alerts (US-12.15). */
 export interface AlertPreferences {
   email: boolean
@@ -4332,6 +4346,21 @@ export const tenantApi = {
         locale,
         draft,
       })
+    },
+  },
+  /** Self check-in kiosks of a branch, and clients' kiosk PINs (US-08.05). */
+  kiosks: {
+    async list(locationId: number): Promise<KioskDevice[]> {
+      return (await http.get(`/api/locations/${locationId}/kiosks`)).data.data
+    },
+    async create(locationId: number, name: string): Promise<KioskDevice> {
+      return (await http.post(`/api/locations/${locationId}/kiosks`, { name })).data.data
+    },
+    async revoke(locationId: number, id: number): Promise<KioskDevice> {
+      return (await http.post(`/api/locations/${locationId}/kiosks/${id}/revoke`)).data.data
+    },
+    async setClientPin(clientId: number, pin: string | null): Promise<{ has_pin: boolean }> {
+      return (await http.put(`/api/clients/${clientId}/kiosk-pin`, { pin })).data.data
     },
   },
   /** The notification log (US-12.14). */

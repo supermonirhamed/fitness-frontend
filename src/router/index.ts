@@ -83,6 +83,13 @@ const tenantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/tenant/WaiverSignView.vue'),
     meta: { permission: 'clients.update' },
   },
+  // The self check-in kiosk (US-08.05): signed in by its device token, never a staff login.
+  {
+    path: '/kiosk',
+    name: 'tenant.kiosk',
+    component: () => import('@/views/kiosk/KioskView.vue'),
+    meta: { link: true, kiosk: true },
+  },
   {
     path: '/forgot-password',
     name: 'tenant.forgot',
@@ -761,6 +768,8 @@ if (context.kind === 'tenant') {
 
   // A session that ends server-side (expired, deactivated) sends the user back to sign in.
   onUnauthenticated(() => {
+    // The kiosk handles its own 401s (an expired kiosk session or an unpaired device).
+    if (router.currentRoute.value.meta.kiosk) return
     if (router.currentRoute.value.matched.some((r) => r.meta.clientApp)) {
       const app = useClientApp()
       if (!app.signedIn) return

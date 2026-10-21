@@ -82,6 +82,8 @@ export interface ClientProfile extends ClientAccount {
     marketing_consent: boolean
     has_photo: boolean
     has_health_notes: boolean
+    /** Mobile and PIN work at the self check-in kiosk (US-08.05). */
+    has_kiosk_pin: boolean
   }
   emergency_contacts: { name: string; relation: string; phone: string }[]
   preferences: Preferences
@@ -766,6 +768,11 @@ export const clientApi = {
     },
     async deletePhoto(): Promise<void> {
       await http.delete('/api/app/profile/photo')
+    },
+    /** The PIN for the self check-in kiosk (US-08.05); null removes it. */
+    async setKioskPin(pin: string | null, confirmation: string | null): Promise<ClientProfile> {
+      return (await http.put('/api/app/profile/kiosk-pin', { pin, pin_confirmation: confirmation }))
+        .data.data
     },
     async requestContactChange(
       field: 'email' | 'mobile',

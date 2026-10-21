@@ -35,6 +35,7 @@ import ClientMembershipsTab from '@/components/clients/ClientMembershipsTab.vue'
 import ClientPaymentsCard from '@/components/clients/ClientPaymentsCard.vue'
 import ClientMessagesTab from '@/components/clients/ClientMessagesTab.vue'
 import ClientNotesTab from '@/components/clients/ClientNotesTab.vue'
+import KioskPinDrawer from '@/components/clients/KioskPinDrawer.vue'
 import MergeClientsDialog from '@/components/clients/MergeClientsDialog.vue'
 import ClientTimeline from '@/components/clients/ClientTimeline.vue'
 import ClientWaiversTab from '@/components/clients/ClientWaiversTab.vue'
@@ -98,6 +99,7 @@ const statusMenu = ref<InstanceType<typeof Menu>>()
 const statusAction = ref<'deactivate' | 'reactivate' | 'block' | 'unblock' | null>(null)
 const anonymizeOpen = ref(false)
 const mergeOpen = ref(false)
+const pinOpen = ref(false)
 function onMerged(merged: Client) {
   client.value = merged
   toast.add({ severity: 'success', summary: t('merge.done'), life: 4000 })
@@ -113,7 +115,16 @@ const statusItems = computed(() => {
     icon: `pi ${icon}`,
     command: () => (statusAction.value = action),
   })
+  // Kiosk PIN (US-08.05) for front-desk staff too; the rest needs clients.delete.
+  const pinItem = {
+    label: t('kioskPin.title'),
+    icon: 'pi pi-key',
+    command: () => (pinOpen.value = true),
+  }
+  if (!canManage.value)
+    return auth.can('clients.update') && !client.value?.anonymized ? [pinItem] : []
   return [
+    pinItem,
     ...(s === 'Blocked' ? [item('unblock', 'pi-unlock')] : [item('block', 'pi-ban')]),
     ...(s === 'Inactive'
       ? [item('reactivate', 'pi-replay')]
@@ -444,7 +455,7 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
               disabled
             />
           </span>
-          <template v-if="canManage">
+          <template v-if="statusItems.length">
             <Button
               icon="pi pi-ellipsis-v"
               severity="secondary"
@@ -732,6 +743,12 @@ const PAYMENT_SEVERITY = { unpaid: 'danger', partial: 'warn', paid: 'success' } 
       </Tabs>
     </template>
 
+    <KioskPinDrawer
+      v-if="client"
+      v-model:visible="pinOpen"
+      :client="client"
+      @changed="(has: boolean) => client && (client.has_kiosk_pin = has)"
+    />
     <MergeClientsDialog
       v-if="client"
       v-model:visible="mergeOpen"

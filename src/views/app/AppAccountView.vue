@@ -176,6 +176,19 @@ async function uploadPhoto(event: Event) {
     failed(e)
   }
 }
+// The PIN for the self check-in kiosk (US-08.05), used with the mobile number.
+const kioskPin = ref('')
+const kioskPinConfirm = ref('')
+async function saveKioskPin(pin: string | null) {
+  try {
+    adopt(await clientApi.profile.setKioskPin(pin, pin === null ? null : kioskPinConfirm.value))
+    kioskPin.value = ''
+    kioskPinConfirm.value = ''
+    saved(pin ? t('kioskPin.saved') : t('kioskPin.cleared'))
+  } catch (e) {
+    failed(e)
+  }
+}
 async function removePhoto() {
   await clientApi.profile.deletePhoto().catch(failed)
   await load()
@@ -509,6 +522,54 @@ onMounted(async () => {
           />
         </div>
       </section>
+
+      <form class="ca-card ca-form" @submit.prevent="saveKioskPin(kioskPin)">
+        <h2 class="ca-subtitle">{{ t('kioskPin.title') }}</h2>
+        <p class="ca-muted ca-small">
+          {{ t('kioskPin.help') }}
+          {{ profile.profile.has_kiosk_pin ? t('kioskPin.has') : t('kioskPin.none') }}
+        </p>
+        <FormField :label="t('kioskPin.pin')" for="app-kiosk-pin">
+          <InputText
+            id="app-kiosk-pin"
+            v-model="kioskPin"
+            type="password"
+            inputmode="numeric"
+            maxlength="6"
+            autocomplete="off"
+            dir="ltr"
+            fluid
+          />
+        </FormField>
+        <FormField :label="t('kioskPin.confirm')" for="app-kiosk-pin-confirm">
+          <InputText
+            id="app-kiosk-pin-confirm"
+            v-model="kioskPinConfirm"
+            type="password"
+            inputmode="numeric"
+            maxlength="6"
+            autocomplete="off"
+            dir="ltr"
+            fluid
+          />
+        </FormField>
+        <div class="ca-row">
+          <Button
+            type="submit"
+            :label="profile.profile.has_kiosk_pin ? t('kioskPin.change') : t('kioskPin.set')"
+            size="small"
+            :disabled="!/^\d{4,6}$/.test(kioskPin)"
+          />
+          <Button
+            v-if="profile.profile.has_kiosk_pin"
+            :label="t('kioskPin.clear')"
+            variant="text"
+            severity="danger"
+            size="small"
+            @click="saveKioskPin(null)"
+          />
+        </div>
+      </form>
 
       <section class="ca-card ca-form">
         <h2 class="ca-subtitle">{{ t('app.account.emergency') }}</h2>

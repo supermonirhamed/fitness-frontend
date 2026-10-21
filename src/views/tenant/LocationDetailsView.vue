@@ -26,6 +26,7 @@ import StatusBanner from '@/components/patterns/StatusBanner.vue'
 import UnsavedBar from '@/components/patterns/UnsavedBar.vue'
 import ZoneBadge from '@/components/patterns/ZoneBadge.vue'
 import CheckInQrDialog from '@/components/locations/CheckInQrDialog.vue'
+import KioskDevicesDrawer from '@/components/locations/KioskDevicesDrawer.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import StatusTag from '@/components/patterns/StatusTag.vue'
 import BusinessHoursEditor from '@/components/locations/BusinessHoursEditor.vue'
@@ -131,6 +132,7 @@ const archiveOpen = ref(false)
 const archiving = ref(false)
 const archiveError = ref<string | null>(null)
 const qrOpen = ref(false)
+const kiosksOpen = ref(false)
 const moreItems = computed<MenuItem[]>(() => {
   const l = location.value
   if (!l) return []
@@ -139,9 +141,15 @@ const moreItems = computed<MenuItem[]>(() => {
     icon: 'pi pi-qrcode',
     command: () => (qrOpen.value = true),
   }
-  if (!canChangeStatus.value) return [qr]
+  const kiosks: MenuItem = {
+    label: t('kioskDevices.title'),
+    icon: 'pi pi-tablet',
+    command: () => (kiosksOpen.value = true),
+  }
+  if (!canChangeStatus.value) return canEdit.value ? [qr, kiosks] : [qr]
   return [
     qr,
+    kiosks,
     l.status === 'Active'
       ? {
           label: t('deactivateLocation.action'),
@@ -383,6 +391,12 @@ async function refreshStats() {
           <Button icon="pi pi-pencil" :label="t('common.edit')" @click="formOpen = true" />
         </template>
       </PageHeader>
+      <KioskDevicesDrawer
+        v-model:visible="kiosksOpen"
+        :location-id="location.id"
+        :location-name="location.name"
+        :can-edit="canEdit"
+      />
       <CheckInQrDialog
         v-model:visible="qrOpen"
         :location-id="location.id"
