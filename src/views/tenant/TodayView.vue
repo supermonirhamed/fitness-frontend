@@ -4,8 +4,15 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import EmptyState from '@/components/patterns/EmptyState.vue'
-import { tenantApi, type Invoice, type InvoiceTotals, type UncoveredBooking } from '@/api/tenant'
+import {
+  tenantApi,
+  type Invoice,
+  type InvoiceTotals,
+  type StaffInboxItem,
+  type UncoveredBooking,
+} from '@/api/tenant'
 import { useFormat } from '@/composables/useFormat'
+import { useStaffInboxText } from '@/composables/useStaffInboxText'
 import { useStaffAuth } from '@/stores/staffAuth'
 
 const { t, d, locale } = useI18n()
@@ -60,6 +67,18 @@ async function loadOverdue() {
 }
 onMounted(loadOverdue)
 watch(() => auth.currentLocation?.id, loadOverdue)
+
+// The Alerts Center (Breakdown §2, US-12.15): the user's unread staff alerts, urgent first.
+const alertText = useStaffInboxText()
+const alerts = ref<StaffInboxItem[]>([])
+onMounted(async () => {
+  alerts.value = await tenantApi.staffInbox.alerts().catch(() => [])
+})
+async function dismiss(ids?: number[]) {
+  const gone = ids ?? alerts.value.map((a) => a.id)
+  alerts.value = alerts.value.filter((a) => !gone.includes(a.id))
+  await tenantApi.staffInbox.read(gone).catch(() => undefined)
+}
 </script>
 
 <template>
@@ -77,6 +96,48 @@ watch(() => auth.currentLocation?.id, loadOverdue)
           @click="$router.push({ name: 'tenant.branches', query: { new: '1' } })"
         />
       </EmptyState>
+    </section>
+    <section v-if="alerts.length" class="card uncovered" :aria-label="t('today.alertsTitle')">
+      <header class="uncovered__head">
+        <i class="pi pi-bell" aria-hidden="true" />
+        <div>
+          <h2>{{ t('today.alertsTitle') }}</h2>
+          <p>{{ t('today.alertsHint') }}</p>
+        </div>
+        <Button
+          :label="t('today.dismissAll')"
+          variant="text"
+          size="small"
+          class="see-all"
+          @click="dismiss()"
+        />
+      </header>
+      <ul>
+        <li v-for="a in alerts" :key="a.id" class="alert">
+          <i
+            :class="['pi', a.urgent ? 'pi-exclamation-circle urgent' : 'pi-info-circle muted']"
+            aria-hidden="true"
+          />
+          <RouterLink
+            v-if="typeof a.data.link === 'string'"
+            :to="a.data.link"
+            class="alert__text"
+            @click="dismiss([a.id])"
+            >{{ alertText(a) }}</RouterLink
+          >
+          <span v-else class="alert__text">{{ alertText(a) }}</span>
+          <span class="muted">{{ a.at ? format.dateTime(a.at) : '' }}</span>
+          <Button
+            icon="pi pi-check"
+            variant="text"
+            size="small"
+            severity="secondary"
+            rounded
+            :aria-label="t('today.dismiss')"
+            @click="dismiss([a.id])"
+          />
+        </li>
+      </ul>
     </section>
     <section v-if="overdue?.data.length" class="card uncovered">
       <header class="uncovered__head">
@@ -191,6 +252,19 @@ watch(() => auth.currentLocation?.id, loadOverdue)
   padding: 8px 0;
   border-top: 1px solid var(--border-subtle, var(--border-default));
   font: var(--text-small);
+}
+.uncovered li.alert {
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+}
+.alert__text {
+  color: var(--text-primary);
+}
+a.alert__text:hover {
+  text-decoration: underline;
+}
+.urgent {
+  color: var(--sev-warn-solid);
 }
 .who {
   font-weight: 600;

@@ -302,6 +302,8 @@ export interface Service {
   slot_interval: number | null
   /** Its own booking reminder times, hours before (US-12.08); null: the organization's. */
   reminder_hours?: number[] | null
+  /** Managers are alerted when a session is below it a day before (US-12.15). */
+  min_attendees?: number | null
   /** How it can be paid for (US-02.08). */
   allow_membership: boolean
   allow_package: boolean
@@ -342,6 +344,8 @@ export interface ServiceInput {
   buffer_after: number | null
   slot_interval?: number | null
   reminder_hours?: number[] | null
+  /** Managers are alerted when a session is below it a day before (US-12.15). */
+  min_attendees?: number | null
   allow_membership: boolean
   allow_package: boolean
   allow_drop_in: boolean
@@ -3441,9 +3445,21 @@ export interface BroadcastPreview {
 export interface StaffInboxItem {
   id: number
   kind: string
+  /** Staff alerts (US-12.15) carry a `link` to where to act. */
   data: Record<string, unknown>
+  urgent?: boolean
   read: boolean
   at: string | null
+}
+/** How a staff user gets their alerts (US-12.15). */
+export interface AlertPreferences {
+  email: boolean
+  in_app: boolean
+  digest: boolean
+  /** Alerts turned off. */
+  off: string[]
+  /** The alerts that concern this user. */
+  kinds: { key: string; audience: 'coach' | 'manager'; urgent: boolean }[]
 }
 
 export const tenantApi = {
@@ -4364,6 +4380,16 @@ export const tenantApi = {
     async read(ids?: number[]): Promise<number> {
       return (await http.post('/api/account/notifications/read', ids ? { ids } : {})).data.data
         .unread
+    },
+    /** The dashboard's Alerts Center (US-12.15). */
+    async alerts(): Promise<StaffInboxItem[]> {
+      return (await http.get('/api/account/alerts')).data.data
+    },
+    async preferences(): Promise<AlertPreferences> {
+      return (await http.get('/api/account/alert-preferences')).data.data
+    },
+    async updatePreferences(input: Omit<AlertPreferences, 'kinds'>): Promise<AlertPreferences> {
+      return (await http.put('/api/account/alert-preferences', input)).data.data
     },
   },
   paymentSettings: {

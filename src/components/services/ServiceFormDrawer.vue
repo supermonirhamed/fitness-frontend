@@ -68,6 +68,7 @@ const blank = (): ServiceInput => ({
   buffer_after: 0,
   slot_interval: null,
   reminder_hours: null,
+  min_attendees: null,
   allow_membership: false,
   allow_package: false,
   allow_drop_in: true,
@@ -190,6 +191,7 @@ watch(visible, (open) => {
           buffer_after: s.buffer_after,
           slot_interval: s.slot_interval,
           reminder_hours: s.reminder_hours ?? null,
+          min_attendees: s.min_attendees ?? null,
           allow_membership: s.allow_membership,
           allow_package: s.allow_package,
           allow_drop_in: s.allow_drop_in,
@@ -239,6 +241,7 @@ async function submit() {
   const input: ServiceInput = {
     ...form,
     default_capacity: openAccess.value ? null : form.default_capacity,
+    min_attendees: openAccess.value ? null : form.min_attendees,
     status: editing.value ? form.status : form.status,
     equipment_notes: form.equipment_notes || null,
     locations,
@@ -380,6 +383,21 @@ async function submit() {
           />
           <small :class="err('default_capacity') ? 'error' : 'hint'">{{
             err('default_capacity') ?? t('catalog.capacityHint')
+          }}</small>
+        </div>
+        <div v-if="!openAccess" class="field">
+          <label for="service-min-attendees">{{ t('catalog.minAttendees') }}</label>
+          <InputNumber
+            v-model="form.min_attendees"
+            input-id="service-min-attendees"
+            :min="1"
+            :max="form.default_capacity ?? 10000"
+            :placeholder="t('catalog.noMinimum')"
+            :invalid="!!err('min_attendees')"
+            fluid
+          />
+          <small :class="err('min_attendees') ? 'error' : 'hint'">{{
+            err('min_attendees') ?? t('catalog.minAttendeesHint')
           }}</small>
         </div>
       </div>

@@ -6,10 +6,14 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import OverlayBadge from 'primevue/overlaybadge'
 import Popover from 'primevue/popover'
+import { useRouter } from 'vue-router'
 import { tenantApi, type StaffInboxItem } from '@/api/tenant'
 import { useFormat } from '@/composables/useFormat'
+import { useStaffInboxText } from '@/composables/useStaffInboxText'
 
-const { t, te } = useI18n()
+const { t } = useI18n()
+const router = useRouter()
+const text = useStaffInboxText()
 const format = useFormat()
 const items = ref<StaffInboxItem[]>([])
 const unread = ref(0)
@@ -38,10 +42,10 @@ async function toggle(event: Event) {
   await refresh()
   if (unread.value) unread.value = await tenantApi.staffInbox.read().catch(() => unread.value)
 }
-function text(item: StaffInboxItem): string {
-  return te(`staffInbox.kinds.${item.kind}`)
-    ? t(`staffInbox.kinds.${item.kind}`, item.data as Record<string, unknown>)
-    : item.kind
+function open(item: StaffInboxItem) {
+  if (typeof item.data.link !== 'string') return
+  panel.value?.hide()
+  router.push(item.data.link)
 }
 </script>
 
@@ -71,7 +75,16 @@ function text(item: StaffInboxItem): string {
       <p v-if="loaded && !items.length" class="muted small">{{ t('staffInbox.none') }}</p>
       <ul v-else>
         <li v-for="item in items" :key="item.id" :class="{ unread: !item.read }">
-          <span>{{ text(item) }}</span>
+          <button
+            v-if="typeof item.data.link === 'string'"
+            type="button"
+            class="link"
+            @click="open(item)"
+          >
+            <i v-if="item.urgent" class="pi pi-exclamation-circle urgent" aria-hidden="true" />
+            {{ text(item) }}
+          </button>
+          <span v-else>{{ text(item) }}</span>
           <span class="muted small">{{ item.at ? format.dateTime(item.at) : '' }}</span>
         </li>
       </ul>
@@ -100,8 +113,24 @@ li {
   padding: 8px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
-li.unread > span:first-child {
+li.unread > :first-child {
   font-weight: 600;
+}
+.link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.link:hover {
+  text-decoration: underline;
+}
+.urgent {
+  color: var(--sev-warn-solid);
+  font-size: 12px;
 }
 .muted {
   color: var(--text-muted);

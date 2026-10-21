@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import RadioButton from 'primevue/radiobutton'
+import AlertPreferencesCard from '@/components/account/AlertPreferencesCard.vue'
 import PageHeader from '@/components/patterns/PageHeader.vue'
 import { tenantApi } from '@/api/tenant'
 import { resolveLocale, setLocale, type Locale } from '@/i18n'
@@ -96,6 +97,8 @@ async function save() {
         />
       </div>
     </form>
+
+    <AlertPreferencesCard />
   </div>
 </template>
 
